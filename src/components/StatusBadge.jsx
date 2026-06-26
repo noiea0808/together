@@ -1,16 +1,12 @@
-const CONFIG = {
-  점심:  { label: '점심 가능', color: 'var(--color-status-lunch)' },
-  저녁:  { label: '저녁 가능', color: 'var(--color-status-dinner)' },
-  커피:  { label: '커피만',    color: 'var(--color-status-coffee)' },
-  패스:  { label: '패스',      color: 'var(--color-status-pass)' },
-}
+import { SLOT_STATUS_OPTIONS } from '../mock/data'
 
 export default function StatusBadge({ status }) {
   if (!status) return <span style={styles.empty}>미설정</span>
-  const c = CONFIG[status]
+  const opt = SLOT_STATUS_OPTIONS.find(o => o.key === status)
+  if (!opt) return <span style={styles.empty}>미설정</span>
   return (
-    <span style={{ ...styles.badge, background: c.color + '22', color: c.color, border: `1px solid ${c.color}44` }}>
-      {c.label}
+    <span style={{ ...styles.badge, background: opt.color + '22', color: opt.color, border: `1px solid ${opt.color}44` }}>
+      {opt.emoji} {opt.label}
     </span>
   )
 }

@@ -1,212 +1,410 @@
-import { useState } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { ME, GROUPS, MEMBERS, STATUSES, POTS } from '../mock/data'
-import StatusBadge from '../components/StatusBadge'
+import { useUser } from '../lib/UserContext'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus } from '../lib/db'
+import { supabase } from '../lib/supabase'
+import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
 
-const STATUS_OPTIONS = [
-  { key: '점심', emoji: '🍱', color: 'var(--color-status-lunch)' },
-  { key: '저녁', emoji: '🍽️', color: 'var(--color-status-dinner)' },
-  { key: '커피', emoji: '☕', color: 'var(--color-status-coffee)' },
-  { key: '패스', emoji: '🙅', color: 'var(--color-status-pass)' },
-]
+const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
+
+function toDateStr(date) {
+  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
+}
+function formatDate(date) {
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+}
+function addDays(date, n) {
+  const d = new Date(date); d.setDate(d.getDate() + n); return d
+}
+const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+
+function sortPots(pots) {
+  const byTime = (a, b) => a.meal_time.localeCompare(b.meal_time)
+  return [
+    ...pots.filter(p => p.is_default).sort(byTime),
+    ...pots.filter(p => !p.is_default).sort(byTime),
+  ]
+}
 
 export default function TodayPage() {
   const navigate = useNavigate()
-  const [myStatus, setMyStatus] = useState(null)
+  const { user } = useUser()
 
-  const getStatus = (groupId, userId) => {
-    if (userId === ME.id) return myStatus
-    return STATUSES[groupId]?.find(s => s.user_id === userId)?.status ?? null
+  const [currentDate, setCurrentDate] = useState(TODAY)
+  const [selectedSlot, setSelectedSlot] = useState('점심')
+  const [openDropdown, setOpenDropdown] = useState(null)
+
+  const [groups, setGroups] = useState([])
+  const [membersMap, setMembersMap] = useState({})   // groupId -> members[]
+  const [statusesMap, setStatusesMap] = useState({}) // groupId -> statuses[]
+  const [potsMap, setPotsMap] = useState({})         // groupId -> pots[]
+  const [loading, setLoading] = useState(true)
+
+  // 내 슬롯 상태: { slot -> { status, time, menu } }
+  // statusesMap에서 user.id 기준으로 파생하지 않고 별도 관리 (낙관적 업데이트)
+  const [mySlots, setMySlots] = useState({})
+
+  const dateStr = toDateStr(currentDate)
+  const isToday = currentDate.getTime() === TODAY.getTime()
+
+  // 데이터 로드
+  const loadData = useCallback(async () => {
+    if (!user) return
+    setLoading(true)
+    try {
+      const myGroups = await getMyGroups(user.id)
+      if (myGroups.length === 0) {
+        navigate('/group-setup', { replace: true })
+        return
+      }
+      setGroups(myGroups)
+
+      const [membersResults, statusResults, potResults] = await Promise.all([
+        Promise.all(myGroups.map(g => getGroupMembers(g.id).then(m => [g.id, m]))),
+        Promise.all(myGroups.map(g => getGroupStatuses(g.id, dateStr).then(s => [g.id, s]))),
+        Promise.all(myGroups.map(g => getGroupPots(g.id, dateStr).then(p => [g.id, p]))),
+      ])
+
+      const newMembersMap = Object.fromEntries(membersResults)
+      const newStatusesMap = Object.fromEntries(statusResults)
+      const newPotsMap = Object.fromEntries(potResults)
+
+      setMembersMap(newMembersMap)
+      setStatusesMap(newStatusesMap)
+      setPotsMap(newPotsMap)
+
+      // 내 상태 초기화 (첫 번째 그룹 기준)
+      const firstGroupId = myGroups[0]?.id
+      if (firstGroupId) {
+        const myStatuses = newStatusesMap[firstGroupId]?.filter(s => s.user_id === user.id) ?? []
+        const slots = {}
+        myStatuses.forEach(s => {
+          slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
+        })
+        setMySlots(slots)
+      }
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLoading(false)
+    }
+  }, [user, dateStr, navigate])
+
+  useEffect(() => { loadData() }, [loadData])
+
+  // 실시간 구독 — 상태/밥팟 변경 시 해당 그룹 데이터만 재로드
+  const groupsRef = useRef([])
+  useEffect(() => { groupsRef.current = groups }, [groups])
+
+  useEffect(() => {
+    if (!user) return
+
+    const reloadGroup = async (groupId) => {
+      const [statuses, pots] = await Promise.all([
+        getGroupStatuses(groupId, dateStr),
+        getGroupPots(groupId, dateStr),
+      ])
+      setStatusesMap(prev => ({ ...prev, [groupId]: statuses }))
+      setPotsMap(prev => ({ ...prev, [groupId]: pots }))
+    }
+
+    const statusSub = supabase
+      .channel('daily_status_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_status' },
+        (payload) => {
+          const groupId = payload.new?.group_id ?? payload.old?.group_id
+          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
+            reloadGroup(groupId)
+          }
+        }
+      )
+      .subscribe()
+
+    const potSub = supabase
+      .channel('pot_changes')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_pots' },
+        (payload) => {
+          const groupId = payload.new?.group_id ?? payload.old?.group_id
+          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
+            reloadGroup(groupId)
+          }
+        }
+      )
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pot_members' },
+        () => {
+          groupsRef.current.forEach(g => reloadGroup(g.id))
+        }
+      )
+      .subscribe()
+
+    return () => {
+      supabase.removeChannel(statusSub)
+      supabase.removeChannel(potSub)
+    }
+  }, [user, dateStr])
+
+  useEffect(() => {
+    const close = () => setOpenDropdown(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [])
+
+  const setSlotStatus = async (slot, statusKey) => {
+    setMySlots(prev => ({ ...prev, [slot]: { ...(prev[slot] ?? {}), status: statusKey } }))
+    setOpenDropdown(null)
+    // 모든 내 그룹에 상태 저장
+    for (const g of groups) {
+      await upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot, status: statusKey, meal_time: mySlots[slot]?.time, menu: mySlots[slot]?.menu })
+    }
+  }
+
+  const setSlotField = async (slot, key, val) => {
+    const updated = { ...(mySlots[slot] ?? {}), [key]: val }
+    setMySlots(prev => ({ ...prev, [slot]: updated }))
+    if (updated.status) {
+      for (const g of groups) {
+        await upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot, status: updated.status, meal_time: updated.time, menu: updated.menu })
+      }
+    }
+  }
+
+  const clearSlot = async (slot) => {
+    setMySlots(prev => { const n = { ...prev }; delete n[slot]; return n })
+    setOpenDropdown(null)
+    for (const g of groups) {
+      await deleteStatus({ userId: user.id, groupId: g.id, date: dateStr, slot })
+    }
+  }
+
+  if (loading) {
+    return <div style={styles.loadingPage}>🍚<br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
   return (
     <div style={styles.page}>
-      {/* 날짜 헤더 */}
-      <div style={styles.header}>
-        <div style={styles.date}>
-          {new Date().toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })}
+      {/* 날짜 네비 */}
+      <div style={styles.dateNav}>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>←</button>
+        <div style={styles.dateText}>
+          <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
+          {isToday && <span style={styles.todayBadge}>오늘</span>}
         </div>
-        <button style={styles.settingBtn} onClick={() => navigate('/group')}>⚙️</button>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
       </div>
 
-      {/* 내 상태 — 전역 고정 */}
-      <div style={styles.myStatusCard}>
-        <div style={styles.myStatusTitle}>
-          오늘 나는
-          {myStatus && <StatusBadge status={myStatus} />}
-        </div>
-        <div style={styles.statusGrid}>
-          {STATUS_OPTIONS.map(opt => (
-            <button
-              key={opt.key}
-              style={{
-                ...styles.statusBtn,
-                borderColor: myStatus === opt.key ? opt.color : 'var(--color-border)',
-                background: myStatus === opt.key ? opt.color + '18' : 'transparent',
-                color: myStatus === opt.key ? opt.color : 'var(--color-text)',
-              }}
-              onClick={() => setMyStatus(myStatus === opt.key ? null : opt.key)}
-            >
-              <span style={styles.statusEmoji}>{opt.emoji}</span>
-              <span style={styles.statusLabel}>{opt.key}</span>
-            </button>
-          ))}
+      {/* 내 슬롯 그리드 */}
+      <div style={styles.myCard}>
+        <div style={styles.myCardTitle}>오늘 나는</div>
+        <div style={styles.slotGrid}>
+          {SLOT_ORDER.map(slot => {
+            const data = mySlots[slot]
+            const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+            const isSelected = selectedSlot === slot
+            const isDropOpen = openDropdown === slot
+
+            return (
+              <div
+                key={slot}
+                style={{
+                  ...styles.slotCard,
+                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  borderWidth: isSelected ? 2 : 1.5,
+                  background: opt ? opt.color + '0d' : 'var(--color-surface)',
+                }}
+                onClick={() => setSelectedSlot(slot)}
+              >
+                <div style={styles.slotName}>{slot}</div>
+
+                <div style={styles.slotStatusLayer}>
+                  <button
+                    style={{
+                      ...styles.slotStatusBtn,
+                      color: opt ? opt.color : 'var(--color-text-muted)',
+                      borderColor: opt ? opt.color + '55' : 'var(--color-border)',
+                      background: opt ? opt.color + '12' : 'var(--color-surface-2)',
+                    }}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setSelectedSlot(slot)
+                      setOpenDropdown(prev => prev === slot ? null : slot)
+                    }}
+                  >
+                    {opt ? <>{opt.emoji} {opt.label}</> : <span style={{ fontSize: 11 }}>+ 상태설정</span>}
+                  </button>
+
+                  {isDropOpen && (
+                    <div style={styles.dropdown} onClick={e => e.stopPropagation()}>
+                      {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
+                        <button
+                          key={o.key}
+                          style={{
+                            ...styles.dropItem,
+                            background: data?.status === o.key ? o.color + '18' : 'transparent',
+                            color: data?.status === o.key ? o.color : 'var(--color-text)',
+                            fontWeight: data?.status === o.key ? 700 : 400,
+                          }}
+                          onClick={() => setSlotStatus(slot, o.key)}
+                        >
+                          {o.emoji} {o.label}
+                        </button>
+                      ))}
+                      {data?.status && (
+                        <button
+                          style={{ ...styles.dropItem, color: 'var(--color-text-muted)', borderTop: '1px solid var(--color-border)', fontSize: 11 }}
+                          onClick={() => clearSlot(slot)}
+                        >
+                          ✕ 초기화
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                <div style={styles.slotDetailLayer} onClick={e => e.stopPropagation()}>
+                  <input
+                    type="time"
+                    style={styles.slotTimeInput}
+                    value={data?.time ?? ''}
+                    onChange={e => setSlotField(slot, 'time', e.target.value)}
+                    disabled={!data?.status}
+                  />
+                  <input
+                    style={styles.slotMenuInput}
+                    placeholder="메뉴"
+                    value={data?.menu ?? ''}
+                    onChange={e => setSlotField(slot, 'menu', e.target.value)}
+                    maxLength={10}
+                    disabled={!data?.status}
+                  />
+                </div>
+              </div>
+            )
+          })}
         </div>
       </div>
 
-      {/* 그룹 카드 목록 */}
-      {GROUPS.map(group => (
-        <GroupCard
-          key={group.id}
-          group={group}
-          members={MEMBERS[group.id] ?? []}
-          pots={POTS[group.id] ?? []}
-          getStatus={(uid) => getStatus(group.id, uid)}
-          onNavigate={navigate}
-        />
-      ))}
+      {/* 그룹별 현황 */}
+      <div style={styles.sectionTitle}>{selectedSlot} 현황</div>
+      {groups.map(group => {
+        const members = membersMap[group.id] ?? []
+        const statuses = statusesMap[group.id] ?? []
+        const pots = sortPots((potsMap[group.id] ?? []).filter(p => p.slot === selectedSlot))
+        return (
+          <GroupSlotCard
+            key={group.id}
+            group={group}
+            slot={selectedSlot}
+            members={members}
+            statuses={statuses}
+            pots={pots}
+            myUserId={user.id}
+            mySlotData={mySlots[selectedSlot]}
+            onNavigate={navigate}
+            onRefresh={loadData}
+          />
+        )
+      })}
 
-      {/* 그룹 추가 */}
-      <button style={styles.addGroupBtn}>
+      <button style={styles.addGroupBtn} onClick={() => navigate('/group-setup')}>
         + 그룹 만들기 / 참여하기
       </button>
     </div>
   )
 }
 
-function GroupCard({ group, members, pots, getStatus, onNavigate }) {
-  const [collapsed, setCollapsed] = useState(false)
+function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, onNavigate, onRefresh }) {
+  const getMemberData = (userId) => {
+    if (userId === myUserId) return mySlotData ?? null
+    return statuses.find(s => s.user_id === userId && s.slot === slot) ?? null
+  }
+
+  const hasActivity = members.some(m => getMemberData(m.id)?.status) || pots.length > 0
 
   return (
-    <div style={styles.groupCard}>
-      <div style={styles.groupHeader} onClick={() => setCollapsed(c => !c)}>
-        <span style={styles.groupName}>{group.emoji} {group.name}</span>
-        <div style={styles.groupHeaderRight}>
-          <span style={styles.memberCount}>{members.length}명</span>
-          <span style={styles.collapseIcon}>{collapsed ? '▸' : '▾'}</span>
-        </div>
+    <div style={{ ...styles.groupCard, opacity: hasActivity ? 1 : 0.45 }}>
+      <div style={styles.groupHeader}>
+        <span style={styles.groupName}>{group.name}</span>
+        {hasActivity && <span style={styles.activityDot} />}
       </div>
 
-      {!collapsed && (
-        <>
-          {/* 멤버 상태 */}
-          <div style={styles.memberList}>
-            {members.map(member => (
-              <div key={member.id} style={styles.memberRow}>
-                <div style={styles.avatar}>{member.nickname[0]}</div>
-                <span style={styles.memberName}>
-                  {member.nickname}{member.id === ME.id ? ' (나)' : ''}
-                </span>
-                <StatusBadge status={getStatus(member.id)} />
+      <div style={styles.memberList}>
+        {members.map(member => {
+          const data = getMemberData(member.id)
+          const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+          return (
+            <div key={member.id} style={styles.memberRow}>
+              <div style={{ ...styles.avatar, background: member.id === myUserId ? 'var(--color-primary)' : '#888' }}>
+                {member.nickname[0]}
               </div>
-            ))}
-          </div>
-
-          {/* 밥팟 */}
-          {pots.length > 0 && (
-            <div style={styles.potsSection}>
-              <div style={styles.potsSectionTitle}>열린 밥팟</div>
-              <div style={styles.potList}>
-                {pots.map(pot => <PotCard key={pot.id} pot={pot} />)}
+              <span style={styles.memberName}>
+                {member.nickname}{member.id === myUserId ? ' (나)' : ''}
+              </span>
+              <div style={styles.memberInfo}>
+                {data?.meal_time && <span style={styles.memberMeta}>{data.meal_time.slice(0, 5)}</span>}
+                {data?.meal_time && data?.menu && <span style={styles.metaDot}>·</span>}
+                {data?.menu && <span style={styles.memberMeta}>{data.menu}</span>}
+                {opt && (data?.meal_time || data?.menu) && <span style={styles.metaDot}>·</span>}
+                {opt
+                  ? <span style={{ ...styles.memberStatus, color: opt.color }}>{opt.emoji} {opt.label}</span>
+                  : <span style={styles.memberStatusEmpty}>미설정</span>
+                }
               </div>
             </div>
-          )}
+          )
+        })}
+      </div>
 
-          <button
-            style={styles.createPotBtn}
-            onClick={() => onNavigate('/create')}
-          >
-            + 밥팟 만들기
-          </button>
-        </>
+      {pots.length > 0 && (
+        <div style={styles.potsArea}>
+          <div style={styles.potsLabel}>열린 밥팟</div>
+          {pots.map(pot => <PotCard key={pot.id} pot={pot} />)}
+        </div>
       )}
+
+      <button style={styles.createBtn} onClick={() => onNavigate('/create')}>
+        + 밥팟 만들기
+      </button>
     </div>
   )
 }
 
 const styles = {
-  page: {
-    flex: 1, padding: 'var(--spacing-md)',
-    paddingBottom: 32, overflowY: 'auto',
-    display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
-  },
-  header: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  },
-  date: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
-  settingBtn: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
-
-  myStatusCard: {
-    background: 'var(--color-surface)',
-    border: '2px solid var(--color-primary)33',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--spacing-md)',
-  },
-  myStatusTitle: {
-    fontWeight: 800, fontSize: 'var(--font-size-lg)',
-    marginBottom: 'var(--spacing-sm)',
-    display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)',
-  },
-  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 8 },
-  statusBtn: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '10px 4px', border: '2px solid', borderRadius: 'var(--radius-md)',
-    cursor: 'pointer', transition: 'all 0.15s', gap: 4,
-    WebkitTapHighlightColor: 'transparent',
-  },
-  statusEmoji: { fontSize: 22 },
-  statusLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700 },
-
-  groupCard: {
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    overflow: 'hidden',
-  },
-  groupHeader: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    padding: 'var(--spacing-md)',
-    cursor: 'pointer',
-    background: 'var(--color-surface-2)',
-  },
+  page: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 32 },
+  loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
+  dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  navBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 12px' },
+  dateText: { display: 'flex', alignItems: 'center', gap: 8 },
+  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
+  myCard: { background: 'var(--color-surface)', border: '2px solid var(--color-primary)33', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
+  myCardTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
+  slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'border-color 0.15s' },
+  slotName: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '7px 4px 4px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', borderRadius: 'calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px) 0 0' },
+  slotStatusLayer: { position: 'relative', padding: '6px 6px 4px' },
+  slotStatusBtn: { width: '100%', padding: '5px 4px', border: '1px solid', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, transition: 'all 0.12s', whiteSpace: 'nowrap' },
+  dropdown: { position: 'absolute', top: 'calc(100% + 2px)', left: 0, width: 150, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', zIndex: 200, overflow: 'hidden' },
+  dropItem: { width: '100%', padding: '9px 12px', display: 'flex', alignItems: 'center', gap: 6, border: 'none', cursor: 'pointer', fontSize: 12, textAlign: 'left' },
+  slotDetailLayer: { display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 6px 7px', borderTop: '1px solid rgba(0,0,0,0.05)', borderRadius: '0 0 calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px)' },
+  slotTimeInput: { width: '100%', padding: '3px 4px', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 11, outline: 'none', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  slotMenuInput: { width: '100%', padding: '3px 4px', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 11, outline: 'none', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  sectionTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  groupCard: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', transition: 'opacity 0.2s' },
+  groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)' },
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
-  groupHeaderRight: { display: 'flex', alignItems: 'center', gap: 8 },
-  memberCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
-  collapseIcon: { fontSize: 12, color: 'var(--color-text-muted)' },
-
-  memberList: {
-    display: 'flex', flexDirection: 'column', gap: 6,
-    padding: '12px var(--spacing-md)',
-    borderBottom: '1px solid var(--color-border)',
-  },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)' },
-  avatar: {
-    width: 32, height: 32, borderRadius: '50%',
-    background: 'var(--color-primary)', color: '#fff',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    fontWeight: 700, fontSize: 13, flexShrink: 0,
-  },
-  memberName: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 600 },
-
-  potsSection: { padding: '12px var(--spacing-md)' },
-  potsSectionTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
-  potList: { display: 'flex', flexDirection: 'column', gap: 8 },
-
-  createPotBtn: {
-    width: '100%', padding: 12,
-    background: 'none', border: 'none',
-    borderTop: '1px solid var(--color-border)',
-    color: 'var(--color-primary)', fontWeight: 700,
-    fontSize: 'var(--font-size-sm)', cursor: 'pointer',
-  },
-
-  addGroupBtn: {
-    width: '100%', padding: 14,
-    background: 'var(--color-surface-2)',
-    border: '1.5px dashed var(--color-border)',
-    borderRadius: 'var(--radius-lg)',
-    color: 'var(--color-text-muted)', fontWeight: 600,
-    fontSize: 'var(--font-size-sm)', cursor: 'pointer',
-  },
+  activityDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' },
+  memberList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
+  memberRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  avatar: { width: 28, height: 28, borderRadius: '50%', color: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11 },
+  memberName: { fontSize: 13, fontWeight: 600, flexShrink: 0 },
+  memberInfo: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, overflow: 'hidden' },
+  memberMeta: { fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  metaDot: { fontSize: 11, color: 'var(--color-border)' },
+  memberStatus: { fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' },
+  memberStatusEmpty: { fontSize: 11, color: 'var(--color-text-muted)' },
+  potsArea: { padding: '10px var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 8 },
+  potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  addGroupBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 }

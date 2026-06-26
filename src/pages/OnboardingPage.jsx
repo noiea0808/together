@@ -1,13 +1,28 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { createUser } from '../lib/db'
+import { useUser } from '../lib/UserContext'
 
 export default function OnboardingPage() {
   const navigate = useNavigate()
+  const { login } = useUser()
   const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
 
-  const handleJoin = () => {
-    if (!nickname.trim()) return
-    navigate('/today')
+  const handleJoin = async () => {
+    if (!nickname.trim() || loading) return
+    setLoading(true)
+    setError(null)
+    try {
+      const user = await createUser(nickname.trim())
+      login(user)
+      navigate('/today')
+    } catch (e) {
+      setError('오류가 발생했어요. 다시 시도해주세요.')
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
@@ -19,7 +34,7 @@ export default function OnboardingPage() {
       </div>
 
       <div style={styles.card}>
-        <div style={styles.cardTitle}>개발팀에 입장하기</div>
+        <div style={styles.cardTitle}>시작하기</div>
         <p style={styles.cardDesc}>닉네임을 입력하면 바로 시작할 수 있어요.</p>
         <input
           style={styles.input}
@@ -29,13 +44,16 @@ export default function OnboardingPage() {
           onKeyDown={e => e.key === 'Enter' && handleJoin()}
           maxLength={8}
           autoFocus
+          disabled={loading}
         />
         <div style={styles.hint}>{nickname.length}/8</div>
+        {error && <p style={styles.error}>{error}</p>}
         <button
-          style={{ ...styles.btn, opacity: nickname.trim() ? 1 : 0.4 }}
+          style={{ ...styles.btn, opacity: nickname.trim() && !loading ? 1 : 0.4 }}
           onClick={handleJoin}
+          disabled={loading}
         >
-          입장하기
+          {loading ? '입장 중...' : '입장하기'}
         </button>
       </div>
 
@@ -64,10 +82,10 @@ const styles = {
   input: {
     width: '100%', padding: '14px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
-    fontSize: 'var(--font-size-base)', outline: 'none',
-    boxSizing: 'border-box',
+    fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
   hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right', marginBottom: 'var(--spacing-md)', marginTop: 4 },
+  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', marginBottom: 'var(--spacing-sm)' },
   btn: {
     width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
     border: 'none', borderRadius: 'var(--radius-full)',
