@@ -1,12 +1,22 @@
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
+import OnboardingPage from './pages/OnboardingPage'
+import TodayPage from './pages/TodayPage'
+import CreatePotPage from './pages/CreatePotPage'
+import PotDetailPage from './pages/PotDetailPage'
+import GroupPage from './pages/GroupPage'
 
 export default function App() {
   return (
-    <div className="page text-center">
-      <h1 style={{ fontSize: 'var(--font-size-2xl)', marginTop: 'var(--spacing-xl)' }}>
-        같이 먹자 🍚
-      </h1>
-      <p className="text-muted mt-md">오늘 같이 먹을 사람, 묻지 말고 확인하기</p>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Navigate to="/onboarding" replace />} />
+        <Route path="/onboarding" element={<OnboardingPage />} />
+        <Route path="/today" element={<TodayPage />} />
+        <Route path="/create" element={<CreatePotPage />} />
+        <Route path="/pot/:id" element={<PotDetailPage />} />
+        <Route path="/group" element={<GroupPage />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
