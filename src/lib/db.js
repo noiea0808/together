@@ -149,7 +149,7 @@ export async function getGroupStatuses(groupId, date) {
 }
 
 // ── 밥팟 ──────────────────────────────────────────
-export async function createPot({ groupId, date, slot, meal_time, title, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, title, menu, max_people, is_public, is_default, createdBy }) {
   const { data, error } = await supabase
     .from('meal_pots')
     .insert({
@@ -158,6 +158,7 @@ export async function createPot({ groupId, date, slot, meal_time, title, max_peo
       slot,
       meal_time,
       title,
+      menu: menu || null,
       max_people,
       is_public,
       is_default,
@@ -225,6 +226,18 @@ export async function updateNickname(userId, nickname) {
   if (error) throw error
 }
 
+export async function getMyPotsForSlot(userId, groupId, date, slot) {
+  const { data, error } = await supabase
+    .from('pot_members')
+    .select('pot_id, meal_pots!inner(id, title, meal_time, slot, date, group_id)')
+    .eq('user_id', userId)
+    .eq('meal_pots.group_id', groupId)
+    .eq('meal_pots.date', date)
+    .eq('meal_pots.slot', slot)
+  if (error) throw error
+  return data
+}
+
 export async function updatePotCreator(potId, newCreatorId) {
   const { error } = await supabase
     .from('meal_pots')
@@ -241,10 +254,18 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, title, max_people, is_public }) {
+export async function updatePot(potId, { meal_time, title, menu, max_people, is_public }) {
   const { error } = await supabase
     .from('meal_pots')
-    .update({ meal_time, title, max_people, is_public })
+    .update({ meal_time, title, menu: menu || null, max_people, is_public })
+    .eq('id', potId)
+  if (error) throw error
+}
+
+export async function updatePotMenu(potId, menu) {
+  const { error } = await supabase
+    .from('meal_pots')
+    .update({ menu: menu || null })
     .eq('id', potId)
   if (error) throw error
 }

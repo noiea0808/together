@@ -207,9 +207,9 @@ export default function TodayPage() {
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
       </div>
 
-      {/* 내 슬롯 그리드 */}
+      {/* 나의 상태 슬롯 그리드 */}
       <div style={styles.myCard}>
-        <div style={styles.myCardTitle}>오늘 나는</div>
+        <div style={styles.myCardTitle}>나의 상태</div>
         <div style={styles.slotGrid}>
           {SLOT_ORDER.map(slot => {
             const data = mySlots[slot]
@@ -217,9 +217,13 @@ export default function TodayPage() {
             const isSelected = selectedSlot === slot
             const isDropOpen = openDropdown === slot
 
-            // 내가 참여 중인 밥팟이 있는 슬롯인지 확인
-            const isInPot = Object.values(potsMap).flat()
-              .some(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+            // 내가 참여 중인 밥팟 목록 (슬롯 기준, 시간순 정렬)
+            const myPotsInSlot = Object.values(potsMap).flat()
+              .filter(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+              .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
+            const potCount = myPotsInSlot.length
+            const earliestPot = myPotsInSlot[0]
+            const isInPot = potCount > 0
             const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
 
             return (
@@ -252,7 +256,7 @@ export default function TodayPage() {
                     }}
                   >
                     {lockedOpt
-                      ? <>{lockedOpt.emoji} {lockedOpt.label} 🔒</>
+                      ? <>{lockedOpt.emoji} {lockedOpt.label}{potCount > 1 ? ` x${potCount}` : ''}</>
                       : opt ? <>{opt.emoji} {opt.label}</> : <span style={{ fontSize: 11 }}>+ 상태설정</span>
                     }
                   </button>
@@ -291,21 +295,35 @@ export default function TodayPage() {
                 </div>
 
                 <div style={styles.slotDetailLayer} onClick={e => e.stopPropagation()}>
-                  <input
-                    type="time"
-                    style={{ ...styles.slotTimeInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
-                    value={data?.time ?? ''}
-                    onChange={e => setSlotField(slot, 'time', e.target.value)}
-                    disabled={!data?.status || data?.status === 'skip'}
-                  />
-                  <input
-                    style={{ ...styles.slotMenuInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
-                    placeholder="메뉴"
-                    value={data?.menu ?? ''}
-                    onChange={e => setSlotField(slot, 'menu', e.target.value)}
-                    maxLength={10}
-                    disabled={!data?.status || data?.status === 'skip'}
-                  />
+                  {isInPot ? (
+                    // 팟 참여중이면 팟 정보 표시 (읽기 전용)
+                    <>
+                      <div style={styles.slotPotInfo}>
+                        {earliestPot.meal_time?.slice(0, 5)}
+                      </div>
+                      <div style={{ ...styles.slotPotInfo, fontSize: 10 }}>
+                        {earliestPot.title}
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <input
+                        type="time"
+                        style={{ ...styles.slotTimeInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
+                        value={data?.time ?? ''}
+                        onChange={e => setSlotField(slot, 'time', e.target.value)}
+                        disabled={!data?.status || data?.status === 'skip'}
+                      />
+                      <input
+                        style={{ ...styles.slotMenuInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
+                        placeholder="메뉴"
+                        value={data?.menu ?? ''}
+                        onChange={e => setSlotField(slot, 'menu', e.target.value)}
+                        maxLength={10}
+                        disabled={!data?.status || data?.status === 'skip'}
+                      />
+                    </>
+                  )}
                 </div>
               </div>
             )
@@ -484,6 +502,7 @@ const styles = {
   slotDetailLayer: { display: 'flex', flexDirection: 'column', gap: 4, padding: '4px 6px 7px', borderTop: '1px solid rgba(0,0,0,0.05)', borderRadius: '0 0 calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px)' },
   slotTimeInput: { width: '100%', padding: '3px 4px', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 11, outline: 'none', background: 'var(--color-surface)', color: 'var(--color-text)' },
   slotMenuInput: { width: '100%', padding: '3px 4px', border: '1px solid var(--color-border)', borderRadius: 4, fontSize: 11, outline: 'none', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  slotPotInfo: { width: '100%', fontSize: 11, fontWeight: 600, color: '#4CAF50', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   sectionTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   groupCard: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', transition: 'opacity 0.2s' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)' },

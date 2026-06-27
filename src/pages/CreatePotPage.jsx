@@ -20,6 +20,7 @@ export default function CreatePotPage() {
     slot: searchParams.get('slot') ?? '점심',
     meal_time: '12:00',
     title: '',
+    menu: '',
     max_people: 4,
     is_public: false,
     is_default: false,
@@ -48,6 +49,7 @@ export default function CreatePotPage() {
         slot: form.slot,
         meal_time: form.meal_time,
         title: form.title.trim() || `${form.slot} ${form.meal_time}`,
+        menu: form.menu.trim(),
         max_people: form.max_people,
         is_public: form.is_public,
         is_default: form.is_default,
@@ -131,15 +133,26 @@ export default function CreatePotPage() {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>메뉴 / 이름</label>
+          <label style={styles.label}>밥팟 이름</label>
           <input
             style={styles.input}
-            placeholder="예: 김치찌개팟, 편의점 런치"
+            placeholder="예: 점심팟, 저녁 한판"
             value={form.title}
             onChange={e => set('title', e.target.value)}
             maxLength={20}
           />
           <div style={styles.hint}>{form.title.length}/20</div>
+        </div>
+
+        <div style={styles.field}>
+          <label style={styles.label}>메뉴 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span></label>
+          <input
+            style={styles.input}
+            placeholder="예: 김치찌개, 삼겹살, 편의점 — 미입력 시 미정"
+            value={form.menu}
+            onChange={e => set('menu', e.target.value)}
+            maxLength={20}
+          />
         </div>
 
         <div style={styles.field}>

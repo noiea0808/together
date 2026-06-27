@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot } from '../lib/db'
+import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot, updatePotMenu } from '../lib/db'
 
 function toDateStr(date) {
   return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
@@ -17,6 +17,9 @@ export default function PotDetailPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [editForm, setEditForm] = useState({})
+  const [conflict, setConflict] = useState(null)
+  const [editingMenu, setEditingMenu] = useState(false)
+  const [menuValue, setMenuValue] = useState('') // { otherPot } | null
 
   const loadPot = async () => {
     try {
@@ -25,9 +28,11 @@ export default function PotDetailPage() {
       setEditForm({
         meal_time: data.meal_time?.slice(0, 5) ?? '',
         title: data.title ?? '',
+        menu: data.menu ?? '',
         max_people: data.max_people ?? 4,
         is_public: data.is_public ?? false,
       })
+      setMenuValue(data.menu ?? '')
     } catch (e) {
       console.error(e)
     } finally {
@@ -41,6 +46,33 @@ export default function PotDetailPage() {
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
+
+  const doJoin = async () => {
+    const dateStr = toDateStr(new Date())
+    await joinPot(pot.id, user.id)
+    if (pot.group_id) {
+      await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
+    }
+    await loadPot()
+    setActionLoading(false)
+  }
+
+  // 충돌 옵션: 기존 팟에서 나가고 현재 팟 참여
+  const handleConflictLeaveAndJoin = async () => {
+    if (!conflict) return
+    setActionLoading(true)
+    setConflict(null)
+    const dateStr = toDateStr(new Date())
+    await leavePot(conflict.otherPot.id, user.id)
+    await doJoin()
+  }
+
+  // 충돌 옵션: 중복 참여 (그냥 둘 다 참여)
+  const handleConflictJoinBoth = async () => {
+    setActionLoading(true)
+    setConflict(null)
+    await doJoin()
+  }
 
   const handleJoinToggle = async () => {
     if (!pot || actionLoading) return
@@ -70,10 +102,18 @@ export default function PotDetailPage() {
           await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
         }
       } else {
-        await joinPot(pot.id, user.id)
+        // 같은 슬롯에 이미 참여 중인 다른 팟이 있는지 확인
         if (pot.group_id) {
-          await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
+          const myPots = await getMyPotsForSlot(user.id, pot.group_id, dateStr, pot.slot)
+          const otherPot = myPots.find(p => p.pot_id !== pot.id)
+          if (otherPot) {
+            setConflict({ otherPot: otherPot.meal_pots })
+            setActionLoading(false)
+            return
+          }
         }
+        await doJoin()
+        return
       }
       await loadPot()
     } catch (e) {
@@ -81,6 +121,14 @@ export default function PotDetailPage() {
     } finally {
       setActionLoading(false)
     }
+  }
+
+  const handleSaveMenu = async () => {
+    try {
+      await updatePotMenu(pot.id, menuValue.trim())
+      await loadPot()
+      setEditingMenu(false)
+    } catch (e) { console.error(e) }
   }
 
   const handleSaveEdit = async () => {
@@ -144,7 +192,7 @@ export default function PotDetailPage() {
               />
             </div>
             <div style={styles.field}>
-              <label style={styles.label}>메뉴 / 이름</label>
+              <label style={styles.label}>밥팟 이름</label>
               <input
                 style={styles.input}
                 value={editForm.title}
@@ -187,6 +235,36 @@ export default function PotDetailPage() {
               <span style={styles.slotTag}>{pot.slot}</span>
             </div>
             <h2 style={styles.title}>{pot.title}</h2>
+
+            {/* 메뉴 — 인라인 편집 */}
+            {editingMenu ? (
+              <div style={styles.menuEditRow}>
+                <input
+                  style={styles.menuInput}
+                  value={menuValue}
+                  onChange={e => setMenuValue(e.target.value)}
+                  placeholder="메뉴 입력"
+                  maxLength={20}
+                  autoFocus
+                  onKeyDown={e => { if (e.key === 'Enter') handleSaveMenu(); if (e.key === 'Escape') setEditingMenu(false) }}
+                />
+                <button style={styles.menuSaveBtn} onClick={handleSaveMenu}>저장</button>
+                <button style={styles.menuCancelBtn} onClick={() => setEditingMenu(false)}>✕</button>
+              </div>
+            ) : (
+              <div style={styles.menuRow}>
+                <span style={styles.menuLabel}>메뉴</span>
+                <span style={{ ...styles.menuValue, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+                  {pot.menu || '미정'}
+                </span>
+                {isMaster && (
+                  <button style={styles.menuEditBtn} onClick={() => { setMenuValue(pot.menu ?? ''); setEditingMenu(true) }}>
+                    수정
+                  </button>
+                )}
+              </div>
+            )}
+
             {!pot.is_default && pot.users && (
               <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
             )}
@@ -251,6 +329,32 @@ export default function PotDetailPage() {
           </>
         )}
       </div>
+
+      {/* 중복 참여 충돌 다이얼로그 */}
+      {conflict && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <div style={styles.dialogEmoji}>⚠️</div>
+            <div style={styles.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
+            <p style={styles.dialogDesc}>
+              <strong>{pot.slot}</strong> 슬롯에{'\n'}
+              <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}
+              에 이미 참여하고 있어요.
+            </p>
+            <div style={styles.dialogBtns}>
+              <button style={styles.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>
+                기존 밥팟 나가고 여기 참여
+              </button>
+              <button style={styles.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>
+                중복 참여하기
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConflict(null)}>
+                참여 취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -281,6 +385,14 @@ const styles = {
   publicTag: { fontSize: 12, background: '#eee', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
   slotTag: { fontSize: 12, background: 'var(--color-surface-2)', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
   title: { fontSize: 'var(--font-size-xl)', fontWeight: 800, marginTop: -4 },
+  menuRow: { display: 'flex', alignItems: 'center', gap: 8 },
+  menuLabel: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 30 },
+  menuValue: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
+  menuEditBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
+  menuEditRow: { display: 'flex', alignItems: 'center', gap: 6 },
+  menuInput: { flex: 1, padding: '8px 12px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
+  menuSaveBtn: { padding: '8px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 13, cursor: 'pointer' },
+  menuCancelBtn: { padding: '8px 10px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--color-text-muted)' },
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' },
   dotsSection: { padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   dotsLabel: { fontWeight: 700, marginBottom: 'var(--spacing-sm)' },
@@ -295,4 +407,14 @@ const styles = {
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
   shareText: { flex: 1, fontSize: 13, color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
   shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
+
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  dialogEmoji: { fontSize: 40 },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 }

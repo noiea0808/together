@@ -25,6 +25,9 @@ export default function PotCard({ pot }) {
         <span style={styles.title}>{pot.title}</span>
         {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}
         {pot.is_public && <span style={styles.publicTag}>공개</span>}
+        <span style={{ ...styles.menu, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+          {pot.menu || '미정'}
+        </span>
         <span style={{ ...styles.count, color: isFull ? '#4CAF50' : 'var(--color-text-muted)', marginLeft: 'auto' }}>
           {filled}/{pot.max_people}명
         </span>
@@ -65,6 +68,7 @@ const styles = {
   title: { fontSize: 13, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   defaultTag: { fontSize: 10, background: '#E8F5E9', borderRadius: 4, padding: '1px 6px', color: '#4CAF50', flexShrink: 0, fontWeight: 600 },
   publicTag: { fontSize: 10, background: '#eee', borderRadius: 4, padding: '1px 6px', color: 'var(--color-text-muted)', flexShrink: 0 },
+  menu: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
   count: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
   members: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   memberChip: { display: 'flex', alignItems: 'center', gap: 4 },
