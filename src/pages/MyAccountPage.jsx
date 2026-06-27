@@ -2,12 +2,15 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { updateNickname } from '../lib/db'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import BottomNav from '../components/BottomNav'
 
 export default function MyAccountPage() {
   const navigate = useNavigate()
   const { user, logout, login } = useUser()
   const [nickname, setNickname] = useState(user?.nickname ?? '')
+  const { installPrompt, triggerInstall, isInstalled, isIOS } = useInstallPrompt()
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -86,12 +89,58 @@ export default function MyAccountPage() {
           </div>
         </div>
 
+        {/* 홈 화면 설치 */}
+        {!isInstalled && (
+          <div style={styles.section}>
+            <button
+              style={styles.installBtn}
+              onClick={() => {
+                if (isIOS) setShowIOSGuide(true)
+                else triggerInstall()
+              }}
+            >
+              <span>📲</span>
+              <span>홈 화면에 앱 추가</span>
+            </button>
+            <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>
+          </div>
+        )}
+        {isInstalled && (
+          <div style={styles.installedBadge}>✓ 홈 화면에 설치됨</div>
+        )}
+
         {/* 로그아웃 */}
         <div style={{ marginTop: 'auto' }}>
           <button style={styles.logoutBtn} onClick={handleLogout}>
             로그아웃
           </button>
         </div>
+
+        {/* iOS 안내 모달 */}
+        {showIOSGuide && (
+          <div style={styles.modalOverlay} onClick={() => setShowIOSGuide(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div style={styles.modalTitle}>홈 화면에 추가하기</div>
+              <div style={styles.guideSteps}>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>1</span>
+                  <span>Safari 하단의 <strong>공유 버튼(□↑)</strong>을 탭하세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>2</span>
+                  <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>3</span>
+                  <span>우측 상단 <strong>추가</strong>를 탭하면 완료!</span>
+                </div>
+              </div>
+              <button style={styles.modalClose} onClick={() => setShowIOSGuide(false)}>
+                확인
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <BottomNav />
@@ -125,4 +174,14 @@ const styles = {
 
 
   logoutBtn: { width: '100%', padding: 14, background: 'none', border: '1.5px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  installBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
+  installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-sm)', color: '#4CAF50', fontWeight: 700, padding: 8 },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
+  modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
+  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-lg)', textAlign: 'center' },
+  guideSteps: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' },
+  guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
+  guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 13 },
+  modalClose: { width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
 }

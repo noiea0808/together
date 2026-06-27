@@ -1,0 +1,19 @@
+{
+  "name": "같이 먹자",
+  "short_name": "같이먹자",
+  "description": "오늘 같이 먹을 사람, 묻지 말고 확인하기",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#FF6B35",
+  "orientation": "portrait",
+  "lang": "ko",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
