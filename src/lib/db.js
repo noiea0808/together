@@ -225,6 +225,22 @@ export async function updateNickname(userId, nickname) {
   if (error) throw error
 }
 
+export async function updatePotCreator(potId, newCreatorId) {
+  const { error } = await supabase
+    .from('meal_pots')
+    .update({ created_by: newCreatorId })
+    .eq('id', potId)
+  if (error) throw error
+}
+
+export async function deletePot(potId) {
+  const { error } = await supabase
+    .from('meal_pots')
+    .delete()
+    .eq('id', potId)
+  if (error) throw error
+}
+
 export async function updatePot(potId, { meal_time, title, max_people, is_public }) {
   const { error } = await supabase
     .from('meal_pots')

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers } from '../lib/db'
+import BottomNav from '../components/BottomNav'
 
 export default function GroupPage() {
   const navigate = useNavigate()
@@ -24,9 +25,7 @@ export default function GroupPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>그룹 설정</span>
-        <span />
+        <span style={styles.headerTitle}>그룹 관리</span>
       </div>
 
       <div style={styles.body}>
@@ -43,6 +42,7 @@ export default function GroupPage() {
           + 그룹 만들기 / 참여하기
         </button>
       </div>
+      <BottomNav />
     </div>
   )
 }
@@ -85,7 +85,7 @@ function GroupSection({ group, members, myUserId }) {
               <div style={styles.avatar}>{member.nickname[0]}</div>
               <span style={styles.memberName}>{member.nickname}</span>
               {member.id === myUserId && <span style={styles.meTag}>나</span>}
-              {member.id === group.created_by && <span style={styles.ownerTag}>개설자</span>}
+              {member.id === group.created_by && <span style={styles.ownerTag}>👑 방장</span>}
             </div>
           ))}
         </div>
@@ -100,7 +100,7 @@ const styles = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  body: { flex: 1, padding: 'var(--spacing-md)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' },
+  body: { flex: 1, padding: 'var(--spacing-md)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)', paddingBottom: 80 },
   groupSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', paddingBottom: 'var(--spacing-xl)', borderBottom: '1px solid var(--color-border)' },
   groupCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
   groupEmoji: { fontSize: 36 },

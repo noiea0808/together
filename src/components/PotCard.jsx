@@ -39,7 +39,7 @@ export default function PotCard({ pot }) {
                 {member.nickname[0]}
               </div>
               <span style={styles.memberName}>
-                {member.nickname}{isCreator ? ' (개설)' : ''}
+                {member.nickname}{isCreator ? ' 👑' : ''}
               </span>
             </div>
           )

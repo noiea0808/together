@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, upsertStatus, updatePot } from '../lib/db'
+import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot } from '../lib/db'
 
 function toDateStr(date) {
   return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
@@ -40,7 +40,7 @@ export default function PotDetailPage() {
   const participants = pot?.pot_members?.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?' })) ?? []
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
-  const isCreator = !pot?.is_default && pot?.created_by === user?.id
+  const isMaster = !pot?.is_default && pot?.created_by === user?.id
 
   const handleJoinToggle = async () => {
     if (!pot || actionLoading) return
@@ -48,6 +48,23 @@ export default function PotDetailPage() {
     try {
       const dateStr = toDateStr(new Date())
       if (isJoined) {
+        if (isMaster) {
+          // 방장이 나갈 때
+          const others = participants.filter(m => m.id !== user.id)
+          if (others.length === 0) {
+            // 혼자였으면 팟 삭제
+            await deletePot(pot.id)
+            if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
+            navigate(-1)
+            return
+          } else {
+            // 가장 먼저 참여한 사람에게 방장 이전
+            const nextMaster = pot.pot_members
+              .filter(pm => pm.user_id !== user.id)
+              .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
+            await updatePotCreator(pot.id, nextMaster.user_id)
+          }
+        }
         await leavePot(pot.id, user.id)
         if (pot.group_id) {
           await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
@@ -80,11 +97,20 @@ export default function PotDetailPage() {
     }
   }
 
-  const handleShare = () => {
-    if (!pot) return
-    const text = `🍚 ${pot.meal_time?.slice(0, 5)} ${pot.title} · ${participants.length}/${pot.max_people}명 · 같이먹자`
+  const [showShare, setShowShare] = useState(false)
+  const [copied, setCopied] = useState(null)
+
+  const potLink = `${window.location.origin}/pot/${pot?.id}`
+  const kakaoText = pot ? `🍚 ${pot.meal_time?.slice(0, 5)} ${pot.title} · ${participants.length}/${pot.max_people}명 · 같이먹자 → ${potLink}` : ''
+
+  const copyText = (text, type) => {
     navigator.clipboard?.writeText(text)
-    alert('복사됐습니다!\n' + text)
+    setCopied(type)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
+  const handleShare = () => {
+    setShowShare(v => !v)
   }
 
   if (loading) return <div style={styles.loadingPage}>🍚</div>
@@ -95,13 +121,13 @@ export default function PotDetailPage() {
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
         <span style={styles.headerTitle}>밥팟 {editMode ? '수정' : '상세'}</span>
-        {isCreator && !editMode && (
+        {isMaster && !editMode && (
           <button style={styles.editBtn} onClick={() => setEditMode(true)}>수정</button>
         )}
         {editMode && (
           <button style={styles.editBtn} onClick={() => setEditMode(false)}>취소</button>
         )}
-        {!isCreator && <span />}
+        {!isMaster && <span />}
       </div>
 
       <div style={styles.body}>
@@ -162,7 +188,7 @@ export default function PotDetailPage() {
             </div>
             <h2 style={styles.title}>{pot.title}</h2>
             {!pot.is_default && pot.users && (
-              <p style={styles.creatorLine}>{pot.users.nickname} 개설</p>
+              <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
             )}
 
             <div style={styles.dotsSection}>
@@ -193,14 +219,35 @@ export default function PotDetailPage() {
               </button>
             )}
 
-            <button style={styles.shareBtn} onClick={handleShare}>🔗 링크 복사</button>
+            <button style={styles.shareBtn} onClick={handleShare}>
+              🔗 {showShare ? '닫기' : '공유하기'}
+            </button>
 
-            <div style={styles.kakaoPreview}>
-              <div style={styles.kakaoTitle}>카톡 공유 미리보기</div>
-              <div style={styles.kakaoText}>
-                🍚 {pot.meal_time?.slice(0, 5)} {pot.title} · {participants.length}/{pot.max_people}명 · 같이먹자 → 링크
+            {showShare && (
+              <div style={styles.sharePanel}>
+                <div style={styles.shareLabel}>밥팟 링크</div>
+                <div style={styles.shareRow}>
+                  <span style={styles.shareText}>{potLink}</span>
+                  <button
+                    style={{ ...styles.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
+                    onClick={() => copyText(potLink, 'link')}
+                  >
+                    {copied === 'link' ? '✓' : '복사'}
+                  </button>
+                </div>
+
+                <div style={styles.shareLabel}>카톡 공유용</div>
+                <div style={styles.shareRow}>
+                  <span style={{ ...styles.shareText, fontSize: 12 }}>{kakaoText}</span>
+                  <button
+                    style={{ ...styles.shareCopyBtn, background: copied === 'kakao' ? '#4CAF50' : '#FEE500', color: copied === 'kakao' ? '#fff' : '#3C1E1E' }}
+                    onClick={() => copyText(kakaoText, 'kakao')}
+                  >
+                    {copied === 'kakao' ? '✓' : '복사'}
+                  </button>
+                </div>
               </div>
-            </div>
+            )}
           </>
         )}
       </div>
@@ -243,7 +290,9 @@ const styles = {
   dotName: { fontSize: 10, color: 'var(--color-text-muted)' },
   btn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
   shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
-  kakaoPreview: { background: '#FEE500', borderRadius: 'var(--radius-md)', padding: 'var(--spacing-md)' },
-  kakaoTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, marginBottom: 4, color: '#3C1E1E' },
-  kakaoText: { fontSize: 'var(--font-size-sm)', color: '#3C1E1E' },
+  sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
+  shareLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
+  shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
+  shareText: { flex: 1, fontSize: 13, color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
+  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
 }

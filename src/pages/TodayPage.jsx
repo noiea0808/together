@@ -204,10 +204,7 @@ export default function TodayPage() {
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {isToday && <span style={styles.todayBadge}>오늘</span>}
         </div>
-        <div style={{ display: 'flex', alignItems: 'center' }}>
-          <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
-          <button style={styles.settingBtn} onClick={() => navigate('/group')}>⚙️</button>
-        </div>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
       </div>
 
       {/* 내 슬롯 그리드 */}
@@ -220,6 +217,11 @@ export default function TodayPage() {
             const isSelected = selectedSlot === slot
             const isDropOpen = openDropdown === slot
 
+            // 내가 참여 중인 밥팟이 있는 슬롯인지 확인
+            const isInPot = Object.values(potsMap).flat()
+              .some(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+            const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
+
             return (
               <div
                 key={slot}
@@ -227,7 +229,7 @@ export default function TodayPage() {
                   ...styles.slotCard,
                   borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
                   borderWidth: isSelected ? 2 : 1.5,
-                  background: opt ? opt.color + '0d' : 'var(--color-surface)',
+                  background: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '0d' : 'var(--color-surface)',
                 }}
                 onClick={() => setSelectedSlot(slot)}
               >
@@ -237,20 +239,25 @@ export default function TodayPage() {
                   <button
                     style={{
                       ...styles.slotStatusBtn,
-                      color: opt ? opt.color : 'var(--color-text-muted)',
-                      borderColor: opt ? opt.color + '55' : 'var(--color-border)',
-                      background: opt ? opt.color + '12' : 'var(--color-surface-2)',
+                      color: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color : 'var(--color-text-muted)',
+                      borderColor: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '55' : 'var(--color-border)',
+                      background: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '12' : 'var(--color-surface-2)',
+                      cursor: isInPot ? 'default' : 'pointer',
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
+                      if (isInPot) return // 참여중이면 드롭다운 막기
                       setSelectedSlot(slot)
                       setOpenDropdown(prev => prev === slot ? null : slot)
                     }}
                   >
-                    {opt ? <>{opt.emoji} {opt.label}</> : <span style={{ fontSize: 11 }}>+ 상태설정</span>}
+                    {lockedOpt
+                      ? <>{lockedOpt.emoji} {lockedOpt.label} 🔒</>
+                      : opt ? <>{opt.emoji} {opt.label}</> : <span style={{ fontSize: 11 }}>+ 상태설정</span>
+                    }
                   </button>
 
-                  {isDropOpen && (
+                  {isDropOpen && !isInPot && (
                     <div style={styles.dropdown} onClick={e => e.stopPropagation()}>
                       {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
                         <button

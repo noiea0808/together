@@ -86,14 +86,6 @@ export default function MyAccountPage() {
           </div>
         </div>
 
-        {/* 그룹 관리 */}
-        <div style={styles.section}>
-          <button style={styles.menuBtn} onClick={() => navigate('/group')}>
-            👥 그룹 관리
-            <span style={styles.menuArrow}>→</span>
-          </button>
-        </div>
-
         {/* 로그아웃 */}
         <div style={{ marginTop: 'auto' }}>
           <button style={styles.logoutBtn} onClick={handleLogout}>
@@ -130,8 +122,7 @@ const styles = {
   cancelBtn: { padding: '10px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 13, cursor: 'pointer' },
   savedMsg: { fontSize: 12, color: '#4CAF50', fontWeight: 600 },
 
-  menuBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '14px var(--spacing-md)', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', textAlign: 'left' },
-  menuArrow: { color: 'var(--color-text-muted)', fontSize: 16 },
+
 
   logoutBtn: { width: '100%', padding: 14, background: 'none', border: '1.5px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
 }
