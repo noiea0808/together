@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, joinPot, upsertStatus } from '../lib/db'
+import { getMyGroups, createPot, joinPot } from '../lib/db'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -87,12 +87,8 @@ export default function CreatePotPage() {
         createdBy: user.id,
       })
       if (!form.is_default) {
+        // 참여 사실은 pot_members로 기록 — daily_status.status는 사용자 의향 전용
         await joinPot(pot.id, user.id)
-        await upsertStatus({
-          userId: user.id,
-          date: dateStr, slot: form.slot,
-          status: '참여중', meal_time: form.meal_time,
-        })
       }
       navigate('/today')
     } catch (e) {

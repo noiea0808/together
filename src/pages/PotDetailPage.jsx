@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, leavePotWithCleanup, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups } from '../lib/db'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -109,11 +109,9 @@ export default function PotDetailPage() {
     await loadPot()
   }
 
-  // 참여 관련
+  // 참여 관련 — 참여 사실은 pot_members로만 기록 (status는 사용자 의향 전용)
   const doJoin = async () => {
-    const dateStr = toDateStr(new Date())
     await joinPot(pot.id, user.id)
-    await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
     await loadPot()
     setActionLoading(false)
   }
@@ -140,7 +138,6 @@ export default function PotDetailPage() {
           const others = participants.filter(m => m.id !== user.id)
           if (others.length === 0) {
             await deletePot(pot.id)
-            await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: 'open' })
             navigate(-1); return
           } else {
             const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
@@ -148,7 +145,6 @@ export default function PotDetailPage() {
           }
         }
         await leavePotWithCleanup(pot.id, user.id)
-        await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: 'open' })
       } else {
         const myPots = await getMyPotsForSlotAllGroups(user.id, dateStr, pot.slot)
         const otherPot = myPots.find(p => p.pot_id !== pot.id)
