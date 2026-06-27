@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom'
 const TABS = [
   { path: '/today',    icon: '🍚', label: '오늘' },
   { path: '/schedule', icon: '📅', label: '일정' },
-  { path: '/group',    icon: '👥', label: '그룹관리' },
+  { path: '/group',    icon: '👥', label: '친구' },
   { path: '/account',  icon: '👤', label: '내 계정' },
 ]
 

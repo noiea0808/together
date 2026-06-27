@@ -6,7 +6,10 @@ import { getMyGroups, createPot, joinPot, upsertStatus } from '../lib/db'
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
 function toDateStr(date) {
-  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 
 export default function CreatePotPage() {

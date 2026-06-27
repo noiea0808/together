@@ -89,6 +89,22 @@ export async function getGroupByInviteCode(code) {
   return data
 }
 
+export async function updateGroupName(groupId, name) {
+  const { error } = await supabase
+    .from('groups')
+    .update({ name })
+    .eq('id', groupId)
+  if (error) throw error
+}
+
+export async function leaveGroup(groupId, userId) {
+  const { error } = await supabase
+    .from('group_members')
+    .delete()
+    .match({ group_id: groupId, user_id: userId })
+  if (error) throw error
+}
+
 export async function joinGroup(groupId, userId) {
   const { error } = await supabase
     .from('group_members')
@@ -127,6 +143,15 @@ export async function upsertStatus({ userId, groupId, date, slot, status, meal_t
       meal_time: meal_time || null,
       menu: menu || null,
     }, { onConflict: 'user_id,group_id,date,slot' })
+  if (error) throw error
+}
+
+export async function setGroupSharing(userId, groupId, date, isHidden) {
+  // 해당 그룹의 오늘 모든 슬롯 상태를 숨김/공개 처리
+  const { error } = await supabase
+    .from('daily_status')
+    .update({ is_hidden: isHidden })
+    .match({ user_id: userId, group_id: groupId, date })
   if (error) throw error
 }
 

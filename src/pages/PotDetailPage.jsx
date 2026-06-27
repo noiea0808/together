@@ -1,10 +1,49 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot, updatePotMenu } from '../lib/db'
+import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot } from '../lib/db'
 
 function toDateStr(date) {
-  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+// 인라인 편집 가능한 필드 컴포넌트
+function InlineField({ label, value, displayValue, editable, renderEditor, onEdit, editing, onSave, onCancel }) {
+  return (
+    <div style={iStyles.row}>
+      <span style={iStyles.label}>{label}</span>
+      {editing ? (
+        <div style={iStyles.editorWrap}>
+          {renderEditor()}
+          <button style={iStyles.saveBtn} onClick={onSave}>저장</button>
+          <button style={iStyles.cancelBtn} onClick={onCancel}>✕</button>
+        </div>
+      ) : (
+        <div style={iStyles.valueWrap}>
+          <span style={{ ...iStyles.value, color: value ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
+            {displayValue ?? value ?? '미정'}
+          </span>
+          {editable && (
+            <button style={iStyles.editBtn} onClick={onEdit}>수정</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+const iStyles = {
+  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--color-border)' },
+  label: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 52, flexShrink: 0 },
+  valueWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  value: { fontSize: 'var(--font-size-base)', fontWeight: 600 },
+  editBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', flexShrink: 0 },
+  editorWrap: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
+  saveBtn: { padding: '6px 12px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
+  cancelBtn: { padding: '6px 8px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--color-text-muted)', flexShrink: 0 },
 }
 
 export default function PotDetailPage() {
@@ -15,29 +54,23 @@ export default function PotDetailPage() {
   const [pot, setPot] = useState(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
-  const [editMode, setEditMode] = useState(false)
-  const [editForm, setEditForm] = useState({})
   const [conflict, setConflict] = useState(null)
-  const [editingMenu, setEditingMenu] = useState(false)
-  const [menuValue, setMenuValue] = useState('') // { otherPot } | null
+  const [showShare, setShowShare] = useState(false)
+  const [copied, setCopied] = useState(null)
+
+  // 인라인 편집 상태
+  const [editingField, setEditingField] = useState(null) // 'time'|'title'|'menu'|'max_people'|null
+  const [fieldValue, setFieldValue] = useState('')
+  const [tempMaxPeople, setTempMaxPeople] = useState(4)
+  const [tempIsPublic, setTempIsPublic] = useState(false)
 
   const loadPot = async () => {
     try {
       const data = await getPot(id)
       setPot(data)
-      setEditForm({
-        meal_time: data.meal_time?.slice(0, 5) ?? '',
-        title: data.title ?? '',
-        menu: data.menu ?? '',
-        max_people: data.max_people ?? 4,
-        is_public: data.is_public ?? false,
-      })
-      setMenuValue(data.menu ?? '')
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setLoading(false)
-    }
+      setTempIsPublic(data.is_public ?? false)
+    } catch (e) { console.error(e) }
+    finally { setLoading(false) }
   }
 
   useEffect(() => { loadPot() }, [id])
@@ -47,30 +80,51 @@ export default function PotDetailPage() {
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
 
+  const startEdit = (field, value) => {
+    setEditingField(field)
+    setFieldValue(value ?? '')
+    if (field === 'max_people') setTempMaxPeople(pot?.max_people ?? 4)
+  }
+  const cancelEdit = () => setEditingField(null)
+
+  const saveField = async (field) => {
+    let patch = {}
+    if (field === 'time') patch = { meal_time: fieldValue, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'title') patch = { meal_time: pot.meal_time, title: fieldValue || pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'menu') patch = { meal_time: pot.meal_time, title: pot.title, menu: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'max_people') patch = { meal_time: pot.meal_time, title: pot.title, menu: pot.menu, max_people: tempMaxPeople, is_public: pot.is_public }
+    try {
+      await updatePot(pot.id, patch)
+      await loadPot()
+      setEditingField(null)
+    } catch (e) { console.error(e) }
+  }
+
+  const togglePublic = async () => {
+    const next = !pot.is_public
+    setTempIsPublic(next)
+    await updatePot(pot.id, { meal_time: pot.meal_time, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: next })
+    await loadPot()
+  }
+
+  // 참여 관련
   const doJoin = async () => {
     const dateStr = toDateStr(new Date())
     await joinPot(pot.id, user.id)
-    if (pot.group_id) {
-      await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
-    }
+    if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
     await loadPot()
     setActionLoading(false)
   }
 
-  // 충돌 옵션: 기존 팟에서 나가고 현재 팟 참여
   const handleConflictLeaveAndJoin = async () => {
     if (!conflict) return
-    setActionLoading(true)
-    setConflict(null)
-    const dateStr = toDateStr(new Date())
+    setActionLoading(true); setConflict(null)
     await leavePot(conflict.otherPot.id, user.id)
     await doJoin()
   }
 
-  // 충돌 옵션: 중복 참여 (그냥 둘 다 참여)
   const handleConflictJoinBoth = async () => {
-    setActionLoading(true)
-    setConflict(null)
+    setActionLoading(true); setConflict(null)
     await doJoin()
   }
 
@@ -81,85 +135,34 @@ export default function PotDetailPage() {
       const dateStr = toDateStr(new Date())
       if (isJoined) {
         if (isMaster) {
-          // 방장이 나갈 때
           const others = participants.filter(m => m.id !== user.id)
           if (others.length === 0) {
-            // 혼자였으면 팟 삭제
             await deletePot(pot.id)
             if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
-            navigate(-1)
-            return
+            navigate(-1); return
           } else {
-            // 가장 먼저 참여한 사람에게 방장 이전
-            const nextMaster = pot.pot_members
-              .filter(pm => pm.user_id !== user.id)
-              .sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
-            await updatePotCreator(pot.id, nextMaster.user_id)
+            const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
+            await updatePotCreator(pot.id, next.user_id)
           }
         }
         await leavePot(pot.id, user.id)
-        if (pot.group_id) {
-          await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
-        }
+        if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
       } else {
-        // 같은 슬롯에 이미 참여 중인 다른 팟이 있는지 확인
         if (pot.group_id) {
           const myPots = await getMyPotsForSlot(user.id, pot.group_id, dateStr, pot.slot)
           const otherPot = myPots.find(p => p.pot_id !== pot.id)
-          if (otherPot) {
-            setConflict({ otherPot: otherPot.meal_pots })
-            setActionLoading(false)
-            return
-          }
+          if (otherPot) { setConflict({ otherPot: otherPot.meal_pots }); setActionLoading(false); return }
         }
-        await doJoin()
-        return
+        await doJoin(); return
       }
       await loadPot()
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const handleSaveMenu = async () => {
-    try {
-      await updatePotMenu(pot.id, menuValue.trim())
-      await loadPot()
-      setEditingMenu(false)
     } catch (e) { console.error(e) }
+    finally { setActionLoading(false) }
   }
-
-  const handleSaveEdit = async () => {
-    if (!pot || actionLoading) return
-    setActionLoading(true)
-    try {
-      await updatePot(pot.id, editForm)
-      await loadPot()
-      setEditMode(false)
-    } catch (e) {
-      console.error(e)
-    } finally {
-      setActionLoading(false)
-    }
-  }
-
-  const [showShare, setShowShare] = useState(false)
-  const [copied, setCopied] = useState(null)
 
   const potLink = `${window.location.origin}/pot/${pot?.id}`
   const kakaoText = pot ? `🍚 ${pot.meal_time?.slice(0, 5)} ${pot.title} · ${participants.length}/${pot.max_people}명 · 같이먹자 → ${potLink}` : ''
-
-  const copyText = (text, type) => {
-    navigator.clipboard?.writeText(text)
-    setCopied(type)
-    setTimeout(() => setCopied(null), 2000)
-  }
-
-  const handleShare = () => {
-    setShowShare(v => !v)
-  }
+  const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
 
   if (loading) return <div style={styles.loadingPage}>🍚</div>
   if (!pot) return <div style={styles.loadingPage}>밥팟을 찾을 수 없어요.</div>
@@ -168,189 +171,165 @@ export default function PotDetailPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>밥팟 {editMode ? '수정' : '상세'}</span>
-        {isMaster && !editMode && (
-          <button style={styles.editBtn} onClick={() => setEditMode(true)}>수정</button>
-        )}
-        {editMode && (
-          <button style={styles.editBtn} onClick={() => setEditMode(false)}>취소</button>
-        )}
-        {!isMaster && <span />}
+        <span style={styles.headerTitle}>밥팟 상세</span>
+        <span />
       </div>
 
       <div style={styles.body}>
-        {editMode ? (
-          /* ── 수정 모드 ── */
-          <div style={styles.editForm}>
-            <div style={styles.field}>
-              <label style={styles.label}>시간</label>
-              <input
-                type="time"
-                style={styles.input}
-                value={editForm.meal_time}
-                onChange={e => setEditForm(f => ({ ...f, meal_time: e.target.value }))}
-              />
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>밥팟 이름</label>
-              <input
-                style={styles.input}
-                value={editForm.title}
-                onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
-                maxLength={20}
-              />
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>최대 인원</label>
-              <div style={styles.stepper}>
-                <button style={styles.step} onClick={() => setEditForm(f => ({ ...f, max_people: Math.max(participants.length, 2, f.max_people - 1) }))}>−</button>
-                <span style={styles.stepVal}>{editForm.max_people}명</span>
-                <button style={styles.step} onClick={() => setEditForm(f => ({ ...f, max_people: Math.min(10, f.max_people + 1) }))}>+</button>
-              </div>
-            </div>
-            <div style={styles.field}>
-              <label style={styles.label}>공개 범위</label>
-              <div style={styles.toggleRow}>
-                <button style={{ ...styles.toggleBtn, ...(!editForm.is_public ? styles.toggleActive : {}) }} onClick={() => setEditForm(f => ({ ...f, is_public: false }))}>그룹만</button>
-                <button style={{ ...styles.toggleBtn, ...(editForm.is_public ? styles.toggleActive : {}) }} onClick={() => setEditForm(f => ({ ...f, is_public: true }))}>전체 공개</button>
-              </div>
-            </div>
+        {/* 태그 행 */}
+        <div style={styles.tagRow}>
+          {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}
+          <span style={styles.slotTag}>{pot.slot}</span>
+          {/* 공개 범위 — 방장만 토글 */}
+          {isMaster ? (
             <button
-              style={{ ...styles.btn, opacity: actionLoading ? 0.4 : 1, marginTop: 8 }}
-              onClick={handleSaveEdit}
-              disabled={actionLoading}
+              style={{ ...styles.publicToggle, background: pot.is_public ? '#E3F2FD' : 'var(--color-surface-2)', color: pot.is_public ? '#2196F3' : 'var(--color-text-muted)', borderColor: pot.is_public ? '#2196F3' : 'var(--color-border)' }}
+              onClick={togglePublic}
             >
-              {actionLoading ? '저장 중...' : '저장하기'}
+              {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
             </button>
+          ) : (
+            pot.is_public && <span style={styles.publicTag}>공개</span>
+          )}
+        </div>
+
+        {/* 인라인 편집 필드들 */}
+        <div style={styles.fields}>
+          {/* 시간 */}
+          <InlineField
+            label="시간"
+            value={pot.meal_time?.slice(0, 5)}
+            editable={isMaster}
+            editing={editingField === 'time'}
+            onEdit={() => startEdit('time', pot.meal_time?.slice(0, 5) ?? '')}
+            onSave={() => saveField('time')}
+            onCancel={cancelEdit}
+            renderEditor={() => (
+              <input type="time" style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} autoFocus />
+            )}
+          />
+
+          {/* 밥팟 이름 */}
+          <InlineField
+            label="이름"
+            value={pot.title}
+            editable={isMaster}
+            editing={editingField === 'title'}
+            onEdit={() => startEdit('title', pot.title ?? '')}
+            onSave={() => saveField('title')}
+            onCancel={cancelEdit}
+            renderEditor={() => (
+              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={20} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') saveField('title'); if (e.key === 'Escape') cancelEdit() }} />
+            )}
+          />
+
+          {/* 메뉴 */}
+          <InlineField
+            label="메뉴"
+            value={pot.menu}
+            displayValue={pot.menu || '미정'}
+            editable={isMaster}
+            editing={editingField === 'menu'}
+            onEdit={() => startEdit('menu', pot.menu ?? '')}
+            onSave={() => saveField('menu')}
+            onCancel={cancelEdit}
+            renderEditor={() => (
+              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={20} autoFocus placeholder="미입력 시 미정"
+                onKeyDown={e => { if (e.key === 'Enter') saveField('menu'); if (e.key === 'Escape') cancelEdit() }} />
+            )}
+          />
+
+          {/* 최대 인원 */}
+          <InlineField
+            label="최대"
+            value={`${pot.max_people}명`}
+            editable={isMaster}
+            editing={editingField === 'max_people'}
+            onEdit={() => startEdit('max_people')}
+            onSave={() => saveField('max_people')}
+            onCancel={cancelEdit}
+            renderEditor={() => (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <button style={styles.stepperBtn} onClick={() => setTempMaxPeople(v => Math.max(participants.length, 2, v - 1))}>−</button>
+                <span style={{ fontWeight: 700, fontSize: 16, minWidth: 32, textAlign: 'center' }}>{tempMaxPeople}명</span>
+                <button style={styles.stepperBtn} onClick={() => setTempMaxPeople(v => Math.min(10, v + 1))}>+</button>
+              </div>
+            )}
+          />
+        </div>
+
+        {!pot.is_default && pot.users && (
+          <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
+        )}
+
+        {/* 인원 점 UI */}
+        <div style={styles.dotsSection}>
+          <div style={styles.dotsLabel}>{participants.length}/{pot.max_people}명</div>
+          <div style={styles.dots}>
+            {Array.from({ length: pot.max_people }).map((_, i) => {
+              const member = participants[i]
+              const isMe = member?.id === user?.id
+              return (
+                <div key={i} style={styles.dotWrapper}>
+                  <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
+                    {member ? member.nickname[0] : ''}
+                  </div>
+                  <div style={styles.dotName}>{member?.nickname ?? '　'}</div>
+                </div>
+              )
+            })}
           </div>
+        </div>
+
+        {isJoined ? (
+          <button style={{ ...styles.btn, background: 'var(--color-surface-2)', color: 'var(--color-text)' }} onClick={handleJoinToggle} disabled={actionLoading}>
+            {actionLoading ? '처리 중...' : '참여 취소'}
+          </button>
         ) : (
-          /* ── 상세 보기 ── */
-          <>
-            <div style={styles.timeRow}>
-              <span style={{ ...styles.time, color: pot.is_default ? '#4CAF50' : 'var(--color-primary)' }}>
-                {pot.meal_time?.slice(0, 5)}
-              </span>
-              {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}
-              {pot.is_public && <span style={styles.publicTag}>공개</span>}
-              <span style={styles.slotTag}>{pot.slot}</span>
-            </div>
-            <h2 style={styles.title}>{pot.title}</h2>
+          <button style={{ ...styles.btn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
+            {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '참여하기 🙋'}
+          </button>
+        )}
 
-            {/* 메뉴 — 인라인 편집 */}
-            {editingMenu ? (
-              <div style={styles.menuEditRow}>
-                <input
-                  style={styles.menuInput}
-                  value={menuValue}
-                  onChange={e => setMenuValue(e.target.value)}
-                  placeholder="메뉴 입력"
-                  maxLength={20}
-                  autoFocus
-                  onKeyDown={e => { if (e.key === 'Enter') handleSaveMenu(); if (e.key === 'Escape') setEditingMenu(false) }}
-                />
-                <button style={styles.menuSaveBtn} onClick={handleSaveMenu}>저장</button>
-                <button style={styles.menuCancelBtn} onClick={() => setEditingMenu(false)}>✕</button>
-              </div>
-            ) : (
-              <div style={styles.menuRow}>
-                <span style={styles.menuLabel}>메뉴</span>
-                <span style={{ ...styles.menuValue, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-                  {pot.menu || '미정'}
-                </span>
-                {isMaster && (
-                  <button style={styles.menuEditBtn} onClick={() => { setMenuValue(pot.menu ?? ''); setEditingMenu(true) }}>
-                    수정
-                  </button>
-                )}
-              </div>
-            )}
+        <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
+          🔗 {showShare ? '닫기' : '공유하기'}
+        </button>
 
-            {!pot.is_default && pot.users && (
-              <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
-            )}
-
-            <div style={styles.dotsSection}>
-              <div style={styles.dotsLabel}>{participants.length}/{pot.max_people}명</div>
-              <div style={styles.dots}>
-                {Array.from({ length: pot.max_people }).map((_, i) => {
-                  const member = participants[i]
-                  const isMe = member?.id === user?.id
-                  return (
-                    <div key={i} style={styles.dotWrapper}>
-                      <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
-                        {member ? member.nickname[0] : ''}
-                      </div>
-                      <div style={styles.dotName}>{member?.nickname ?? '　'}</div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {isJoined ? (
-              <button style={{ ...styles.btn, background: 'var(--color-surface-2)', color: 'var(--color-text)' }} onClick={handleJoinToggle} disabled={actionLoading}>
-                {actionLoading ? '처리 중...' : '참여 취소'}
+        {showShare && (
+          <div style={styles.sharePanel}>
+            <div style={styles.shareLabel}>밥팟 링크</div>
+            <div style={styles.shareRow}>
+              <span style={styles.shareText}>{potLink}</span>
+              <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }} onClick={() => copyText(potLink, 'link')}>
+                {copied === 'link' ? '✓' : '복사'}
               </button>
-            ) : (
-              <button style={{ ...styles.btn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
-                {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '참여하기 🙋'}
+            </div>
+            <div style={styles.shareLabel}>카톡 공유용</div>
+            <div style={styles.shareRow}>
+              <span style={{ ...styles.shareText, fontSize: 12 }}>{kakaoText}</span>
+              <button style={{ ...styles.shareCopyBtn, background: copied === 'kakao' ? '#4CAF50' : '#FEE500', color: copied === 'kakao' ? '#fff' : '#3C1E1E' }} onClick={() => copyText(kakaoText, 'kakao')}>
+                {copied === 'kakao' ? '✓' : '복사'}
               </button>
-            )}
-
-            <button style={styles.shareBtn} onClick={handleShare}>
-              🔗 {showShare ? '닫기' : '공유하기'}
-            </button>
-
-            {showShare && (
-              <div style={styles.sharePanel}>
-                <div style={styles.shareLabel}>밥팟 링크</div>
-                <div style={styles.shareRow}>
-                  <span style={styles.shareText}>{potLink}</span>
-                  <button
-                    style={{ ...styles.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
-                    onClick={() => copyText(potLink, 'link')}
-                  >
-                    {copied === 'link' ? '✓' : '복사'}
-                  </button>
-                </div>
-
-                <div style={styles.shareLabel}>카톡 공유용</div>
-                <div style={styles.shareRow}>
-                  <span style={{ ...styles.shareText, fontSize: 12 }}>{kakaoText}</span>
-                  <button
-                    style={{ ...styles.shareCopyBtn, background: copied === 'kakao' ? '#4CAF50' : '#FEE500', color: copied === 'kakao' ? '#fff' : '#3C1E1E' }}
-                    onClick={() => copyText(kakaoText, 'kakao')}
-                  >
-                    {copied === 'kakao' ? '✓' : '복사'}
-                  </button>
-                </div>
-              </div>
-            )}
-          </>
+            </div>
+          </div>
         )}
       </div>
 
-      {/* 중복 참여 충돌 다이얼로그 */}
+      {/* 중복 참여 충돌 */}
       {conflict && (
         <div style={styles.overlay}>
           <div style={styles.dialog}>
-            <div style={styles.dialogEmoji}>⚠️</div>
+            <div style={{ fontSize: 40 }}>⚠️</div>
             <div style={styles.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
             <p style={styles.dialogDesc}>
               <strong>{pot.slot}</strong> 슬롯에{'\n'}
-              <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}
-              에 이미 참여하고 있어요.
+              <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}에 이미 참여하고 있어요.
             </p>
             <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>
-                기존 밥팟 나가고 여기 참여
-              </button>
-              <button style={styles.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>
-                중복 참여하기
-              </button>
-              <button style={styles.dialogBtnCancel} onClick={() => setConflict(null)}>
-                참여 취소
-              </button>
+              <button style={styles.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>기존 밥팟 나가고 여기 참여</button>
+              <button style={styles.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>중복 참여하기</button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConflict(null)}>참여 취소</button>
             </div>
           </div>
         </div>
@@ -365,35 +344,19 @@ const styles = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  editBtn: { background: 'none', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-full)', color: 'var(--color-primary)', fontSize: 13, fontWeight: 700, padding: '5px 14px', cursor: 'pointer' },
   body: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflowY: 'auto' },
 
-  editForm: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)' },
-  field: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' },
-  label: { fontWeight: 700, fontSize: 'var(--font-size-sm)' },
-  input: { padding: '13px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
-  stepper: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)' },
-  step: { width: 40, height: 40, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  stepVal: { fontSize: 'var(--font-size-lg)', fontWeight: 700, minWidth: 40, textAlign: 'center' },
-  toggleRow: { display: 'flex', gap: 'var(--spacing-sm)' },
-  toggleBtn: { flex: 1, padding: 12, border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  toggleActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
-
-  timeRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  time: { fontSize: 'var(--font-size-2xl)', fontWeight: 900 },
+  tagRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   defaultTag: { fontSize: 12, background: '#E8F5E9', borderRadius: 4, padding: '2px 8px', color: '#4CAF50', fontWeight: 600 },
   publicTag: { fontSize: 12, background: '#eee', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
   slotTag: { fontSize: 12, background: 'var(--color-surface-2)', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 800, marginTop: -4 },
-  menuRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  menuLabel: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 30 },
-  menuValue: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
-  menuEditBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
-  menuEditRow: { display: 'flex', alignItems: 'center', gap: 6 },
-  menuInput: { flex: 1, padding: '8px 12px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
-  menuSaveBtn: { padding: '8px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 13, cursor: 'pointer' },
-  menuCancelBtn: { padding: '8px 10px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--color-text-muted)' },
-  creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' },
+  publicToggle: { fontSize: 12, fontWeight: 600, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
+
+  fields: { display: 'flex', flexDirection: 'column' },
+  inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' },
+  stepperBtn: { width: 32, height: 32, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+
+  creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: -4 },
   dotsSection: { padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   dotsLabel: { fontWeight: 700, marginBottom: 'var(--spacing-sm)' },
   dots: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' },
@@ -406,11 +369,10 @@ const styles = {
   shareLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
   shareText: { flex: 1, fontSize: 13, color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
-  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
+  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogEmoji: { fontSize: 40 },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },

@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, setGroupSharing } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
@@ -10,10 +10,25 @@ import BottomNav from '../components/BottomNav'
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
 
 function toDateStr(date) {
-  return date.toLocaleDateString('ko-KR', { timeZone: 'Asia/Seoul' }).replace(/\. /g, '-').replace('.', '')
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
 }
 function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+}
+
+function getRelativeLabel(date) {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
+  if (diff === 0)  return { label: '오늘',   color: 'var(--color-primary)' }
+  if (diff === -1) return { label: '어제',   color: '#2196F3' }
+  if (diff === -2) return { label: '엊그제', color: '#2196F3' }
+  if (diff === 1)  return { label: '내일',   color: '#4CAF50' }
+  if (diff === 2)  return { label: '모레',   color: '#4CAF50' }
+  if (diff < 0)   return { label: `${Math.abs(diff)}일 전`, color: '#9E9E9E' }
+  return { label: `${diff}일 뒤`, color: '#9E9E9E' }
 }
 function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
@@ -35,6 +50,8 @@ export default function TodayPage() {
   const [currentDate, setCurrentDate] = useState(TODAY)
   const [selectedSlot, setSelectedSlot] = useState('점심')
   const [openDropdown, setOpenDropdown] = useState(null)
+  const [allCollapsed, setAllCollapsed] = useState(false)
+  const [collapseKey, setCollapseKey] = useState(0) // 강제 리렌더용
 
   const [groups, setGroups] = useState([])
   const [membersMap, setMembersMap] = useState({})   // groupId -> members[]
@@ -202,7 +219,7 @@ export default function TodayPage() {
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>←</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          {isToday && <span style={styles.todayBadge}>오늘</span>}
+          {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
         </div>
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
       </div>
@@ -332,7 +349,12 @@ export default function TodayPage() {
       </div>
 
       {/* 그룹별 현황 */}
-      <div style={styles.sectionTitle}>{selectedSlot} 현황</div>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div style={styles.sectionTitle}>{selectedSlot} 현황</div>
+        <button style={styles.collapseAllBtn} onClick={() => { setAllCollapsed(v => !v); setCollapseKey(k => k + 1) }}>
+          {allCollapsed ? '모두 펼치기' : '모두 접기'}
+        </button>
+      </div>
       {groups.length === 0 && (
         <div style={styles.emptyGroup}>
           <div style={{ fontSize: 36 }}>👥</div>
@@ -345,25 +367,35 @@ export default function TodayPage() {
           </button>
         </div>
       )}
-      {groups.map(group => {
-        const members = membersMap[group.id] ?? []
-        const statuses = statusesMap[group.id] ?? []
-        const pots = sortPots((potsMap[group.id] ?? []).filter(p => p.slot === selectedSlot))
-        return (
-          <GroupSlotCard
-            key={group.id}
-            group={group}
-            slot={selectedSlot}
-            members={members}
-            statuses={statuses}
-            pots={pots}
-            myUserId={user.id}
-            mySlotData={mySlots[selectedSlot]}
-            onNavigate={navigate}
-            onRefresh={loadData}
-          />
-        )
-      })}
+      {(() => {
+        // 내가 이 슬롯의 어느 그룹 팟에든 참여 중인지 전체 기준으로 계산
+        const amIInAnyPot = Object.values(potsMap).flat()
+          .some(p => p.slot === selectedSlot && p.pot_members?.some(pm => pm.user_id === user.id))
+
+        return groups.map(group => {
+          const members = membersMap[group.id] ?? []
+          const statuses = statusesMap[group.id] ?? []
+          const pots = sortPots((potsMap[group.id] ?? []).filter(p => p.slot === selectedSlot))
+          return (
+            <GroupSlotCard
+              key={group.id}
+              group={group}
+              slot={selectedSlot}
+              members={members}
+              statuses={statuses}
+              pots={pots}
+              myUserId={user.id}
+              mySlotData={mySlots[selectedSlot]}
+              amIInAnyPot={amIInAnyPot}
+              allCollapsed={allCollapsed}
+              collapseKey={collapseKey}
+              dateStr={dateStr}
+              onNavigate={navigate}
+              onRefresh={loadData}
+            />
+          )
+        })
+      })()}
 
       <button style={styles.addGroupBtn} onClick={() => navigate('/group-setup')}>
         + 그룹 만들기 / 참여하기
@@ -374,19 +406,56 @@ export default function TodayPage() {
   )
 }
 
-function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, onNavigate, onRefresh }) {
+function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh }) {
   const [showInvite, setShowInvite] = useState(false)
-  const [copied, setCopied] = useState(null) // 'code' | 'link' | null
+  const [copied, setCopied] = useState(null)
+  const [showSettings, setShowSettings] = useState(false)
+  const [editingName, setEditingName] = useState(false)
+  const [nameValue, setNameValue] = useState(group.name)
+  const [confirmLeave, setConfirmLeave] = useState(false)
+  const [sharing, setSharing] = useState(true)
+  const [collapsed, setCollapsed] = useState(false)
+  useEffect(() => { setCollapsed(allCollapsed) }, [collapseKey])
 
-  const isInPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId))
+  // 초기 공유 상태: statusesMap에서 내 is_hidden 확인
+  useEffect(() => {
+    const myAnyStatus = statuses.find(s => s.user_id === myUserId)
+    if (myAnyStatus) setSharing(!myAnyStatus.is_hidden)
+  }, [statuses, myUserId])
+
+  const handleToggleSharing = async () => {
+    const next = !sharing
+    setSharing(next)
+    await setGroupSharing(myUserId, group.id, dateStr, !next)
+  }
+
+  const isMaster = group.created_by === myUserId
+
+  const handleSaveName = async () => {
+    if (!nameValue.trim()) return
+    await updateGroupName(group.id, nameValue.trim())
+    setEditingName(false)
+    setShowSettings(false)
+    onRefresh()
+  }
+
+  const handleLeave = async () => {
+    await leaveGroup(group.id, myUserId)
+    onRefresh()
+  }
+
+  const isInPot = amIInAnyPot // 전체 그룹 기준 (상태 표시용)
+  const isInThisGroupPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId)) // 이 그룹 팟 참여 여부 (헤더 색상용)
 
   const getMemberData = (userId) => {
     if (userId === myUserId) {
-      // 내가 이 그룹 슬롯의 팟에 참여중이면 참여중으로 고정
+      if (!sharing) return null // 비공유 상태면 내 상태 숨김
       if (isInPot) return { ...mySlotData, status: '참여중' }
       return mySlotData ?? null
     }
-    return statuses.find(s => s.user_id === userId && s.slot === slot) ?? null
+    const s = statuses.find(s => s.user_id === userId && s.slot === slot)
+    if (!s || s.is_hidden) return null  // 숨김 처리된 상태는 표시 안 함
+    return s
   }
 
   const hasActivity = members.some(m => getMemberData(m.id)?.status) || pots.length > 0
@@ -398,46 +467,106 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   }
 
   return (
-    <div style={{ ...styles.groupCard, opacity: hasActivity ? 1 : 0.45 }}>
-      <div style={styles.groupHeader}>
-        <span style={styles.groupName}>{group.name}</span>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+    <div style={styles.groupCard}>
+      <div style={{
+        ...styles.groupHeader,
+        background: !sharing ? '#EEEEEE' : isInThisGroupPot ? '#E8F5E9' : 'var(--color-surface-2)',
+      }}>
+        {/* 좌측: 활동 도트 + 그룹명 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {hasActivity && <span style={styles.activityDot} />}
-          <button style={styles.inviteBtn} onClick={() => setShowInvite(v => !v)}>
-            {showInvite ? '닫기' : '초대'}
-          </button>
+          <span style={{ ...styles.groupName, color: sharing ? 'var(--color-text)' : '#9E9E9E' }}>{group.name}</span>
+        </div>
+        {/* 우측: 토글 + 초대 + 설정 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+          {/* 공유 토글 */}
+          <div style={styles.toggleWrap} onClick={handleToggleSharing}>
+            <div style={{ ...styles.toggleTrack, background: sharing ? 'var(--color-primary)' : '#BDBDBD' }}>
+              <div style={{ ...styles.toggleThumb, transform: sharing ? 'translateX(14px)' : 'translateX(0)' }} />
+            </div>
+            <span style={{ ...styles.toggleLabel, color: sharing ? 'var(--color-primary)' : '#9E9E9E' }}>
+              {sharing ? '공유중' : '비공유'}
+            </span>
+          </div>
+          <button style={styles.groupSettingsBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
+          <button style={styles.groupCollapseBtn} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
         </div>
       </div>
 
-      {showInvite && (
-        <div style={styles.invitePanel}>
-          <div style={styles.inviteLabel}>초대 코드</div>
-          <div style={styles.inviteCodeBox}>
-            <span style={styles.inviteCode}>{group.invite_code}</span>
-            <button
-              style={{ ...styles.inviteCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }}
-              onClick={() => copyText(group.invite_code, 'code')}
-            >
-              {copied === 'code' ? '✓' : '복사'}
-            </button>
-          </div>
-          <div style={styles.inviteLabel} >초대 링크</div>
-          <div style={styles.inviteCodeBox}>
-            <span style={{ ...styles.inviteCode, fontSize: 11, color: 'var(--color-text-muted)' }}>
-              {window.location.origin}/join/{group.invite_code}
-            </span>
-            <button
-              style={{ ...styles.inviteCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
-              onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}
-            >
-              {copied === 'link' ? '✓' : '복사'}
+      {/* 그룹 설정 바텀시트 */}
+      {showSettings && (
+        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setConfirmLeave(false) }}>
+          <div style={styles.sheet} onClick={e => e.stopPropagation()}>
+            <div style={styles.sheetTitle}>{group.name}</div>
+
+            {isMaster && !editingName && (
+              <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
+                <span>✏️</span><span style={styles.sheetRowLabel}>그룹명 변경</span>
+              </button>
+            )}
+
+            {isMaster && editingName && (
+              <div style={styles.sheetNameEdit}>
+                <div style={styles.sheetNameLabel}>새 그룹명</div>
+                <input
+                  style={styles.sheetNameInput}
+                  value={nameValue}
+                  onChange={e => setNameValue(e.target.value)}
+                  maxLength={20}
+                  autoFocus
+                  onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+                />
+                <div style={styles.sheetNameBtns}>
+                  <button style={styles.sheetSaveBtn} onClick={handleSaveName}>저장</button>
+                  <button style={styles.sheetCancelBtn} onClick={() => { setEditingName(false); setNameValue(group.name) }}>취소</button>
+                </div>
+              </div>
+            )}
+
+            {!confirmLeave ? (
+              <button style={{ ...styles.sheetRow, color: '#f44336' }} onClick={() => setConfirmLeave(true)}>
+                <span>🚪</span><span style={styles.sheetRowLabel}>그룹 나가기</span>
+              </button>
+            ) : (
+              <div style={styles.sheetLeaveConfirm}>
+                <p style={styles.sheetLeaveText}>정말 그룹을 나가시겠어요?</p>
+                <div style={styles.sheetLeaveBtns}>
+                  <button style={styles.sheetLeaveYes} onClick={handleLeave}>나가기</button>
+                  <button style={styles.sheetLeaveNo} onClick={() => setConfirmLeave(false)}>취소</button>
+                </div>
+              </div>
+            )}
+
+            {/* 초대 */}
+            <div style={styles.sheetInviteSection}>
+              <div style={styles.sheetInviteLabel}>초대 코드</div>
+              <div style={styles.sheetInviteCodeBox}>
+                <span style={styles.sheetInviteCode}>{group.invite_code}</span>
+                <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }}
+                  onClick={() => copyText(group.invite_code, 'code')}>
+                  {copied === 'code' ? '✓' : '복사'}
+                </button>
+              </div>
+              <div style={styles.sheetInviteLabel}>초대 링크</div>
+              <div style={styles.sheetInviteCodeBox}>
+                <span style={{ ...styles.sheetInviteCode, fontSize: 11 }}>{`${window.location.origin}/join/${group.invite_code}`}</span>
+                <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
+                  onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}>
+                  {copied === 'link' ? '✓' : '복사'}
+                </button>
+              </div>
+            </div>
+
+            <button style={styles.sheetClose} onClick={() => { setShowSettings(false); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>
+              닫기
             </button>
           </div>
         </div>
       )}
 
 
-      <div style={styles.memberList}>
+
+      {!collapsed && <div style={styles.memberList}>
         {members.map(member => {
           const data = getMemberData(member.id)
           const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
@@ -462,18 +591,18 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             </div>
           )
         })}
-      </div>
+      </div>}
 
-      {pots.length > 0 && (
+      {!collapsed && pots.length > 0 && (
         <div style={styles.potsArea}>
           <div style={styles.potsLabel}>열린 밥팟</div>
           {pots.map(pot => <PotCard key={pot.id} pot={pot} />)}
         </div>
       )}
 
-      <button style={styles.createBtn} onClick={() => onNavigate('/create')}>
+      {!collapsed && <button style={styles.createBtn} onClick={() => onNavigate('/create')}>
         + 밥팟 만들기
-      </button>
+      </button>}
     </div>
   )
 }
@@ -490,6 +619,7 @@ const styles = {
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
+  relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   myCard: { background: 'var(--color-surface)', border: '2px solid var(--color-primary)33', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
   myCardTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
@@ -508,6 +638,35 @@ const styles = {
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)' },
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   inviteBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  groupSettingsBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '0 2px' },
+  groupCollapseBtn: { background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px', color: 'var(--color-text-muted)' },
+  collapseAllBtn: { fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
+  toggleWrap: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
+  toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
+  toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
+  toggleLabel: { fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' },
+  sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4 },
+  sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 8, textAlign: 'center' },
+  sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
+  sheetRowLabel: { flex: 1 },
+  sheetNameEdit: { display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 0' },
+  sheetNameLabel: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)' },
+  sheetNameInput: { width: '100%', padding: '12px var(--spacing-md)', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box' },
+  sheetNameBtns: { display: 'flex', gap: 8 },
+  sheetSaveBtn: { flex: 1, padding: 12, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  sheetCancelBtn: { padding: '12px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  sheetLeaveConfirm: { padding: '8px 0' },
+  sheetLeaveText: { fontSize: 14, color: '#f44336', fontWeight: 600, marginBottom: 12, textAlign: 'center' },
+  sheetLeaveBtns: { display: 'flex', gap: 8 },
+  sheetLeaveYes: { flex: 1, padding: 12, background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 14, cursor: 'pointer' },
+  sheetLeaveNo: { padding: '12px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 14, cursor: 'pointer' },
+  sheetClose: { width: '100%', padding: 12, marginTop: 8, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
+  sheetInviteSection: { display: 'flex', flexDirection: 'column', gap: 6, padding: '4px 0' },
+  sheetInviteLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
+  sheetInviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' },
+  sheetInviteCode: { flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: 1, wordBreak: 'break-all' },
+  sheetInviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   invitePanel: { margin: '0 var(--spacing-md) var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 },
   inviteLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
   inviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', border: '1px solid var(--color-border)' },

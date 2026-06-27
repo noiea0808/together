@@ -17,7 +17,8 @@ function parseError(e) {
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { login } = useUser()
-  const [tab, setTab] = useState('signup') // 'signup' | 'login'
+  const hasPendingInvite = !!localStorage.getItem('pendingInviteCode')
+  const [tab, setTab] = useState('login')
   const [form, setForm] = useState({ email: '', password: '', nickname: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -77,19 +78,25 @@ export default function OnboardingPage() {
       </div>
 
       <div style={styles.card}>
+        {/* 초대 링크로 온 경우 안내 */}
+        {hasPendingInvite && (
+          <div style={styles.inviteBanner}>
+            🎉 초대 링크로 오셨군요! 로그인하면 바로 입장됩니다.
+          </div>
+        )}
         {/* 탭 */}
         <div style={styles.tabs}>
-          <button
-            style={{ ...styles.tab, ...(tab === 'signup' ? styles.tabActive : {}) }}
-            onClick={() => { setTab('signup'); setError(null) }}
-          >
-            회원가입
-          </button>
           <button
             style={{ ...styles.tab, ...(tab === 'login' ? styles.tabActive : {}) }}
             onClick={() => { setTab('login'); setError(null) }}
           >
             로그인
+          </button>
+          <button
+            style={{ ...styles.tab, ...(tab === 'signup' ? styles.tabActive : {}) }}
+            onClick={() => { setTab('signup'); setError(null) }}
+          >
+            회원가입
           </button>
         </div>
 
@@ -203,4 +210,5 @@ const styles = {
     marginTop: 4,
   },
   footer: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
+  inviteBanner: { background: 'var(--color-primary)12', border: '1px solid var(--color-primary)33', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },
 }

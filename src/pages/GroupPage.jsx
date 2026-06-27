@@ -1,11 +1,9 @@
 import { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers } from '../lib/db'
 import BottomNav from '../components/BottomNav'
 
 export default function GroupPage() {
-  const navigate = useNavigate()
   const { user } = useUser()
   const [groups, setGroups] = useState([])
   const [membersMap, setMembersMap] = useState({})
@@ -20,102 +18,98 @@ export default function GroupPage() {
     })
   }, [user.id])
 
+  // 나를 제외한 모든 친구 + 각자 속한 그룹 정보
+  const friendMap = {}
+  groups.forEach(g => {
+    (membersMap[g.id] ?? []).forEach(member => {
+      if (member.id === user.id) return
+      if (!friendMap[member.id]) {
+        friendMap[member.id] = { ...member, groups: [] }
+      }
+      friendMap[member.id].groups.push(g)
+    })
+  })
+  const friends = Object.values(friendMap).sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'))
+
+  const totalMembers = new Set(
+    Object.values(membersMap).flat().map(m => m.id).filter(id => id !== user.id)
+  ).size
+
   if (loading) return <div style={styles.loadingPage}>🍚</div>
 
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <span style={styles.headerTitle}>그룹 관리</span>
+        <span style={styles.headerTitle}>친구 관리</span>
       </div>
 
       <div style={styles.body}>
-        {groups.map(group => (
-          <GroupSection
-            key={group.id}
-            group={group}
-            members={membersMap[group.id] ?? []}
-            myUserId={user.id}
-          />
-        ))}
+        {/* 요약 */}
+        <div style={styles.summary}>
+          <div style={styles.summaryItem}>
+            <div style={styles.summaryNum}>{totalMembers}</div>
+            <div style={styles.summaryLabel}>함께하는 친구</div>
+          </div>
+          <div style={styles.summaryDivider} />
+          <div style={styles.summaryItem}>
+            <div style={styles.summaryNum}>{groups.length}</div>
+            <div style={styles.summaryLabel}>참여 그룹</div>
+          </div>
+        </div>
 
-        <button style={styles.addBtn} onClick={() => navigate('/group-setup')}>
-          + 그룹 만들기 / 참여하기
-        </button>
+        {/* 친구 목록 */}
+        {friends.length === 0 ? (
+          <div style={styles.empty}>
+            <div style={{ fontSize: 40 }}>👥</div>
+            <div style={{ fontWeight: 700 }}>아직 친구가 없어요</div>
+            <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
+              그룹에 초대하면 친구들이 여기 표시됩니다.
+            </p>
+          </div>
+        ) : (
+          <div style={styles.friendList}>
+            {friends.map(friend => (
+              <div key={friend.id} style={styles.friendRow}>
+                <div style={styles.avatar}>{friend.nickname[0]}</div>
+                <div style={styles.friendInfo}>
+                  <div style={styles.friendName}>{friend.nickname}</div>
+                  <div style={styles.friendGroups}>
+                    {friend.groups.map(g => (
+                      <span key={g.id} style={styles.groupTag}>{g.name}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
+
       <BottomNav />
     </div>
   )
 }
 
-function GroupSection({ group, members, myUserId }) {
-  const [copied, setCopied] = useState(false)
-  const inviteLink = `${window.location.origin}/join/${group.invite_code}`
-
-  const handleCopy = () => {
-    navigator.clipboard?.writeText(inviteLink)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
-
-  return (
-    <div style={styles.groupSection}>
-      <div style={styles.groupCard}>
-        <span style={styles.groupEmoji}>👥</span>
-        <div>
-          <div style={styles.groupName}>{group.name}</div>
-          <div style={styles.memberCount}>{members.length}명</div>
-        </div>
-      </div>
-
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>초대 링크</div>
-        <div style={styles.inviteBox}>
-          <span style={styles.inviteCode}>{inviteLink}</span>
-        </div>
-        <button style={styles.copyBtn} onClick={handleCopy}>
-          {copied ? '✓ 복사됐습니다!' : '🔗 초대 링크 복사'}
-        </button>
-      </div>
-
-      <div style={styles.section}>
-        <div style={styles.sectionTitle}>멤버 {members.length}명</div>
-        <div style={styles.memberList}>
-          {members.map(member => (
-            <div key={member.id} style={styles.memberRow}>
-              <div style={styles.avatar}>{member.nickname[0]}</div>
-              <span style={styles.memberName}>{member.nickname}</span>
-              {member.id === myUserId && <span style={styles.meTag}>나</span>}
-              {member.id === group.created_by && <span style={styles.ownerTag}>👑 방장</span>}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
-
 const styles = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
-  back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  body: { flex: 1, padding: 'var(--spacing-md)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)', paddingBottom: 80 },
-  groupSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', paddingBottom: 'var(--spacing-xl)', borderBottom: '1px solid var(--color-border)' },
-  groupCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
-  groupEmoji: { fontSize: 36 },
-  groupName: { fontSize: 'var(--font-size-lg)', fontWeight: 800 },
-  memberCount: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: 2 },
-  section: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
-  sectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)' },
-  inviteBox: { padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
-  inviteCode: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', wordBreak: 'break-all' },
-  copyBtn: { width: '100%', padding: 12, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  memberList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  memberRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '8px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  avatar: { width: 32, height: 32, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 13 },
-  memberName: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 600 },
-  meTag: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)22', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 10px', fontWeight: 700 },
-  ownerTag: { fontSize: 'var(--font-size-xs)', background: '#FFF3E0', color: '#FF9800', borderRadius: 'var(--radius-full)', padding: '2px 10px', fontWeight: 700 },
-  addBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
+  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-xl)' },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
+
+  summary: { display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)' },
+  summaryItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
+  summaryNum: { fontSize: 32, fontWeight: 900, color: 'var(--color-primary)' },
+  summaryLabel: { fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 600 },
+  summaryDivider: { width: 1, background: 'var(--color-border)', margin: '8px 0' },
+
+  empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)' },
+
+  friendList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  friendRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  avatar: { width: 40, height: 40, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 16, flexShrink: 0 },
+  friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4 },
+  friendName: { fontSize: 'var(--font-size-base)', fontWeight: 700 },
+  friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
+  groupTag: { fontSize: 11, background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
 }
