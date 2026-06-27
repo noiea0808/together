@@ -162,8 +162,40 @@ export async function setStatusHidden(userId, date, isHidden) {
   if (error) throw error
 }
 
+// ── 상태 파생 공통 헬퍼 ──────────────────────────────
+// 저장된 daily_status에 "밥팟 참여 사실"을 덮어써 그룹별 표시 상태를 만든다.
+// 참여는 daily_status보다 우선: 이 그룹 팟 → 참여중 / 다른 그룹 팟 → 약속있음(closed)
+function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenKeys, date }) {
+  const memberSet = new Set(memberIds)
+  const map = {}
+  statusRows.forEach(s => {
+    if (memberSet.has(s.user_id)) map[`${s.user_id}:${s.slot}`] = { ...s }
+  })
+  potParts.forEach(pm => {
+    const mp = pm.meal_pots
+    if (!memberSet.has(pm.user_id)) return
+    const key = `${pm.user_id}:${mp.slot}`
+    const existing = map[key]
+    if (mp.group_id === groupId) {
+      map[key] = {
+        user_id: pm.user_id, date, slot: mp.slot,
+        status: '참여중', meal_time: mp.meal_time,
+        menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
+      }
+    } else if (!existing || existing.status !== '참여중') {
+      // 다른 그룹 팟 참여 → 약속있음. 시간은 노출하되 메뉴(상대 그룹 정보)는 비노출
+      map[key] = {
+        user_id: pm.user_id, date, slot: mp.slot,
+        status: 'closed', meal_time: mp.meal_time, menu: null,
+        is_hidden: existing?.is_hidden ?? false,
+      }
+    }
+  })
+  return Object.values(map).filter(s => !hiddenKeys.has(`${s.user_id}:${s.slot}`))
+}
+
+// 단일 그룹 상태 — 실시간 부분 갱신(reloadGroup)에서 사용
 export async function getGroupStatuses(groupId, date) {
-  // 그룹 멤버 ID 조회 후 해당 사용자들의 상태를 가져옴
   const { data: members, error: mErr } = await supabase
     .from('group_members')
     .select('user_id')
@@ -173,13 +205,94 @@ export async function getGroupStatuses(groupId, date) {
   const memberIds = members.map(m => m.user_id)
   if (memberIds.length === 0) return []
 
-  const { data, error } = await supabase
-    .from('daily_status')
-    .select('*')
-    .in('user_id', memberIds)
-    .eq('date', date)
-  if (error) throw error
-  return data
+  const [hiddenRes, statusRes, potRes] = await Promise.all([
+    supabase.from('group_share_settings')
+      .select('user_id, slot').eq('group_id', groupId).eq('date', date).eq('is_shared', false),
+    supabase.from('daily_status')
+      .select('*').in('user_id', memberIds).eq('date', date),
+    supabase.from('pot_members')
+      .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
+      .in('user_id', memberIds).eq('meal_pots.date', date),
+  ])
+  if (statusRes.error) throw statusRes.error
+
+  return deriveGroupStatuses({
+    groupId,
+    memberIds,
+    statusRows: statusRes.data ?? [],
+    potParts: potRes.data ?? [],
+    hiddenKeys: new Set((hiddenRes.data ?? []).map(r => `${r.user_id}:${r.slot}`)),
+    date,
+  })
+}
+
+// 오늘 화면 일괄 로더 — 그룹 수와 무관하게 상수 횟수 쿼리
+// members / status / 공유설정 / pots / 팟참여를 한 번씩만 조회하고 클라이언트에서 그룹별 분배
+export async function getTodayBoard(groupIds, date) {
+  const empty = { membersMap: {}, statusesMap: {}, potsMap: {} }
+  if (!groupIds || groupIds.length === 0) return empty
+
+  // 1) 멤버 (그룹 전체 한 번에) — 멤버 ID 집합 확보
+  const { data: memberRows, error: mErr } = await supabase
+    .from('group_members')
+    .select('group_id, user_id, users(*)')
+    .in('group_id', groupIds)
+  if (mErr) throw mErr
+
+  const membersMap = {}
+  const membersByGroup = {}   // groupId -> memberId[]
+  const memberIdSet = new Set()
+  groupIds.forEach(gid => { membersMap[gid] = []; membersByGroup[gid] = [] })
+  memberRows.forEach(r => {
+    membersMap[r.group_id].push(r.users)
+    membersByGroup[r.group_id].push(r.user_id)
+    memberIdSet.add(r.user_id)
+  })
+  const memberIds = [...memberIdSet]
+  if (memberIds.length === 0) return { ...empty, membersMap }
+
+  // 2~5) 상태 / 공유설정 / 팟 / 팟참여 병렬 조회
+  const [statusRes, shareRes, potRes, potPartRes] = await Promise.all([
+    supabase.from('daily_status')
+      .select('*').in('user_id', memberIds).eq('date', date),
+    supabase.from('group_share_settings')
+      .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
+    supabase.from('meal_pots')
+      .select('*, pot_members(user_id, users(nickname))').in('group_id', groupIds).eq('date', date),
+    supabase.from('pot_members')
+      .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
+      .in('user_id', memberIds).eq('meal_pots.date', date),
+  ])
+  if (statusRes.error) throw statusRes.error
+  if (potRes.error) throw potRes.error
+
+  const statusRows = statusRes.data ?? []
+  const potParts = potPartRes.data ?? []
+
+  // 팟 그룹별 분배
+  const potsMap = {}
+  groupIds.forEach(gid => { potsMap[gid] = [] })
+  ;(potRes.data ?? []).forEach(p => { potsMap[p.group_id]?.push(p) })
+
+  // 공유 비활성 키 (그룹별)
+  const hiddenByGroup = {}
+  groupIds.forEach(gid => { hiddenByGroup[gid] = new Set() })
+  ;(shareRes.data ?? []).forEach(r => { hiddenByGroup[r.group_id]?.add(`${r.user_id}:${r.slot}`) })
+
+  // 상태 그룹별 파생
+  const statusesMap = {}
+  groupIds.forEach(gid => {
+    statusesMap[gid] = deriveGroupStatuses({
+      groupId: gid,
+      memberIds: membersByGroup[gid],
+      statusRows,
+      potParts,
+      hiddenKeys: hiddenByGroup[gid],
+      date,
+    })
+  })
+
+  return { membersMap, statusesMap, potsMap }
 }
 
 export async function getMyStatuses(userId, date) {
@@ -193,7 +306,7 @@ export async function getMyStatuses(userId, date) {
 }
 
 // ── 밥팟 ──────────────────────────────────────────
-export async function createPot({ groupId, date, slot, meal_time, title, menu, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, max_people, is_public, is_default, createdBy }) {
   const { data, error } = await supabase
     .from('meal_pots')
     .insert({
@@ -201,6 +314,7 @@ export async function createPot({ groupId, date, slot, meal_time, title, menu, m
       date,
       slot,
       meal_time,
+      end_time: end_time || null,
       title,
       menu: menu || null,
       max_people,
@@ -249,17 +363,111 @@ export async function leavePot(potId, userId) {
   if (error) throw error
 }
 
+// 나간 뒤 기본팟이 아니고 멤버가 없으면 팟 자동 삭제
+export async function leavePotWithCleanup(potId, userId) {
+  const { data: pot } = await supabase
+    .from('meal_pots')
+    .select('is_default')
+    .eq('id', potId)
+    .single()
+
+  const { data: members } = await supabase
+    .from('pot_members')
+    .select('user_id')
+    .eq('pot_id', potId)
+
+  if (!pot?.is_default && (members ?? []).length <= 1) {
+    await deletePot(potId)
+  } else {
+    await leavePot(potId, userId)
+  }
+}
+
 // ── 내 일정 ──────────────────────────────────────────
 export async function getMySchedule(userId, fromDate, toDate) {
+  const [statusRes, potRes] = await Promise.all([
+    supabase.from('daily_status')
+      .select('*').eq('user_id', userId).gte('date', fromDate).lte('date', toDate),
+    supabase.from('pot_members')
+      .select('meal_pots!inner(slot, meal_time, date)')
+      .eq('user_id', userId)
+      .gte('meal_pots.date', fromDate)
+      .lte('meal_pots.date', toDate),
+  ])
+  if (statusRes.error) throw statusRes.error
+
+  // 밥팟 참여 사실로 보정 — 참여중은 저장하지 않고 pot_members에서 파생
+  const map = {}
+  ;(statusRes.data ?? []).forEach(s => { map[`${s.date}:${s.slot}`] = { ...s } })
+  ;(potRes.data ?? []).forEach(pm => {
+    const mp = pm.meal_pots
+    const key = `${mp.date}:${mp.slot}`
+    const existing = map[key]
+    map[key] = {
+      user_id: userId, date: mp.date, slot: mp.slot,
+      status: '참여중', meal_time: mp.meal_time,
+      menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
+    }
+  })
+  return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
+}
+
+// ── 그룹 공유 설정 (그룹 × 날짜 × 슬롯 단위) ─────────────
+// 사전 조건: Supabase에 group_share_settings 테이블 생성 필요
+// CREATE TABLE group_share_settings (
+//   user_id uuid references users(id),
+//   group_id uuid references groups(id),
+//   date date,
+//   slot text,
+//   is_shared boolean default true,
+//   primary key (user_id, group_id, date, slot)
+// );
+export async function getGroupShareSettings(userId, date) {
   const { data, error } = await supabase
-    .from('daily_status')
-    .select('*')
+    .from('group_share_settings')
+    .select('group_id, slot, is_shared')
     .eq('user_id', userId)
-    .gte('date', fromDate)
-    .lte('date', toDate)
-    .order('date', { ascending: true })
+    .eq('date', date)
   if (error) throw error
   return data
+}
+
+export async function setGroupShareSetting(userId, groupId, date, slot, isShared) {
+  const { error } = await supabase
+    .from('group_share_settings')
+    .upsert(
+      { user_id: userId, group_id: groupId, date, slot, is_shared: isShared },
+      { onConflict: 'user_id,group_id,date,slot' }
+    )
+  if (error) throw error
+}
+
+// fromDate 이후 전체 날짜에 공유 설정 적용 (60일 범위)
+export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, isShared) {
+  if (isShared) {
+    // true(공개)로 되돌릴 때 — 레코드 삭제로 기본값(공개) 복원
+    const { error } = await supabase
+      .from('group_share_settings')
+      .delete()
+      .eq('user_id', userId)
+      .eq('group_id', groupId)
+      .eq('slot', slot)
+      .gte('date', fromDate)
+    if (error) throw error
+  } else {
+    // false(비공개)로 — fromDate부터 60일치 레코드 upsert
+    const rows = []
+    const d = new Date(fromDate)
+    for (let i = 0; i < 60; i++) {
+      const dateStr = d.toISOString().slice(0, 10)
+      rows.push({ user_id: userId, group_id: groupId, date: dateStr, slot, is_shared: false })
+      d.setDate(d.getDate() + 1)
+    }
+    const { error } = await supabase
+      .from('group_share_settings')
+      .upsert(rows, { onConflict: 'user_id,group_id,date,slot' })
+    if (error) throw error
+  }
 }
 
 export async function updateNickname(userId, nickname) {
@@ -268,6 +476,18 @@ export async function updateNickname(userId, nickname) {
     .update({ nickname })
     .eq('id', userId)
   if (error) throw error
+}
+
+// 그룹 무관하게 해당 슬롯의 참여 팟 전체 조회
+export async function getMyPotsForSlotAllGroups(userId, date, slot) {
+  const { data, error } = await supabase
+    .from('pot_members')
+    .select('pot_id, meal_pots!inner(id, title, meal_time, slot, date, group_id)')
+    .eq('user_id', userId)
+    .eq('meal_pots.date', date)
+    .eq('meal_pots.slot', slot)
+  if (error) throw error
+  return data
 }
 
 export async function getMyPotsForSlot(userId, groupId, date, slot) {
@@ -298,10 +518,10 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, title, menu, max_people, is_public }) {
+export async function updatePot(potId, { meal_time, end_time, title, menu, max_people, is_public }) {
   const { error } = await supabase
     .from('meal_pots')
-    .update({ meal_time, title, menu: menu || null, max_people, is_public })
+    .update({ meal_time, end_time: end_time || null, title, menu: menu || null, max_people, is_public })
     .eq('id', potId)
   if (error) throw error
 }

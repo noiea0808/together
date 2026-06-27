@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups } from '../lib/db'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -59,8 +59,9 @@ export default function PotDetailPage() {
   const [copied, setCopied] = useState(null)
 
   // 인라인 편집 상태
-  const [editingField, setEditingField] = useState(null) // 'time'|'title'|'menu'|'max_people'|null
+  const [editingField, setEditingField] = useState(null) // 'time'|'end_time'|'title'|'menu'|'max_people'|null
   const [fieldValue, setFieldValue] = useState('')
+  const [endTimeValue, setEndTimeValue] = useState('')
   const [tempMaxPeople, setTempMaxPeople] = useState(4)
   const [tempIsPublic, setTempIsPublic] = useState(false)
 
@@ -84,15 +85,16 @@ export default function PotDetailPage() {
     setEditingField(field)
     setFieldValue(value ?? '')
     if (field === 'max_people') setTempMaxPeople(pot?.max_people ?? 4)
+    if (field === 'time') setEndTimeValue(pot?.end_time?.slice(0, 5) ?? '')
   }
   const cancelEdit = () => setEditingField(null)
 
   const saveField = async (field) => {
     let patch = {}
-    if (field === 'time') patch = { meal_time: fieldValue, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'title') patch = { meal_time: pot.meal_time, title: fieldValue || pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'menu') patch = { meal_time: pot.meal_time, title: pot.title, menu: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'max_people') patch = { meal_time: pot.meal_time, title: pot.title, menu: pot.menu, max_people: tempMaxPeople, is_public: pot.is_public }
+    if (field === 'time') patch = { meal_time: fieldValue, end_time: endTimeValue || null, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'title') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: fieldValue || pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'menu') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'max_people') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, max_people: tempMaxPeople, is_public: pot.is_public }
     try {
       await updatePot(pot.id, patch)
       await loadPot()
@@ -107,11 +109,9 @@ export default function PotDetailPage() {
     await loadPot()
   }
 
-  // 참여 관련
+  // 참여 관련 — 참여 사실은 pot_members로만 기록 (status는 사용자 의향 전용)
   const doJoin = async () => {
-    const dateStr = toDateStr(new Date())
     await joinPot(pot.id, user.id)
-    await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
     await loadPot()
     setActionLoading(false)
   }
@@ -119,7 +119,7 @@ export default function PotDetailPage() {
   const handleConflictLeaveAndJoin = async () => {
     if (!conflict) return
     setActionLoading(true); setConflict(null)
-    await leavePot(conflict.otherPot.id, user.id)
+    await leavePotWithCleanup(conflict.otherPot.id, user.id)
     await doJoin()
   }
 
@@ -138,21 +138,17 @@ export default function PotDetailPage() {
           const others = participants.filter(m => m.id !== user.id)
           if (others.length === 0) {
             await deletePot(pot.id)
-            await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: 'open' })
             navigate(-1); return
           } else {
             const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
             await updatePotCreator(pot.id, next.user_id)
           }
         }
-        await leavePot(pot.id, user.id)
-        await upsertStatus({ userId: user.id, date: dateStr, slot: pot.slot, status: 'open' })
+        await leavePotWithCleanup(pot.id, user.id)
       } else {
-        if (pot.group_id) {
-          const myPots = await getMyPotsForSlot(user.id, pot.group_id, dateStr, pot.slot)
-          const otherPot = myPots.find(p => p.pot_id !== pot.id)
-          if (otherPot) { setConflict({ otherPot: otherPot.meal_pots }); setActionLoading(false); return }
-        }
+        const myPots = await getMyPotsForSlotAllGroups(user.id, dateStr, pot.slot)
+        const otherPot = myPots.find(p => p.pot_id !== pot.id)
+        if (otherPot) { setConflict({ otherPot: otherPot.meal_pots }); setActionLoading(false); return }
         await doJoin(); return
       }
       await loadPot()
@@ -199,13 +195,22 @@ export default function PotDetailPage() {
           <InlineField
             label="시간"
             value={pot.meal_time?.slice(0, 5)}
+            displayValue={
+              pot.meal_time
+                ? `${pot.meal_time.slice(0, 5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}`
+                : '미정'
+            }
             editable={isMaster}
             editing={editingField === 'time'}
             onEdit={() => startEdit('time', pot.meal_time?.slice(0, 5) ?? '')}
             onSave={() => saveField('time')}
             onCancel={cancelEdit}
             renderEditor={() => (
-              <input type="time" style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} autoFocus />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
+                <input type="time" style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} autoFocus />
+                <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
+                <input type="time" style={styles.inlineInput} value={endTimeValue} onChange={e => setEndTimeValue(e.target.value)} />
+              </div>
             )}
           />
 

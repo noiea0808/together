@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, joinPot, upsertStatus } from '../lib/db'
+import { getMyGroups, createPot, joinPot } from '../lib/db'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -19,9 +19,11 @@ export default function CreatePotPage() {
 
   const [groups, setGroups] = useState([])
   const [form, setForm] = useState({
-    group_id: '',
+    group_id: searchParams.get('group_id') ?? '',
     slot: searchParams.get('slot') ?? '점심',
     meal_time: '12:00',
+    end_time: '13:00',
+    duration_minutes: 60, // 0 = 직접입력
     title: '',
     menu: '',
     max_people: 4,
@@ -34,14 +36,39 @@ export default function CreatePotPage() {
   useEffect(() => {
     getMyGroups(user.id).then(g => {
       setGroups(g)
-      if (g.length > 0) setForm(f => ({ ...f, group_id: g[0].id }))
+      if (g.length > 0) setForm(f => ({
+        ...f,
+        group_id: f.group_id || g[0].id,
+      }))
     })
   }, [user.id])
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
-  const handleCreate = async () => {
-    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
+  const addMinutes = (timeStr, minutes) => {
+    if (!timeStr) return ''
+    const [h, m] = timeStr.split(':').map(Number)
+    const total = h * 60 + m + minutes
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+  }
+
+  const setStartTime = (val) => {
+    setForm(f => ({
+      ...f,
+      meal_time: val,
+      end_time: f.duration_minutes > 0 ? addMinutes(val, f.duration_minutes) : f.end_time,
+    }))
+  }
+
+  const setDuration = (minutes) => {
+    setForm(f => ({
+      ...f,
+      duration_minutes: minutes,
+      end_time: minutes > 0 ? addMinutes(f.meal_time, minutes) : f.end_time,
+    }))
+  }
+
+  const doCreate = async () => {
     setLoading(true)
     setError(null)
     try {
@@ -51,6 +78,7 @@ export default function CreatePotPage() {
         date: dateStr,
         slot: form.slot,
         meal_time: form.meal_time,
+        end_time: form.end_time,
         title: form.title.trim() || `${form.slot} ${form.meal_time}`,
         menu: form.menu.trim(),
         max_people: form.max_people,
@@ -58,14 +86,9 @@ export default function CreatePotPage() {
         is_default: form.is_default,
         createdBy: user.id,
       })
-      // 기본팟이 아니면 개설자를 참여자로 자동 추가 + 상태 '모집중'
       if (!form.is_default) {
+        // 참여 사실은 pot_members로 기록 — daily_status.status는 사용자 의향 전용
         await joinPot(pot.id, user.id)
-        await upsertStatus({
-          userId: user.id,
-          date: dateStr, slot: form.slot,
-          status: '모집중', meal_time: form.meal_time,
-        })
       }
       navigate('/today')
     } catch (e) {
@@ -74,6 +97,11 @@ export default function CreatePotPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCreate = async () => {
+    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
+    await doCreate()
   }
 
   return (
@@ -132,7 +160,29 @@ export default function CreatePotPage() {
 
         <div style={styles.field}>
           <label style={styles.label}>시간</label>
-          <input type="time" style={styles.input} value={form.meal_time} onChange={e => set('meal_time', e.target.value)} />
+          <div style={styles.timeRange}>
+            <input type="time" style={styles.timeInput} value={form.meal_time} onChange={e => setStartTime(e.target.value)} />
+            <span style={styles.timeSep}>~</span>
+            <input type="time" style={{ ...styles.timeInput, color: form.duration_minutes > 0 ? 'var(--color-primary)' : 'var(--color-text)' }}
+              value={form.end_time} onChange={e => setForm(f => ({ ...f, end_time: e.target.value, duration_minutes: 0 }))} />
+          </div>
+          <div style={styles.durationRow}>
+            {[30, 60, 90, 120].map(min => (
+              <button
+                key={min}
+                style={{ ...styles.durationBtn, ...(form.duration_minutes === min ? styles.durationBtnActive : {}) }}
+                onClick={() => setDuration(min)}
+              >
+                {min < 60 ? `${min}분` : min === 60 ? '1시간' : min === 90 ? '1.5시간' : '2시간'}
+              </button>
+            ))}
+            <button
+              style={{ ...styles.durationBtn, ...(form.duration_minutes === 0 ? styles.durationBtnActive : {}) }}
+              onClick={() => setDuration(0)}
+            >
+              직접입력
+            </button>
+          </div>
         </div>
 
         <div style={styles.field}>
@@ -188,6 +238,7 @@ export default function CreatePotPage() {
           {loading ? '생성 중...' : form.is_default ? '기본 밥팟 열기 🍚' : '밥팟 열기 🍚'}
         </button>
       </div>
+
     </div>
   )
 }
@@ -209,6 +260,12 @@ const styles = {
   label: { fontWeight: 700, fontSize: 'var(--font-size-sm)' },
   input: { padding: '14px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
   hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
+  timeRange: { display: 'flex', alignItems: 'center', gap: 8 },
+  timeInput: { flex: 1, padding: '14px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
+  timeSep: { fontSize: 16, fontWeight: 700, color: 'var(--color-text-muted)', flexShrink: 0 },
+  durationRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 },
+  durationBtn: { padding: '5px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500 },
+  durationBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
   slotRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   slotBtn: { padding: '7px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)' },
   slotBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
@@ -221,4 +278,12 @@ const styles = {
   publicNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 4 },
   footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },
   createBtn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 }

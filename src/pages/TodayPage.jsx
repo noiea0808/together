@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, setStatusHidden, getMyStatuses } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
@@ -60,8 +60,15 @@ export default function TodayPage() {
   const [loading, setLoading] = useState(true)
 
   // 내 슬롯 상태: { slot -> { status, time, menu } }
-  // statusesMap에서 user.id 기준으로 파생하지 않고 별도 관리 (낙관적 업데이트)
   const [mySlots, setMySlots] = useState({})
+  // 날짜 전체 초기화 확인 팝업
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
+  // 밥팟 만들기 충돌 팝업
+  const [createConflict, setCreateConflict] = useState(null) // { existingPot, groupId, slot }
+  // 공유 토글 범위 선택 팝업
+  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, slot, isShared }
+  // 그룹×슬롯 단위 공유 설정: { [groupId]: { [slot]: boolean } }
+  const [shareSettingsMap, setShareSettingsMap] = useState({})
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
@@ -78,27 +85,32 @@ export default function TodayPage() {
         return
       }
 
-      const [membersResults, statusResults, potResults] = await Promise.all([
-        Promise.all(myGroups.map(g => getGroupMembers(g.id).then(m => [g.id, m]))),
-        Promise.all(myGroups.map(g => getGroupStatuses(g.id, dateStr).then(s => [g.id, s]))),
-        Promise.all(myGroups.map(g => getGroupPots(g.id, dateStr).then(p => [g.id, p]))),
+      const groupIds = myGroups.map(g => g.id)
+      // 보드(멤버/상태/팟) 일괄 + 내 상태 + 공유설정 병렬 — 그룹 수와 무관하게 상수 횟수 쿼리
+      const [board, myStatuses, shareRows] = await Promise.all([
+        getTodayBoard(groupIds, dateStr),
+        getMyStatuses(user.id, dateStr),
+        getGroupShareSettings(user.id, dateStr).catch(() => []),
       ])
 
-      const newMembersMap = Object.fromEntries(membersResults)
-      const newStatusesMap = Object.fromEntries(statusResults)
-      const newPotsMap = Object.fromEntries(potResults)
+      setMembersMap(board.membersMap)
+      setStatusesMap(board.statusesMap)
+      setPotsMap(board.potsMap)
 
-      setMembersMap(newMembersMap)
-      setStatusesMap(newStatusesMap)
-      setPotsMap(newPotsMap)
-
-      // 내 상태 초기화 — 유저 기준 단일 레코드에서 직접 조회
-      const myStatuses = await getMyStatuses(user.id, dateStr)
+      // 내 상태 (사용자 의향 원본)
       const slots = {}
       myStatuses.forEach(s => {
         slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
       })
       setMySlots(slots)
+
+      // 그룹 공유 설정
+      const settingsMap = {}
+      shareRows.forEach(row => {
+        if (!settingsMap[row.group_id]) settingsMap[row.group_id] = {}
+        settingsMap[row.group_id][row.slot] = row.is_shared
+      })
+      setShareSettingsMap(settingsMap)
     } catch (e) {
       console.error(e)
     } finally {
@@ -164,9 +176,35 @@ export default function TodayPage() {
       )
       .subscribe()
 
+    const shareSub = supabase
+      .channel(`share_settings_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_share_settings' },
+        async (payload) => {
+          const groupId = payload.new?.group_id ?? payload.old?.group_id
+          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
+            const [statuses, pots] = await Promise.all([
+              getGroupStatuses(groupId, dateStr),
+              getGroupPots(groupId, dateStr),
+            ])
+            setStatusesMap(prev => ({ ...prev, [groupId]: statuses }))
+            setPotsMap(prev => ({ ...prev, [groupId]: pots }))
+          }
+          // 내 설정이 바뀐 경우 shareSettingsMap도 갱신
+          if (payload.new?.user_id === user.id) {
+            const { group_id, slot, is_shared } = payload.new
+            setShareSettingsMap(prev => ({
+              ...prev,
+              [group_id]: { ...(prev[group_id] ?? {}), [slot]: is_shared },
+            }))
+          }
+        }
+      )
+      .subscribe()
+
     return () => {
       supabase.removeChannel(statusSub)
       supabase.removeChannel(potSub)
+      supabase.removeChannel(shareSub)
     }
   }, [user, dateStr])
 
@@ -176,24 +214,114 @@ export default function TodayPage() {
     return () => document.removeEventListener('click', close)
   }, [])
 
+  // 포그라운드 복귀 시 stale 데이터 갱신
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') loadData()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    return () => document.removeEventListener('visibilitychange', handleVisibility)
+  }, [loadData])
+
   const setSlotStatus = async (slot, statusKey) => {
     setMySlots(prev => ({ ...prev, [slot]: { ...(prev[slot] ?? {}), status: statusKey } }))
     setOpenDropdown(null)
     await upsertStatus({ userId: user.id, date: dateStr, slot, status: statusKey, meal_time: mySlots[slot]?.time, menu: mySlots[slot]?.menu })
   }
 
-  const setSlotField = async (slot, key, val) => {
-    const updated = { ...(mySlots[slot] ?? {}), [key]: val }
-    setMySlots(prev => ({ ...prev, [slot]: updated }))
-    if (updated.status) {
-      await upsertStatus({ userId: user.id, date: dateStr, slot, status: updated.status, meal_time: updated.time, menu: updated.menu })
-    }
+  // 입력 중에는 로컬 상태만 갱신 (그룹에 실시간 전파 안 함)
+  const setSlotField = (slot, key, val) => {
+    setMySlots(prev => ({ ...prev, [slot]: { ...(prev[slot] ?? {}), [key]: val } }))
+  }
+
+  // 입력 완료(blur) 시점에만 그룹에 공유
+  const commitSlotField = async (slot) => {
+    const data = mySlots[slot]
+    if (!data?.status) return
+    await upsertStatus({ userId: user.id, date: dateStr, slot, status: data.status, meal_time: data.time, menu: data.menu })
   }
 
   const clearSlot = async (slot) => {
     setMySlots(prev => { const n = { ...prev }; delete n[slot]; return n })
     setOpenDropdown(null)
     await deleteStatus({ userId: user.id, date: dateStr, slot })
+  }
+
+  // 팟에서 나가기 (초기화 시 사용) — 방장이면 위임 처리, 기본팟 아니고 마지막 멤버면 삭제
+  const leavePotClean = async (pot) => {
+    if (pot.is_default) {
+      await leavePot(pot.id, user.id)
+      return
+    }
+    const members = pot.pot_members ?? []
+    if (members.length <= 1) {
+      await deletePot(pot.id)
+    } else {
+      if (pot.created_by === user.id) {
+        const next = members.find(pm => pm.user_id !== user.id)
+        if (next) await updatePotCreator(pot.id, next.user_id)
+      }
+      await leavePot(pot.id, user.id)
+    }
+  }
+
+  const resetSlot = async (slot) => {
+    const myPotsInSlot = Object.values(potsMap).flat()
+      .filter(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+    await Promise.all(myPotsInSlot.map(leavePotClean))
+    await deleteStatus({ userId: user.id, date: dateStr, slot })
+    setMySlots(prev => { const n = { ...prev }; delete n[slot]; return n })
+    loadData()
+  }
+
+  const resetAll = async () => {
+    setShowResetConfirm(false)
+    const allMyPots = Object.values(potsMap).flat()
+      .filter(p => p.pot_members?.some(pm => pm.user_id === user.id))
+    await Promise.all(allMyPots.map(leavePotClean))
+    await Promise.all(
+      SLOT_ORDER.filter(slot => mySlots[slot]).map(slot => deleteStatus({ userId: user.id, date: dateStr, slot }))
+    )
+    setMySlots({})
+    loadData()
+  }
+
+  const handleCreatePot = (groupId, slot) => {
+    const myPotsInSlot = Object.values(potsMap).flat()
+      .filter(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+    if (myPotsInSlot.length > 0) {
+      setCreateConflict({ existingPot: myPotsInSlot[0], groupId, slot })
+    } else {
+      navigate(`/create?group_id=${groupId}&slot=${slot}`)
+    }
+  }
+
+  const applyShare = (groupId, slot, isShared) => {
+    setShareSettingsMap(prev => ({
+      ...prev,
+      [groupId]: { ...(prev[groupId] ?? {}), [slot]: isShared },
+    }))
+  }
+
+  // 토글 클릭 → 팝업 띄우기
+  const handleToggleShare = (groupId, slot, isShared) => {
+    setShareTogglePending({ groupId, slot, isShared })
+  }
+
+  // 이 날짜만 적용
+  const confirmShareSingle = async () => {
+    const { groupId, slot, isShared } = shareTogglePending
+    setShareTogglePending(null)
+    applyShare(groupId, slot, isShared)
+    try { await setGroupShareSetting(user.id, groupId, dateStr, slot, isShared) } catch {}
+  }
+
+  // 오늘 이후 전체 적용
+  const confirmShareBulk = async () => {
+    const { groupId, slot, isShared } = shareTogglePending
+    setShareTogglePending(null)
+    applyShare(groupId, slot, isShared)
+    try { await setGroupShareSettingBulk(user.id, groupId, dateStr, slot, isShared) } catch {}
   }
 
   if (loading) {
@@ -210,13 +338,21 @@ export default function TodayPage() {
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
+          {!isToday && (
+            <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
+          )}
         </div>
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
       </div>
 
       {/* 나의 상태 슬롯 그리드 */}
       <div style={styles.myCard}>
-        <div style={styles.myCardTitle}>나의 상태</div>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={styles.myCardTitle}>오늘 나는?</div>
+          <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
+            ↺ 초기화
+          </button>
+        </div>
         <div style={styles.slotGrid}>
           {SLOT_ORDER.map(slot => {
             const data = mySlots[slot]
@@ -244,7 +380,16 @@ export default function TodayPage() {
                 }}
                 onClick={() => setSelectedSlot(slot)}
               >
-                <div style={styles.slotName}>{slot}</div>
+                <div style={styles.slotName}>
+                  {slot}
+                  {(data?.status || isInPot) && (
+                    <span
+                      style={styles.slotResetBtn}
+                      onClick={e => { e.stopPropagation(); resetSlot(slot) }}
+                      title="초기화"
+                    >↺</span>
+                  )}
+                </div>
 
                 <div style={styles.slotStatusLayer}>
                   <button
@@ -319,6 +464,7 @@ export default function TodayPage() {
                         style={{ ...styles.slotTimeInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
                         value={data?.time ?? ''}
                         onChange={e => setSlotField(slot, 'time', e.target.value)}
+                        onBlur={() => commitSlotField(slot)}
                         disabled={!data?.status || data?.status === 'skip'}
                       />
                       <input
@@ -326,6 +472,8 @@ export default function TodayPage() {
                         placeholder="메뉴"
                         value={data?.menu ?? ''}
                         onChange={e => setSlotField(slot, 'menu', e.target.value)}
+                        onBlur={() => commitSlotField(slot)}
+                        onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
                         maxLength={10}
                         disabled={!data?.status || data?.status === 'skip'}
                       />
@@ -376,12 +524,15 @@ export default function TodayPage() {
               pots={pots}
               myUserId={user.id}
               mySlotData={mySlots[selectedSlot]}
+              isShared={shareSettingsMap[group.id]?.[selectedSlot] ?? true}
+              onToggleShare={(isShared) => handleToggleShare(group.id, selectedSlot, isShared)}
               amIInAnyPot={amIInAnyPot}
               allCollapsed={allCollapsed}
               collapseKey={collapseKey}
               dateStr={dateStr}
               onNavigate={navigate}
               onRefresh={loadData}
+              onCreatePot={handleCreatePot}
             />
           )
         })
@@ -392,32 +543,98 @@ export default function TodayPage() {
       </button>
     </div>
     <BottomNav />
+
+    {shareTogglePending && (
+      <div style={styles.overlay}>
+        <div style={styles.dialog}>
+          <div style={{ fontSize: 32 }}>{shareTogglePending.isShared ? '🔓' : '🔒'}</div>
+          <div style={styles.dialogTitle}>
+            {shareTogglePending.isShared ? '상태 공유' : '상태 비공유'}
+          </div>
+          <p style={styles.dialogDesc}>
+            이후 날짜에도 모두 적용할까요?{'\n'}
+            <span style={{ fontSize: 12 }}>
+              (그룹: 해당 그룹 · 슬롯: {shareTogglePending.slot})
+            </span>
+          </p>
+          <div style={styles.dialogBtns}>
+            <button style={styles.dialogBtnPrimary} onClick={confirmShareBulk}>
+              오늘 이후 모두 적용
+            </button>
+            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={confirmShareSingle}>
+              오늘만 적용
+            </button>
+            <button style={styles.dialogBtnCancel} onClick={() => setShareTogglePending(null)}>취소</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {createConflict && (
+      <div style={styles.overlay}>
+        <div style={styles.dialog}>
+          <div style={{ fontSize: 36 }}>⚠️</div>
+          <div style={styles.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
+          <p style={styles.dialogDesc}>
+            {createConflict.slot} 슬롯에{'\n'}
+            <strong>{createConflict.existingPot.meal_time?.slice(0,5)} {createConflict.existingPot.title}</strong>{'\n'}
+            에 이미 참여 중이에요.
+          </p>
+          <div style={styles.dialogBtns}>
+            <button style={styles.dialogBtnPrimary} onClick={async () => {
+              const pot = createConflict.existingPot
+              const { groupId, slot } = createConflict
+              setCreateConflict(null)
+              await leavePotWithCleanup(pot.id, user.id)
+              navigate(`/create?group_id=${groupId}&slot=${slot}`)
+            }}>
+              기존 밥팟 나가고 새 팟 열기
+            </button>
+            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={() => {
+              const { groupId, slot } = createConflict
+              setCreateConflict(null)
+              navigate(`/create?group_id=${groupId}&slot=${slot}`)
+            }}>
+              중복으로 새 팟 열기
+            </button>
+            <button style={styles.dialogBtnCancel} onClick={() => setCreateConflict(null)}>취소</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {showResetConfirm && (
+      <div style={styles.overlay}>
+        <div style={styles.dialog}>
+          <div style={{ fontSize: 36 }}>↺</div>
+          <div style={styles.dialogTitle}>하루 상태 초기화</div>
+          <p style={styles.dialogDesc}>
+            {formatDate(currentDate)}의 모든 슬롯 상태를 초기화합니다.{'\n'}
+            참여 중인 밥팟에서도 자동으로 나가게 됩니다.{'\n'}
+            계속하시겠어요?
+          </p>
+          <div style={styles.dialogBtns}>
+            <button style={styles.dialogBtnPrimary} onClick={resetAll}>초기화하기</button>
+            <button style={styles.dialogBtnCancel} onClick={() => setShowResetConfirm(false)}>취소</button>
+          </div>
+        </div>
+      </div>
+    )}
     </div>
   )
 }
 
-function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh }) {
+function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, isShared, onToggleShare, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh, onCreatePot }) {
   const [showInvite, setShowInvite] = useState(false)
   const [copied, setCopied] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(group.name)
   const [confirmLeave, setConfirmLeave] = useState(false)
-  const [sharing, setSharing] = useState(true)
   const [collapsed, setCollapsed] = useState(false)
   useEffect(() => { setCollapsed(allCollapsed) }, [collapseKey])
 
-  // 초기 공유 상태: statusesMap에서 내 is_hidden 확인
-  useEffect(() => {
-    const myAnyStatus = statuses.find(s => s.user_id === myUserId)
-    if (myAnyStatus) setSharing(!myAnyStatus.is_hidden)
-  }, [statuses, myUserId])
-
-  const handleToggleSharing = async () => {
-    const next = !sharing
-    setSharing(next)
-    await setStatusHidden(myUserId, dateStr, !next)
-  }
+  const handleToggleSharing = () => onToggleShare(!isShared)
 
   const isMaster = group.created_by === myUserId
 
@@ -439,12 +656,27 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
   const getMemberData = (userId) => {
     if (userId === myUserId) {
-      if (!sharing) return null // 비공유 상태면 내 상태 숨김
-      if (isInPot) return { ...mySlotData, status: '참여중' }
-      return mySlotData ?? null
+      if (!isShared) return null
+      // mySlots는 time 키 사용 → 표시용 meal_time으로 매핑
+      const mine = mySlotData ? { ...mySlotData, meal_time: mySlotData.time } : null
+      if (isInThisGroupPot) {
+        const myPot = pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId))
+        return { ...mine, status: '참여중', meal_time: myPot?.meal_time ?? mine?.meal_time }
+      }
+      if (amIInAnyPot) {
+        // 다른 그룹 팟 참여 → 약속있음. 팟 시간은 파생된 statuses 행에서 가져옴
+        const derived = statuses.find(s => s.user_id === myUserId && s.slot === slot)
+        return { status: 'closed', meal_time: derived?.meal_time ?? null }
+      }
+      return mine
     }
     const s = statuses.find(s => s.user_id === userId && s.slot === slot)
-    if (!s || s.is_hidden) return null  // 숨김 처리된 상태는 표시 안 함
+    if (!s || s.is_hidden) return null
+    // 참여중인데 이 그룹 팟에 없으면 → 다른 그룹 팟 참여중 → 약속있음으로 표시
+    if (s.status === '참여중') {
+      const isInThisPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === userId))
+      if (!isInThisPot) return { ...s, status: 'closed' }
+    }
     return s
   }
 
@@ -460,24 +692,28 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
     <div style={styles.groupCard}>
       <div style={{
         ...styles.groupHeader,
-        background: !sharing ? '#EEEEEE' : isInThisGroupPot ? '#E8F5E9' : 'var(--color-surface-2)',
+        background: !isShared ? '#EEEEEE' : isInThisGroupPot ? '#E8F5E9' : 'var(--color-surface-2)',
       }}>
         {/* 좌측: 활동 도트 + 그룹명 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
           {hasActivity && <span style={styles.activityDot} />}
-          <span style={{ ...styles.groupName, color: sharing ? 'var(--color-text)' : '#9E9E9E' }}>{group.name}</span>
+          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#9E9E9E' }}>{group.name}</span>
         </div>
         {/* 우측: 토글 + 초대 + 설정 */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-          {/* 공유 토글 */}
-          <div style={styles.toggleWrap} onClick={handleToggleSharing}>
-            <div style={{ ...styles.toggleTrack, background: sharing ? 'var(--color-primary)' : '#BDBDBD' }}>
-              <div style={{ ...styles.toggleThumb, transform: sharing ? 'translateX(14px)' : 'translateX(0)' }} />
+          {/* 공유 토글 — 이 그룹 현재 슬롯 밥팟 참여 중이면 비활성 */}
+          {isInThisGroupPot ? (
+            <span style={styles.toggleLocked}>🍚 참여중</span>
+          ) : (
+            <div style={styles.toggleWrap} onClick={handleToggleSharing}>
+              <div style={{ ...styles.toggleTrack, background: isShared ? 'var(--color-primary)' : '#BDBDBD' }}>
+                <div style={{ ...styles.toggleThumb, transform: isShared ? 'translateX(14px)' : 'translateX(0)' }} />
+              </div>
+              <span style={{ ...styles.toggleLabel, color: isShared ? 'var(--color-primary)' : '#9E9E9E' }}>
+                {isShared ? '공유중' : '비공유'}
+              </span>
             </div>
-            <span style={{ ...styles.toggleLabel, color: sharing ? 'var(--color-primary)' : '#9E9E9E' }}>
-              {sharing ? '공유중' : '비공유'}
-            </span>
-          </div>
+          )}
           <button style={styles.groupSettingsBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
           <button style={styles.groupCollapseBtn} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
         </div>
@@ -488,6 +724,9 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setConfirmLeave(false) }}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
             <div style={styles.sheetTitle}>{group.name}</div>
+            <div style={styles.sheetMaster}>
+              👑 {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
+            </div>
 
             {isMaster && !editingName && (
               <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
@@ -590,7 +829,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
       )}
 
-      {!collapsed && <button style={styles.createBtn} onClick={() => onNavigate('/create')}>
+      {!collapsed && <button style={styles.createBtn} onClick={() => onCreatePot(group.id, slot)}>
         + 밥팟 만들기
       </button>}
     </div>
@@ -610,11 +849,21 @@ const styles = {
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
+  todayBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myCard: { background: 'var(--color-surface)', border: '2px solid var(--color-primary)33', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
   myCardTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  resetAllBtn: { fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' },
+  slotResetBtn: { marginLeft: 3, fontSize: 9, color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7 },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'border-color 0.15s' },
-  slotName: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '7px 4px 4px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', borderRadius: 'calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px) 0 0' },
+  slotName: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '7px 4px 4px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', borderRadius: 'calc(var(--radius-md) - 2px) calc(var(--radius-md) - 2px) 0 0', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2 },
   slotStatusLayer: { position: 'relative', padding: '6px 6px 4px' },
   slotStatusBtn: { width: '100%', padding: '5px 4px', border: '1px solid', borderRadius: 'var(--radius-sm)', fontSize: 11, fontWeight: 600, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 3, transition: 'all 0.12s', whiteSpace: 'nowrap' },
   dropdown: { position: 'absolute', top: 'calc(100% + 2px)', left: 0, width: 150, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)', boxShadow: 'var(--shadow-md)', zIndex: 200, overflow: 'hidden' },
@@ -632,12 +881,14 @@ const styles = {
   groupCollapseBtn: { background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px', color: 'var(--color-text-muted)' },
   collapseAllBtn: { fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
   toggleWrap: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
+  toggleLocked: { fontSize: 11, fontWeight: 700, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
   toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
   toggleLabel: { fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' },
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4 },
-  sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 8, textAlign: 'center' },
+  sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 4, textAlign: 'center' },
+  sheetMaster: { fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center', marginBottom: 8 },
   sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '14px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
   sheetRowLabel: { flex: 1 },
   sheetNameEdit: { display: 'flex', flexDirection: 'column', gap: 10, padding: '10px 0' },

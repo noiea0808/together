@@ -21,6 +21,7 @@ export default function PotCard({ pot }) {
       <div style={styles.top}>
         <span style={{ ...styles.time, color: pot.is_default ? '#4CAF50' : 'var(--color-primary)' }}>
           {typeof pot.meal_time === 'string' ? pot.meal_time.slice(0, 5) : pot.meal_time}
+          {pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}
         </span>
         <span style={styles.title}>{pot.title}</span>
         {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}

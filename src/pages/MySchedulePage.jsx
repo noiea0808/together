@@ -87,6 +87,7 @@ export default function MySchedulePage() {
               <div style={styles.dayRow} onClick={() => toggleDate(dateStr)}>
                 {/* 날짜 */}
                 <div style={styles.dateCol}>
+                  <div style={styles.dateMonth}>{date.getMonth() + 1}월</div>
                   <div style={{
                     ...styles.dateNum,
                     color: isToday ? 'var(--color-primary)' : isPast ? 'var(--color-text-muted)' : 'var(--color-text)'
@@ -184,6 +185,7 @@ const styles = {
     width: 32, flexShrink: 0,
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
   },
+  dateMonth: { fontSize: 9, fontWeight: 600, color: 'var(--color-text-muted)', lineHeight: 1 },
   dateNum: { fontSize: 17, fontWeight: 800, lineHeight: 1 },
   dateDay: { fontSize: 10, color: 'var(--color-text-muted)' },
   todayDot: { width: 4, height: 4, borderRadius: '50%', background: 'var(--color-primary)', marginTop: 2 },
@@ -198,7 +200,7 @@ const styles = {
 
 
   detail: {
-    margin: '0 var(--spacing-md)', marginBottom: 8,
+    marginLeft: 58, marginRight: 'var(--spacing-md)', marginBottom: 8,
     background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)',
     overflow: 'hidden',
   },
