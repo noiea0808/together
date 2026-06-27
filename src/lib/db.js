@@ -163,7 +163,6 @@ export async function setStatusHidden(userId, date, isHidden) {
 }
 
 export async function getGroupStatuses(groupId, date) {
-  // 그룹 멤버 ID 조회 후 해당 사용자들의 상태를 가져옴
   const { data: members, error: mErr } = await supabase
     .from('group_members')
     .select('user_id')
@@ -173,13 +172,57 @@ export async function getGroupStatuses(groupId, date) {
   const memberIds = members.map(m => m.user_id)
   if (memberIds.length === 0) return []
 
-  const { data, error } = await supabase
+  // 이 그룹에서 비공유로 설정된 (user_id, slot) 쌍 조회
+  const { data: hiddenRows } = await supabase
+    .from('group_share_settings')
+    .select('user_id, slot')
+    .eq('group_id', groupId)
+    .eq('date', date)
+    .eq('is_shared', false)
+
+  const hiddenSet = new Set((hiddenRows ?? []).map(r => `${r.user_id}:${r.slot}`))
+
+  const { data: statusRows, error } = await supabase
     .from('daily_status')
     .select('*')
     .in('user_id', memberIds)
     .eq('date', date)
   if (error) throw error
-  return data
+
+  // (user_id:slot) -> 상태 레코드
+  const map = {}
+  ;(statusRows ?? []).forEach(s => { map[`${s.user_id}:${s.slot}`] = { ...s } })
+
+  // 밥팟 참여라는 "사실"로 상태 보정 — 저장된 status보다 우선
+  // 이 그룹 팟 참여 → 참여중 / 다른 그룹 팟 참여 → 약속있음(closed)
+  const { data: potRows } = await supabase
+    .from('pot_members')
+    .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
+    .in('user_id', memberIds)
+    .eq('meal_pots.date', date)
+
+  ;(potRows ?? []).forEach(pm => {
+    const mp = pm.meal_pots
+    const key = `${pm.user_id}:${mp.slot}`
+    const existing = map[key]
+    if (mp.group_id === groupId) {
+      // 이 그룹 팟 참여 — 최우선
+      map[key] = {
+        user_id: pm.user_id, date, slot: mp.slot,
+        status: '참여중', meal_time: mp.meal_time,
+        menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
+      }
+    } else if (!existing || existing.status !== '참여중') {
+      // 다른 그룹 팟 참여 — 세부정보는 비노출
+      map[key] = {
+        user_id: pm.user_id, date, slot: mp.slot,
+        status: 'closed', meal_time: null, menu: null,
+        is_hidden: existing?.is_hidden ?? false,
+      }
+    }
+  })
+
+  return Object.values(map).filter(s => !hiddenSet.has(`${s.user_id}:${s.slot}`))
 }
 
 export async function getMyStatuses(userId, date) {
@@ -193,7 +236,7 @@ export async function getMyStatuses(userId, date) {
 }
 
 // ── 밥팟 ──────────────────────────────────────────
-export async function createPot({ groupId, date, slot, meal_time, title, menu, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, max_people, is_public, is_default, createdBy }) {
   const { data, error } = await supabase
     .from('meal_pots')
     .insert({
@@ -201,6 +244,7 @@ export async function createPot({ groupId, date, slot, meal_time, title, menu, m
       date,
       slot,
       meal_time,
+      end_time: end_time || null,
       title,
       menu: menu || null,
       max_people,
@@ -249,6 +293,26 @@ export async function leavePot(potId, userId) {
   if (error) throw error
 }
 
+// 나간 뒤 기본팟이 아니고 멤버가 없으면 팟 자동 삭제
+export async function leavePotWithCleanup(potId, userId) {
+  const { data: pot } = await supabase
+    .from('meal_pots')
+    .select('is_default')
+    .eq('id', potId)
+    .single()
+
+  const { data: members } = await supabase
+    .from('pot_members')
+    .select('user_id')
+    .eq('pot_id', potId)
+
+  if (!pot?.is_default && (members ?? []).length <= 1) {
+    await deletePot(potId)
+  } else {
+    await leavePot(potId, userId)
+  }
+}
+
 // ── 내 일정 ──────────────────────────────────────────
 export async function getMySchedule(userId, fromDate, toDate) {
   const { data, error } = await supabase
@@ -262,12 +326,54 @@ export async function getMySchedule(userId, fromDate, toDate) {
   return data
 }
 
+// ── 그룹 공유 설정 (그룹 × 날짜 × 슬롯 단위) ─────────────
+// 사전 조건: Supabase에 group_share_settings 테이블 생성 필요
+// CREATE TABLE group_share_settings (
+//   user_id uuid references users(id),
+//   group_id uuid references groups(id),
+//   date date,
+//   slot text,
+//   is_shared boolean default true,
+//   primary key (user_id, group_id, date, slot)
+// );
+export async function getGroupShareSettings(userId, date) {
+  const { data, error } = await supabase
+    .from('group_share_settings')
+    .select('group_id, slot, is_shared')
+    .eq('user_id', userId)
+    .eq('date', date)
+  if (error) throw error
+  return data
+}
+
+export async function setGroupShareSetting(userId, groupId, date, slot, isShared) {
+  const { error } = await supabase
+    .from('group_share_settings')
+    .upsert(
+      { user_id: userId, group_id: groupId, date, slot, is_shared: isShared },
+      { onConflict: 'user_id,group_id,date,slot' }
+    )
+  if (error) throw error
+}
+
 export async function updateNickname(userId, nickname) {
   const { error } = await supabase
     .from('users')
     .update({ nickname })
     .eq('id', userId)
   if (error) throw error
+}
+
+// 그룹 무관하게 해당 슬롯의 참여 팟 전체 조회
+export async function getMyPotsForSlotAllGroups(userId, date, slot) {
+  const { data, error } = await supabase
+    .from('pot_members')
+    .select('pot_id, meal_pots!inner(id, title, meal_time, slot, date, group_id)')
+    .eq('user_id', userId)
+    .eq('meal_pots.date', date)
+    .eq('meal_pots.slot', slot)
+  if (error) throw error
+  return data
 }
 
 export async function getMyPotsForSlot(userId, groupId, date, slot) {
@@ -298,10 +404,10 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, title, menu, max_people, is_public }) {
+export async function updatePot(potId, { meal_time, end_time, title, menu, max_people, is_public }) {
   const { error } = await supabase
     .from('meal_pots')
-    .update({ meal_time, title, menu: menu || null, max_people, is_public })
+    .update({ meal_time, end_time: end_time || null, title, menu: menu || null, max_people, is_public })
     .eq('id', potId)
   if (error) throw error
 }

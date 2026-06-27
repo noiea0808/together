@@ -10,6 +10,8 @@ import PotDetailPage from './pages/PotDetailPage'
 import GroupPage from './pages/GroupPage'
 import GroupSetupPage from './pages/GroupSetupPage'
 import JoinPage from './pages/JoinPage'
+import AdminLayout from './pages/admin/AdminLayout'
+import StatusGuidePage from './pages/admin/guide/StatusGuidePage'
 
 function AppRoutes() {
   const { user } = useUser()
@@ -31,6 +33,10 @@ function AppRoutes() {
       <Route path="/group"    element={auth(<GroupPage />)} />
       <Route path="/group-setup" element={auth(<GroupSetupPage />)} />
       <Route path="/join/:code"  element={<JoinPage />} />
+      <Route path="/admin" element={<AdminLayout />}>
+        <Route index element={<Navigate to="/admin/guide/status" replace />} />
+        <Route path="guide/status" element={<StatusGuidePage />} />
+      </Route>
       <Route path="*" element={<Navigate to={user ? '/today' : '/onboarding'} replace />} />
     </Routes>
   )
