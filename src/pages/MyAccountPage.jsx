@@ -11,6 +11,7 @@ export default function MyAccountPage() {
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const { installPrompt, triggerInstall, isInstalled, isIOS } = useInstallPrompt()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
+  const [showAndroidGuide, setShowAndroidGuide] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -96,7 +97,8 @@ export default function MyAccountPage() {
               style={styles.installBtn}
               onClick={() => {
                 if (isIOS) setShowIOSGuide(true)
-                else triggerInstall()
+                else if (installPrompt) triggerInstall()
+                else setShowAndroidGuide(true)
               }}
             >
               <span>📲</span>
@@ -115,6 +117,32 @@ export default function MyAccountPage() {
             로그아웃
           </button>
         </div>
+
+        {/* Android 수동 안내 모달 */}
+        {showAndroidGuide && (
+          <div style={styles.modalOverlay} onClick={() => setShowAndroidGuide(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div style={styles.modalTitle}>홈 화면에 추가하기</div>
+              <div style={styles.guideSteps}>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>1</span>
+                  <span>Chrome 주소창 오른쪽 <strong>⋮ 메뉴</strong>를 탭하세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>2</span>
+                  <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>3</span>
+                  <span><strong>추가</strong>를 탭하면 완료!</span>
+                </div>
+              </div>
+              <button style={styles.modalClose} onClick={() => setShowAndroidGuide(false)}>
+                확인
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* iOS 안내 모달 */}
         {showIOSGuide && (

@@ -32,5 +32,8 @@ export function useInstallPrompt() {
     return outcome === 'accepted'
   }
 
-  return { installPrompt, triggerInstall, isInstalled, isIOS }
+  // 설치 가능 여부 (Android Chrome: installPrompt 있어야 함)
+  const canInstall = !isInstalled && (isIOS || !!installPrompt)
+
+  return { installPrompt, triggerInstall, isInstalled, isIOS, canInstall }
 }
