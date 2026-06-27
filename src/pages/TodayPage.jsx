@@ -54,11 +54,11 @@ export default function TodayPage() {
     setLoading(true)
     try {
       const myGroups = await getMyGroups(user.id)
+      setGroups(myGroups)
       if (myGroups.length === 0) {
-        navigate('/group-setup', { replace: true })
+        setLoading(false)
         return
       }
-      setGroups(myGroups)
 
       const [membersResults, statusResults, potResults] = await Promise.all([
         Promise.all(myGroups.map(g => getGroupMembers(g.id).then(m => [g.id, m]))),
@@ -192,6 +192,7 @@ export default function TodayPage() {
     return <div style={styles.loadingPage}>🍚<br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
+
   return (
     <div style={styles.page}>
       {/* 날짜 네비 */}
@@ -300,6 +301,18 @@ export default function TodayPage() {
 
       {/* 그룹별 현황 */}
       <div style={styles.sectionTitle}>{selectedSlot} 현황</div>
+      {groups.length === 0 && (
+        <div style={styles.emptyGroup}>
+          <div style={{ fontSize: 36 }}>👥</div>
+          <div style={{ fontWeight: 700 }}>아직 그룹이 없어요</div>
+          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
+            그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
+          </p>
+          <button style={styles.emptyBtn} onClick={() => navigate('/group-setup')}>
+            그룹 만들기 / 참여하기
+          </button>
+        </div>
+      )}
       {groups.map(group => {
         const members = membersMap[group.id] ?? []
         const statuses = statusesMap[group.id] ?? []
@@ -386,6 +399,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 const styles = {
   page: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 32 },
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
+  emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
+  emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   navBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 12px' },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },

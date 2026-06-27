@@ -1,5 +1,50 @@
 import { supabase } from './supabase'
 
+// ── Auth ──────────────────────────────────────────
+export async function signUp(email, password, nickname) {
+  const { data, error } = await supabase.auth.signUp({ email, password })
+  if (error) throw error
+
+  const authUser = data.user
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .insert({ auth_id: authUser.id, email, nickname })
+    .select()
+    .single()
+  if (profileError) throw profileError
+  return profile
+}
+
+export async function signIn(email, password) {
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  if (error) throw error
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .select('*')
+    .eq('auth_id', data.user.id)
+    .single()
+  if (profileError) throw profileError
+  return profile
+}
+
+export async function signOut() {
+  await supabase.auth.signOut()
+}
+
+export async function getSessionUser() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('auth_id', session.user.id)
+    .single()
+  if (error) return null
+  return data
+}
+
 // ── 유저 ──────────────────────────────────────────
 export async function createUser(nickname) {
   const { data, error } = await supabase

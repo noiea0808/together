@@ -1,28 +1,59 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { createUser } from '../lib/db'
+import { signUp, signIn } from '../lib/db'
 import { useUser } from '../lib/UserContext'
+
+const ERROR_MESSAGES = {
+  'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
+  'User already registered': '이미 가입된 이메일이에요. 로그인해주세요.',
+  'Password should be at least 6 characters': '비밀번호는 6자 이상이어야 해요.',
+  'Unable to validate email address: invalid format': '올바른 이메일 형식이 아니에요.',
+}
+
+function parseError(e) {
+  return ERROR_MESSAGES[e.message] ?? '오류가 발생했어요. 다시 시도해주세요.'
+}
 
 export default function OnboardingPage() {
   const navigate = useNavigate()
   const { login } = useUser()
-  const [nickname, setNickname] = useState('')
+  const [tab, setTab] = useState('signup') // 'signup' | 'login'
+  const [form, setForm] = useState({ email: '', password: '', nickname: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
-  const handleJoin = async () => {
-    if (!nickname.trim() || loading) return
-    setLoading(true)
-    setError(null)
+  const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
+
+  const handleSignUp = async () => {
+    if (!form.email || !form.password || !form.nickname || loading) return
+    setLoading(true); setError(null)
     try {
-      const user = await createUser(nickname.trim())
+      const user = await signUp(form.email.trim(), form.password, form.nickname.trim())
       login(user)
-      navigate('/today')
+      navigate('/group-setup')
     } catch (e) {
-      setError('오류가 발생했어요. 다시 시도해주세요.')
+      setError(parseError(e))
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleSignIn = async () => {
+    if (!form.email || !form.password || loading) return
+    setLoading(true); setError(null)
+    try {
+      const user = await signIn(form.email.trim(), form.password)
+      login(user)
+      navigate('/today')
+    } catch (e) {
+      setError(parseError(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') tab === 'signup' ? handleSignUp() : handleSignIn()
   }
 
   return (
@@ -34,30 +65,84 @@ export default function OnboardingPage() {
       </div>
 
       <div style={styles.card}>
-        <div style={styles.cardTitle}>시작하기</div>
-        <p style={styles.cardDesc}>닉네임을 입력하면 바로 시작할 수 있어요.</p>
-        <input
-          style={styles.input}
-          placeholder="닉네임 입력 (예: 김철수)"
-          value={nickname}
-          onChange={e => setNickname(e.target.value)}
-          onKeyDown={e => e.key === 'Enter' && handleJoin()}
-          maxLength={8}
-          autoFocus
-          disabled={loading}
-        />
-        <div style={styles.hint}>{nickname.length}/8</div>
+        {/* 탭 */}
+        <div style={styles.tabs}>
+          <button
+            style={{ ...styles.tab, ...(tab === 'signup' ? styles.tabActive : {}) }}
+            onClick={() => { setTab('signup'); setError(null) }}
+          >
+            회원가입
+          </button>
+          <button
+            style={{ ...styles.tab, ...(tab === 'login' ? styles.tabActive : {}) }}
+            onClick={() => { setTab('login'); setError(null) }}
+          >
+            로그인
+          </button>
+        </div>
+
+        {/* 닉네임 (회원가입만) */}
+        {tab === 'signup' && (
+          <div style={styles.field}>
+            <label style={styles.label}>닉네임</label>
+            <input
+              style={styles.input}
+              placeholder="예: 김철수"
+              value={form.nickname}
+              onChange={e => set('nickname', e.target.value)}
+              onKeyDown={handleKeyDown}
+              maxLength={8}
+              autoFocus
+              disabled={loading}
+            />
+            <span style={styles.hint}>{form.nickname.length}/8</span>
+          </div>
+        )}
+
+        <div style={styles.field}>
+          <label style={styles.label}>이메일</label>
+          <input
+            style={styles.input}
+            type="email"
+            placeholder="hello@example.com"
+            value={form.email}
+            onChange={e => set('email', e.target.value)}
+            onKeyDown={handleKeyDown}
+            autoFocus={tab === 'login'}
+            disabled={loading}
+          />
+        </div>
+
+        <div style={styles.field}>
+          <label style={styles.label}>비밀번호</label>
+          <input
+            style={styles.input}
+            type="password"
+            placeholder="6자 이상"
+            value={form.password}
+            onChange={e => set('password', e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={loading}
+          />
+        </div>
+
         {error && <p style={styles.error}>{error}</p>}
+
         <button
-          style={{ ...styles.btn, opacity: nickname.trim() && !loading ? 1 : 0.4 }}
-          onClick={handleJoin}
+          style={{
+            ...styles.btn,
+            opacity: (tab === 'signup'
+              ? form.email && form.password && form.nickname
+              : form.email && form.password) && !loading ? 1 : 0.4
+          }}
+          onClick={tab === 'signup' ? handleSignUp : handleSignIn}
           disabled={loading}
         >
-          {loading ? '입장 중...' : '입장하기'}
+          {loading ? '처리 중...' : tab === 'signup' ? '가입하기' : '로그인'}
         </button>
       </div>
 
-      <p style={styles.footer}>설치 불필요 · 회원가입 없음</p>
+      <p style={styles.footer}>설치 불필요 · 링크로 바로 참여</p>
     </div>
   )
 }
@@ -66,7 +151,7 @@ const styles = {
   page: {
     flex: 1, display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    padding: 'var(--spacing-lg)', gap: 'var(--spacing-xl)',
+    padding: 'var(--spacing-lg)', gap: 'var(--spacing-lg)',
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 56, marginBottom: 8 },
@@ -76,20 +161,34 @@ const styles = {
     width: '100%', background: 'var(--color-surface)',
     border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
     padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)',
+    display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
-  cardTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 4 },
-  cardDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginBottom: 'var(--spacing-md)' },
+  tabs: { display: 'flex', gap: 8, marginBottom: 4 },
+  tab: {
+    flex: 1, padding: '10px 0',
+    border: '1.5px solid var(--color-border)',
+    borderRadius: 'var(--radius-full)', background: 'transparent',
+    fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer',
+    color: 'var(--color-text-muted)',
+  },
+  tabActive: {
+    borderColor: 'var(--color-primary)', background: 'var(--color-primary)18',
+    color: 'var(--color-primary)',
+  },
+  field: { display: 'flex', flexDirection: 'column', gap: 4 },
+  label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
   input: {
-    width: '100%', padding: '14px var(--spacing-md)',
+    width: '100%', padding: '13px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
-  hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right', marginBottom: 'var(--spacing-md)', marginTop: 4 },
-  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', marginBottom: 'var(--spacing-sm)' },
+  hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
+  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', margin: 0 },
   btn: {
     width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
     border: 'none', borderRadius: 'var(--radius-full)',
     fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer',
+    marginTop: 4,
   },
   footer: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 }
