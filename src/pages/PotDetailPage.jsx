@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot } from '../lib/db'
+import { getPot, joinPot, leavePot, upsertStatus, updatePot, updatePotCreator, deletePot, getMyPotsForSlot, getMyGroups } from '../lib/db'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -111,7 +111,11 @@ export default function PotDetailPage() {
   const doJoin = async () => {
     const dateStr = toDateStr(new Date())
     await joinPot(pot.id, user.id)
-    if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
+    // 내가 속한 모든 그룹에 '참여중' 상태 업데이트
+    const myGroups = await getMyGroups(user.id)
+    await Promise.all(myGroups.map(g =>
+      upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot: pot.slot, status: '참여중', meal_time: pot.meal_time })
+    ))
     await loadPot()
     setActionLoading(false)
   }
@@ -138,7 +142,8 @@ export default function PotDetailPage() {
           const others = participants.filter(m => m.id !== user.id)
           if (others.length === 0) {
             await deletePot(pot.id)
-            if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
+            const myGroups = await getMyGroups(user.id)
+            await Promise.all(myGroups.map(g => upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot: pot.slot, status: 'open' })))
             navigate(-1); return
           } else {
             const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
@@ -146,7 +151,8 @@ export default function PotDetailPage() {
           }
         }
         await leavePot(pot.id, user.id)
-        if (pot.group_id) await upsertStatus({ userId: user.id, groupId: pot.group_id, date: dateStr, slot: pot.slot, status: 'open' })
+        const myGroups = await getMyGroups(user.id)
+        await Promise.all(myGroups.map(g => upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot: pot.slot, status: 'open' })))
       } else {
         if (pot.group_id) {
           const myPots = await getMyPotsForSlot(user.id, pot.group_id, dateStr, pot.slot)
