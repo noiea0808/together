@@ -130,44 +130,63 @@ export async function getGroupMembers(groupId) {
   return data.map(d => d.users)
 }
 
-// ── 슬롯 상태 ──────────────────────────────────────
-export async function upsertStatus({ userId, groupId, date, slot, status, meal_time, menu }) {
+// ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
+export async function upsertStatus({ userId, date, slot, status, meal_time, menu }) {
   const { error } = await supabase
     .from('daily_status')
     .upsert({
       user_id: userId,
-      group_id: groupId,
       date,
       slot,
       status,
       meal_time: meal_time || null,
       menu: menu || null,
-    }, { onConflict: 'user_id,group_id,date,slot' })
+    }, { onConflict: 'user_id,date,slot' })
   if (error) throw error
 }
 
-export async function setGroupSharing(userId, groupId, date, isHidden) {
-  // 해당 그룹의 오늘 모든 슬롯 상태를 숨김/공개 처리
-  const { error } = await supabase
-    .from('daily_status')
-    .update({ is_hidden: isHidden })
-    .match({ user_id: userId, group_id: groupId, date })
-  if (error) throw error
-}
-
-export async function deleteStatus({ userId, groupId, date, slot }) {
+export async function deleteStatus({ userId, date, slot }) {
   const { error } = await supabase
     .from('daily_status')
     .delete()
-    .match({ user_id: userId, group_id: groupId, date, slot })
+    .match({ user_id: userId, date, slot })
+  if (error) throw error
+}
+
+export async function setStatusHidden(userId, date, isHidden) {
+  // 해당 날짜의 모든 슬롯 is_hidden 일괄 처리
+  const { error } = await supabase
+    .from('daily_status')
+    .update({ is_hidden: isHidden })
+    .match({ user_id: userId, date })
   if (error) throw error
 }
 
 export async function getGroupStatuses(groupId, date) {
+  // 그룹 멤버 ID 조회 후 해당 사용자들의 상태를 가져옴
+  const { data: members, error: mErr } = await supabase
+    .from('group_members')
+    .select('user_id')
+    .eq('group_id', groupId)
+  if (mErr) throw mErr
+
+  const memberIds = members.map(m => m.user_id)
+  if (memberIds.length === 0) return []
+
   const { data, error } = await supabase
     .from('daily_status')
-    .select('*, users(nickname)')
-    .eq('group_id', groupId)
+    .select('*')
+    .in('user_id', memberIds)
+    .eq('date', date)
+  if (error) throw error
+  return data
+}
+
+export async function getMyStatuses(userId, date) {
+  const { data, error } = await supabase
+    .from('daily_status')
+    .select('*')
+    .eq('user_id', userId)
     .eq('date', date)
   if (error) throw error
   return data

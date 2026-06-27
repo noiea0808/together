@@ -62,7 +62,7 @@ export default function CreatePotPage() {
       if (!form.is_default) {
         await joinPot(pot.id, user.id)
         await upsertStatus({
-          userId: user.id, groupId: form.group_id,
+          userId: user.id,
           date: dateStr, slot: form.slot,
           status: '모집중', meal_time: form.meal_time,
         })

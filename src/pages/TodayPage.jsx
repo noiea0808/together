@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, setGroupSharing } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, setStatusHidden, getMyStatuses } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
@@ -92,13 +92,11 @@ export default function TodayPage() {
       setStatusesMap(newStatusesMap)
       setPotsMap(newPotsMap)
 
-      // 내 상태 초기화 — 전체 그룹 중 내 상태가 있는 것 모두 반영
+      // 내 상태 초기화 — 유저 기준 단일 레코드에서 직접 조회
+      const myStatuses = await getMyStatuses(user.id, dateStr)
       const slots = {}
-      myGroups.forEach(g => {
-        const myStatuses = newStatusesMap[g.id]?.filter(s => s.user_id === user.id) ?? []
-        myStatuses.forEach(s => {
-          slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
-        })
+      myStatuses.forEach(s => {
+        slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
       })
       setMySlots(slots)
     } catch (e) {
@@ -124,28 +122,27 @@ export default function TodayPage() {
       ])
       setStatusesMap(prev => ({ ...prev, [groupId]: statuses }))
       setPotsMap(prev => ({ ...prev, [groupId]: pots }))
-
-      // 내 상태도 동기화 (밥팟 참여/취소 등 외부에서 바뀐 경우)
-      const myStatuses = statuses.filter(s => s.user_id === user.id)
-      if (myStatuses.length > 0) {
-        setMySlots(prev => {
-          const updated = { ...prev }
-          myStatuses.forEach(s => {
-            updated[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
-          })
-          return updated
-        })
-      }
     }
 
     const statusSub = supabase
       .channel(`daily_status_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_status' },
         (payload) => {
-          const groupId = payload.new?.group_id ?? payload.old?.group_id
-          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
-            reloadGroup(groupId)
+          const changedUserId = payload.new?.user_id ?? payload.old?.user_id
+          // 내 상태가 바뀐 경우 (다른 기기/팟 참여 등) → mySlots 갱신
+          if (changedUserId === user.id) {
+            const s = payload.new
+            if (s?.slot) {
+              setMySlots(prev => ({
+                ...prev,
+                [s.slot]: s.status
+                  ? { status: s.status, time: s.meal_time, menu: s.menu }
+                  : undefined
+              }))
+            }
           }
+          // 모든 그룹 현황 갱신
+          groupsRef.current.forEach(g => reloadGroup(g.id))
         }
       )
       .subscribe()
@@ -182,28 +179,21 @@ export default function TodayPage() {
   const setSlotStatus = async (slot, statusKey) => {
     setMySlots(prev => ({ ...prev, [slot]: { ...(prev[slot] ?? {}), status: statusKey } }))
     setOpenDropdown(null)
-    // 모든 내 그룹에 상태 저장
-    for (const g of groups) {
-      await upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot, status: statusKey, meal_time: mySlots[slot]?.time, menu: mySlots[slot]?.menu })
-    }
+    await upsertStatus({ userId: user.id, date: dateStr, slot, status: statusKey, meal_time: mySlots[slot]?.time, menu: mySlots[slot]?.menu })
   }
 
   const setSlotField = async (slot, key, val) => {
     const updated = { ...(mySlots[slot] ?? {}), [key]: val }
     setMySlots(prev => ({ ...prev, [slot]: updated }))
     if (updated.status) {
-      for (const g of groups) {
-        await upsertStatus({ userId: user.id, groupId: g.id, date: dateStr, slot, status: updated.status, meal_time: updated.time, menu: updated.menu })
-      }
+      await upsertStatus({ userId: user.id, date: dateStr, slot, status: updated.status, meal_time: updated.time, menu: updated.menu })
     }
   }
 
   const clearSlot = async (slot) => {
     setMySlots(prev => { const n = { ...prev }; delete n[slot]; return n })
     setOpenDropdown(null)
-    for (const g of groups) {
-      await deleteStatus({ userId: user.id, groupId: g.id, date: dateStr, slot })
-    }
+    await deleteStatus({ userId: user.id, date: dateStr, slot })
   }
 
   if (loading) {
@@ -426,7 +416,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const handleToggleSharing = async () => {
     const next = !sharing
     setSharing(next)
-    await setGroupSharing(myUserId, group.id, dateStr, !next)
+    await setStatusHidden(myUserId, dateStr, !next)
   }
 
   const isMaster = group.created_by === myUserId
