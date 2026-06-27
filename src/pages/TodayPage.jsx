@@ -259,6 +259,19 @@ export default function TodayPage() {
 
                   {isDropOpen && !isInPot && (
                     <div style={styles.dropdown} onClick={e => e.stopPropagation()}>
+                      {/* 미설정 항목 항상 최상단 */}
+                      <button
+                        style={{
+                          ...styles.dropItem,
+                          background: !data?.status ? '#f5f5f522' : 'transparent',
+                          color: !data?.status ? 'var(--color-text)' : 'var(--color-text-muted)',
+                          fontWeight: !data?.status ? 700 : 400,
+                          borderBottom: '1px solid var(--color-border)',
+                        }}
+                        onClick={() => clearSlot(slot)}
+                      >
+                        ○ 미설정
+                      </button>
                       {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
                         <button
                           key={o.key}
@@ -273,14 +286,6 @@ export default function TodayPage() {
                           {o.emoji} {o.label}
                         </button>
                       ))}
-                      {data?.status && (
-                        <button
-                          style={{ ...styles.dropItem, color: 'var(--color-text-muted)', borderTop: '1px solid var(--color-border)', fontSize: 11 }}
-                          onClick={() => clearSlot(slot)}
-                        >
-                          ✕ 초기화
-                        </button>
-                      )}
                     </div>
                   )}
                 </div>
@@ -288,18 +293,18 @@ export default function TodayPage() {
                 <div style={styles.slotDetailLayer} onClick={e => e.stopPropagation()}>
                   <input
                     type="time"
-                    style={styles.slotTimeInput}
+                    style={{ ...styles.slotTimeInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
                     value={data?.time ?? ''}
                     onChange={e => setSlotField(slot, 'time', e.target.value)}
-                    disabled={!data?.status}
+                    disabled={!data?.status || data?.status === 'skip'}
                   />
                   <input
-                    style={styles.slotMenuInput}
+                    style={{ ...styles.slotMenuInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
                     placeholder="메뉴"
                     value={data?.menu ?? ''}
                     onChange={e => setSlotField(slot, 'menu', e.target.value)}
                     maxLength={10}
-                    disabled={!data?.status}
+                    disabled={!data?.status || data?.status === 'skip'}
                   />
                 </div>
               </div>
@@ -355,8 +360,14 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const [showInvite, setShowInvite] = useState(false)
   const [copied, setCopied] = useState(null) // 'code' | 'link' | null
 
+  const isInPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId))
+
   const getMemberData = (userId) => {
-    if (userId === myUserId) return mySlotData ?? null
+    if (userId === myUserId) {
+      // 내가 이 그룹 슬롯의 팟에 참여중이면 참여중으로 고정
+      if (isInPot) return { ...mySlotData, status: '참여중' }
+      return mySlotData ?? null
+    }
     return statuses.find(s => s.user_id === userId && s.slot === slot) ?? null
   }
 
