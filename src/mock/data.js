@@ -2,14 +2,11 @@ export const ME = { id: 'user-1', nickname: '나' }
 
 export const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
-// selectable: true → 사용자가 직접 선택 가능
-// selectable: false → 밥팟 개설/참여 시 자동 부여
 export const SLOT_STATUS_OPTIONS = [
-  { key: 'open',   label: '약속 없음', emoji: '🟢', color: '#BDBDBD',               selectable: true },
-  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#BDBDBD',               selectable: true },
-  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2196F3',               selectable: true },
-  { key: '모집중', label: '모집중',    emoji: '🙌', color: 'var(--color-primary)',   selectable: false },
-  { key: '참여중', label: '참여중',    emoji: '✅', color: '#4CAF50',               selectable: false },
+  { key: 'open',   label: '약속 없음', emoji: '🟢', color: '#BDBDBD', selectable: true },
+  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#BDBDBD', selectable: true },
+  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2196F3', selectable: true },
+  { key: '참여중', label: '참여중',    emoji: '✅', color: '#4CAF50', selectable: false },
 ]
 
 export const GROUPS = [

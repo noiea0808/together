@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, joinPot, upsertStatus } from '../lib/db'
+import { getMyGroups, createPot, joinPot, upsertStatus, getMyPotsForSlot } from '../lib/db'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -30,6 +30,7 @@ export default function CreatePotPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [conflict, setConflict] = useState(null) // 중복 팟 경고
 
   useEffect(() => {
     getMyGroups(user.id).then(g => {
@@ -40,8 +41,7 @@ export default function CreatePotPage() {
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
-  const handleCreate = async () => {
-    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
+  const doCreate = async () => {
     setLoading(true)
     setError(null)
     try {
@@ -58,13 +58,12 @@ export default function CreatePotPage() {
         is_default: form.is_default,
         createdBy: user.id,
       })
-      // 기본팟이 아니면 개설자를 참여자로 자동 추가 + 상태 '모집중'
       if (!form.is_default) {
         await joinPot(pot.id, user.id)
         await upsertStatus({
           userId: user.id,
           date: dateStr, slot: form.slot,
-          status: '모집중', meal_time: form.meal_time,
+          status: '참여중', meal_time: form.meal_time,
         })
       }
       navigate('/today')
@@ -74,6 +73,18 @@ export default function CreatePotPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  const handleCreate = async () => {
+    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
+    // 같은 슬롯에 이미 참여 중인 팟이 있는지 확인
+    const dateStr = toDateStr(new Date())
+    const myPots = await getMyPotsForSlot(user.id, form.group_id, dateStr, form.slot)
+    if (myPots.length > 0) {
+      setConflict({ existingPot: myPots[0].meal_pots })
+      return
+    }
+    await doCreate()
   }
 
   return (
@@ -188,6 +199,29 @@ export default function CreatePotPage() {
           {loading ? '생성 중...' : form.is_default ? '기본 밥팟 열기 🍚' : '밥팟 열기 🍚'}
         </button>
       </div>
+
+      {/* 중복 팟 경고 */}
+      {conflict && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <div style={{ fontSize: 36 }}>⚠️</div>
+            <div style={styles.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
+            <p style={styles.dialogDesc}>
+              {form.slot} 슬롯에{'\n'}
+              <strong>{conflict.existingPot?.meal_time?.slice(0,5)} {conflict.existingPot?.title}</strong>{'\n'}
+              에 이미 참여 중이에요.{'\n'}그래도 새 밥팟을 여시겠어요?
+            </p>
+            <div style={styles.dialogBtns}>
+              <button style={styles.dialogBtnPrimary} onClick={() => { setConflict(null); doCreate() }}>
+                그래도 열기
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConflict(null)}>
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -221,4 +255,11 @@ const styles = {
   publicNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 4 },
   footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },
   createBtn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 }
