@@ -74,16 +74,15 @@ export default function TodayPage() {
       setStatusesMap(newStatusesMap)
       setPotsMap(newPotsMap)
 
-      // 내 상태 초기화 (첫 번째 그룹 기준)
-      const firstGroupId = myGroups[0]?.id
-      if (firstGroupId) {
-        const myStatuses = newStatusesMap[firstGroupId]?.filter(s => s.user_id === user.id) ?? []
-        const slots = {}
+      // 내 상태 초기화 — 전체 그룹 중 내 상태가 있는 것 모두 반영
+      const slots = {}
+      myGroups.forEach(g => {
+        const myStatuses = newStatusesMap[g.id]?.filter(s => s.user_id === user.id) ?? []
         myStatuses.forEach(s => {
           slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
         })
-        setMySlots(slots)
-      }
+      })
+      setMySlots(slots)
     } catch (e) {
       console.error(e)
     } finally {
@@ -107,6 +106,18 @@ export default function TodayPage() {
       ])
       setStatusesMap(prev => ({ ...prev, [groupId]: statuses }))
       setPotsMap(prev => ({ ...prev, [groupId]: pots }))
+
+      // 내 상태도 동기화 (밥팟 참여/취소 등 외부에서 바뀐 경우)
+      const myStatuses = statuses.filter(s => s.user_id === user.id)
+      if (myStatuses.length > 0) {
+        setMySlots(prev => {
+          const updated = { ...prev }
+          myStatuses.forEach(s => {
+            updated[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
+          })
+          return updated
+        })
+      }
     }
 
     const statusSub = supabase
@@ -190,7 +201,10 @@ export default function TodayPage() {
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {isToday && <span style={styles.todayBadge}>오늘</span>}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
+        <div style={{ display: 'flex', alignItems: 'center' }}>
+          <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
+          <button style={styles.settingBtn} onClick={() => navigate('/group')}>⚙️</button>
+        </div>
       </div>
 
       {/* 내 슬롯 그리드 */}
@@ -374,6 +388,7 @@ const styles = {
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   navBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 12px' },
+  settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
