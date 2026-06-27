@@ -203,3 +203,32 @@ export async function leavePot(potId, userId) {
     .match({ pot_id: potId, user_id: userId })
   if (error) throw error
 }
+
+// ── 내 일정 ──────────────────────────────────────────
+export async function getMySchedule(userId, fromDate, toDate) {
+  const { data, error } = await supabase
+    .from('daily_status')
+    .select('*')
+    .eq('user_id', userId)
+    .gte('date', fromDate)
+    .lte('date', toDate)
+    .order('date', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function updateNickname(userId, nickname) {
+  const { error } = await supabase
+    .from('users')
+    .update({ nickname })
+    .eq('id', userId)
+  if (error) throw error
+}
+
+export async function updatePot(potId, { meal_time, title, max_people, is_public }) {
+  const { error } = await supabase
+    .from('meal_pots')
+    .update({ meal_time, title, max_people, is_public })
+    .eq('id', potId)
+  if (error) throw error
+}

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, upsertStatus } from '../lib/db'
+import { getMyGroups, createPot, joinPot, upsertStatus } from '../lib/db'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -37,24 +37,25 @@ export default function CreatePotPage() {
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
   const handleCreate = async () => {
-    if (!form.title.trim() || !form.group_id || loading) return
+    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
     setLoading(true)
     setError(null)
     try {
       const dateStr = toDateStr(new Date())
-      await createPot({
+      const pot = await createPot({
         groupId: form.group_id,
         date: dateStr,
         slot: form.slot,
         meal_time: form.meal_time,
-        title: form.title.trim(),
+        title: form.title.trim() || `${form.slot} ${form.meal_time}`,
         max_people: form.max_people,
         is_public: form.is_public,
         is_default: form.is_default,
         createdBy: user.id,
       })
-      // 기본팟이 아니면 개설자 상태를 '모집중'으로 자동 설정
+      // 기본팟이 아니면 개설자를 참여자로 자동 추가 + 상태 '모집중'
       if (!form.is_default) {
+        await joinPot(pot.id, user.id)
         await upsertStatus({
           userId: user.id, groupId: form.group_id,
           date: dateStr, slot: form.slot,
@@ -164,7 +165,7 @@ export default function CreatePotPage() {
 
       <div style={styles.footer}>
         <button
-          style={{ ...styles.createBtn, opacity: form.title.trim() && !loading ? 1 : 0.4 }}
+          style={{ ...styles.createBtn, opacity: (form.title.trim() || form.meal_time) && !loading ? 1 : 0.4 }}
           onClick={handleCreate}
           disabled={loading}
         >

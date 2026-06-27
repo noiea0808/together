@@ -24,13 +24,20 @@ export default function OnboardingPage() {
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
+  const pendingCode = localStorage.getItem('pendingInviteCode')
+
   const handleSignUp = async () => {
     if (!form.email || !form.password || !form.nickname || loading) return
     setLoading(true); setError(null)
     try {
       const user = await signUp(form.email.trim(), form.password, form.nickname.trim())
       login(user)
-      navigate('/group-setup')
+      if (pendingCode) {
+        localStorage.removeItem('pendingInviteCode')
+        navigate(`/join/${pendingCode}`)
+      } else {
+        navigate('/group-setup')
+      }
     } catch (e) {
       setError(parseError(e))
     } finally {
@@ -44,7 +51,12 @@ export default function OnboardingPage() {
     try {
       const user = await signIn(form.email.trim(), form.password)
       login(user)
-      navigate('/today')
+      if (pendingCode) {
+        localStorage.removeItem('pendingInviteCode')
+        navigate(`/join/${pendingCode}`)
+      } else {
+        navigate('/today')
+      }
     } catch (e) {
       setError(parseError(e))
     } finally {

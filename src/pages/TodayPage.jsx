@@ -5,6 +5,7 @@ import { getMyGroups, getGroupMembers, getGroupStatuses, getGroupPots, upsertSta
 import { supabase } from '../lib/supabase'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
+import BottomNav from '../components/BottomNav'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
 
@@ -121,7 +122,7 @@ export default function TodayPage() {
     }
 
     const statusSub = supabase
-      .channel('daily_status_changes')
+      .channel(`daily_status_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'daily_status' },
         (payload) => {
           const groupId = payload.new?.group_id ?? payload.old?.group_id
@@ -133,7 +134,7 @@ export default function TodayPage() {
       .subscribe()
 
     const potSub = supabase
-      .channel('pot_changes')
+      .channel(`pot_changes_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'meal_pots' },
         (payload) => {
           const groupId = payload.new?.group_id ?? payload.old?.group_id
@@ -194,6 +195,7 @@ export default function TodayPage() {
 
 
   return (
+    <div style={styles.wrap}>
     <div style={styles.page}>
       {/* 날짜 네비 */}
       <div style={styles.dateNav}>
@@ -337,10 +339,15 @@ export default function TodayPage() {
         + 그룹 만들기 / 참여하기
       </button>
     </div>
+    <BottomNav />
+    </div>
   )
 }
 
 function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, onNavigate, onRefresh }) {
+  const [showInvite, setShowInvite] = useState(false)
+  const [copied, setCopied] = useState(null) // 'code' | 'link' | null
+
   const getMemberData = (userId) => {
     if (userId === myUserId) return mySlotData ?? null
     return statuses.find(s => s.user_id === userId && s.slot === slot) ?? null
@@ -348,12 +355,51 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
   const hasActivity = members.some(m => getMemberData(m.id)?.status) || pots.length > 0
 
+  const copyText = (text, type) => {
+    navigator.clipboard?.writeText(text)
+    setCopied(type)
+    setTimeout(() => setCopied(null), 2000)
+  }
+
   return (
     <div style={{ ...styles.groupCard, opacity: hasActivity ? 1 : 0.45 }}>
       <div style={styles.groupHeader}>
         <span style={styles.groupName}>{group.name}</span>
-        {hasActivity && <span style={styles.activityDot} />}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          {hasActivity && <span style={styles.activityDot} />}
+          <button style={styles.inviteBtn} onClick={() => setShowInvite(v => !v)}>
+            {showInvite ? '닫기' : '초대'}
+          </button>
+        </div>
       </div>
+
+      {showInvite && (
+        <div style={styles.invitePanel}>
+          <div style={styles.inviteLabel}>초대 코드</div>
+          <div style={styles.inviteCodeBox}>
+            <span style={styles.inviteCode}>{group.invite_code}</span>
+            <button
+              style={{ ...styles.inviteCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }}
+              onClick={() => copyText(group.invite_code, 'code')}
+            >
+              {copied === 'code' ? '✓' : '복사'}
+            </button>
+          </div>
+          <div style={styles.inviteLabel} >초대 링크</div>
+          <div style={styles.inviteCodeBox}>
+            <span style={{ ...styles.inviteCode, fontSize: 11, color: 'var(--color-text-muted)' }}>
+              {window.location.origin}/join/{group.invite_code}
+            </span>
+            <button
+              style={{ ...styles.inviteCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
+              onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}
+            >
+              {copied === 'link' ? '✓' : '복사'}
+            </button>
+          </div>
+        </div>
+      )}
+
 
       <div style={styles.memberList}>
         {members.map(member => {
@@ -397,7 +443,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 }
 
 const styles = {
-  page: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 32 },
+  wrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+  page: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80 },
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
   emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
@@ -423,6 +470,12 @@ const styles = {
   groupCard: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', transition: 'opacity 0.2s' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)' },
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  inviteBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  invitePanel: { margin: '0 var(--spacing-md) var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 },
+  inviteLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
+  inviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', border: '1px solid var(--color-border)' },
+  inviteCode: { flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--color-text)', wordBreak: 'break-all' },
+  inviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
   activityDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' },
   memberList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   memberRow: { display: 'flex', alignItems: 'center', gap: 8 },
