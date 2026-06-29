@@ -560,7 +560,16 @@ export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_tim
   if (error) throw error
 }
 
-export async function deleteGroupDefaultPotConfig(id) {
+export async function deleteGroupDefaultPotConfig(id, fromDate) {
+  // 오늘(또는 지정일) 이후 이 설정으로 자동 생성된 기본팟도 함께 제거
+  if (fromDate) {
+    await supabase
+      .from('meal_pots')
+      .delete()
+      .eq('config_id', id)
+      .eq('is_default', true)
+      .gte('date', fromDate)
+  }
   const { error } = await supabase
     .from('group_default_pot_configs')
     .delete()
@@ -568,17 +577,17 @@ export async function deleteGroupDefaultPotConfig(id) {
   if (error) throw error
 }
 
-// 기본팟 설정이 있는데 해당 날짜에 아직 팟이 없으면 자동 생성 (slot+meal_time 기준으로 중복 방지)
+// 기본팟 설정이 있는데 해당 날짜에 아직 팟이 없으면 자동 생성 (config_id 기준으로 중복 방지)
 export async function ensureDefaultPots(groupId, date, configs) {
   if (!configs || configs.length === 0) return
   const applicable = configs.filter(c => c.effective_from <= date)
   if (applicable.length === 0) return
 
   const { data: existing } = await supabase
-    .from('meal_pots').select('slot, meal_time').eq('group_id', groupId).eq('date', date).eq('is_default', true)
-  const existingKeys = new Set((existing ?? []).map(p => `${p.slot}|${p.meal_time?.slice(0,5)}`))
+    .from('meal_pots').select('config_id').eq('group_id', groupId).eq('date', date).eq('is_default', true)
+  const existingConfigIds = new Set((existing ?? []).map(p => p.config_id).filter(Boolean))
 
-  const toCreate = applicable.filter(c => !existingKeys.has(`${c.slot}|${c.meal_time?.slice(0,5)}`))
+  const toCreate = applicable.filter(c => !existingConfigIds.has(c.id))
   if (toCreate.length === 0) return
 
   const rows = toCreate.map(c => ({
@@ -588,8 +597,12 @@ export async function ensureDefaultPots(groupId, date, configs) {
     max_people: c.max_people, is_public: c.is_public,
     is_default: true, created_by: null,
     last_modified_by: c.last_modified_by,
+    config_id: c.id,
   }))
-  await supabase.from('meal_pots').insert(rows)
+  // 유니크 제약(config_id+date) 위반 시 무시 (동시 요청 경합 방지)
+  for (const row of rows) {
+    await supabase.from('meal_pots').insert(row)
+  }
 }
 
 export async function updatePotMenu(potId, menu) {

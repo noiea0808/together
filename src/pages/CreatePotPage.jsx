@@ -12,17 +12,41 @@ function toDateStr(date) {
   return `${year}-${month}-${day}`
 }
 
+// 현재 시각 기준 다음 정시 (예: 14:20 → 15:00)
+function nextFullHour() {
+  const h = (new Date().getHours() + 1) % 24
+  return `${String(h).padStart(2, '0')}:00`
+}
+
+// 슬롯별 기본 시각 — 아침 7시, 점심 12시, 저녁 19시, 간식류는 다음 정시
+function defaultTimeForSlot(slot) {
+  if (slot === '아침') return '07:00'
+  if (slot === '점심') return '12:00'
+  if (slot === '저녁') return '19:00'
+  return nextFullHour()
+}
+
+function addMinutesStr(timeStr, minutes) {
+  if (!timeStr) return ''
+  const [h, m] = timeStr.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 export default function CreatePotPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user } = useUser()
 
+  const initialSlot = searchParams.get('slot') ?? '점심'
+  const initialDate = searchParams.get('date') ?? toDateStr(new Date())
+  const initialTime = defaultTimeForSlot(initialSlot)
   const [groups, setGroups] = useState([])
   const [form, setForm] = useState({
     group_id: searchParams.get('group_id') ?? '',
-    slot: searchParams.get('slot') ?? '점심',
-    meal_time: '12:00',
-    end_time: '13:00',
+    slot: initialSlot,
+    meal_time: initialTime,
+    end_time: addMinutesStr(initialTime, 60),
     duration_minutes: 60, // 0 = 직접입력
     title: '',
     menu: '',
@@ -72,10 +96,9 @@ export default function CreatePotPage() {
     setLoading(true)
     setError(null)
     try {
-      const dateStr = toDateStr(new Date())
       const pot = await createPot({
         groupId: form.group_id,
-        date: dateStr,
+        date: initialDate,
         slot: form.slot,
         meal_time: form.meal_time,
         end_time: form.end_time,
@@ -88,7 +111,8 @@ export default function CreatePotPage() {
         createdBy: user.id,
       })
       await joinPot(pot.id, user.id)
-      navigate('/today')
+      const today = toDateStr(new Date())
+      navigate(initialDate === today ? '/today' : `/today?date=${initialDate}`)
     } catch (e) {
       setError('밥팟 생성에 실패했어요.')
       console.error(e)
@@ -106,7 +130,10 @@ export default function CreatePotPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>밥팟 만들기</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <span style={styles.headerTitle}>밥팟 만들기</span>
+          <span style={styles.headerSub}>{initialDate !== toDateStr(new Date()) ? `${initialDate} · ` : ''}{form.slot}</span>
+        </div>
         <span />
       </div>
 
@@ -129,7 +156,10 @@ export default function CreatePotPage() {
               <button
                 key={s}
                 style={{ ...styles.slotBtn, ...(form.slot === s ? styles.slotBtnActive : {}) }}
-                onClick={() => set('slot', s)}
+                onClick={() => {
+                  const t = defaultTimeForSlot(s)
+                  setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutesStr(t, f.duration_minutes) : f.end_time }))
+                }}
               >
                 {s}
               </button>
@@ -235,8 +265,9 @@ export default function CreatePotPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
+  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
+  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   form: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', overflowY: 'auto' },
   defaultCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', border: '1.5px solid', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.15s' },

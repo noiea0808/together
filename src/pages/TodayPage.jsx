@@ -312,7 +312,7 @@ export default function TodayPage() {
     if (myPotsInSlot.length > 0) {
       setCreateConflict({ existingPot: myPotsInSlot[0], groupId, slot })
     } else {
-      navigate(`/create?group_id=${groupId}&slot=${slot}`)
+      navigate(`/create?group_id=${groupId}&slot=${slot}&date=${dateStr}`)
     }
   }
 
@@ -608,14 +608,14 @@ export default function TodayPage() {
               const { groupId, slot } = createConflict
               setCreateConflict(null)
               await leavePotWithCleanup(pot.id, user.id)
-              navigate(`/create?group_id=${groupId}&slot=${slot}`)
+              navigate(`/create?group_id=${groupId}&slot=${slot}&date=${dateStr}`)
             }}>
               기존 밥팟 나가고 새 팟 열기
             </button>
             <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={() => {
               const { groupId, slot } = createConflict
               setCreateConflict(null)
-              navigate(`/create?group_id=${groupId}&slot=${slot}`)
+              navigate(`/create?group_id=${groupId}&slot=${slot}&date=${dateStr}`)
             }}>
               중복으로 새 팟 열기
             </button>

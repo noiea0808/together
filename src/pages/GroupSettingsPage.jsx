@@ -5,6 +5,17 @@ import { getMyGroups, getGroupDefaultPotConfigs, insertGroupDefaultPotConfig, up
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
+function nextFullHour() {
+  const h = (new Date().getHours() + 1) % 24
+  return `${String(h).padStart(2, '0')}:00`
+}
+function defaultTimeForSlot(slot) {
+  if (slot === '아침') return '07:00'
+  if (slot === '점심') return '12:00'
+  if (slot === '저녁') return '19:00'
+  return nextFullHour()
+}
+
 function toDateStr(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -32,7 +43,9 @@ export default function GroupSettingsPage() {
   const [error, setError] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
 
+  const editingConfigParam = searchParams.get('config')
   const editingSlotParam = searchParams.get('slot')
+  const isFutureEdit = !!(editingConfigParam || editingSlotParam)
   const initialSlot = editingSlotParam ?? '점심'
   const [editingConfigId, setEditingConfigId] = useState(null) // null = 신규, id = 기존 수정
   const [form, setForm] = useState({
@@ -57,16 +70,14 @@ export default function GroupSettingsPage() {
       if (group) setGroupName(group.name)
       setConfigs(cfgs)
 
-      // ?slot 파라미터로 진입 시 해당 슬롯의 첫 번째 설정을 폼에 채우기
-      const targetSlot = searchParams.get('slot')
-      if (targetSlot) {
-        const existing = cfgs.find(c => c.slot === targetSlot)
-        if (existing) {
-          loadConfigToForm(existing)
-          setEditingConfigId(existing.id)
-        } else {
-          setForm(f => ({ ...f, slot: targetSlot }))
-        }
+      // 향후 수정 진입 — config 파라미터(정확한 설정) 우선, 없으면 slot
+      if (editingConfigParam) {
+        const existing = cfgs.find(c => c.id === editingConfigParam)
+        if (existing) loadConfigToForm(existing)
+      } else if (editingSlotParam) {
+        const existing = cfgs.find(c => c.slot === editingSlotParam)
+        if (existing) loadConfigToForm(existing)
+        else setForm(f => ({ ...f, slot: editingSlotParam }))
       }
       setLoading(false)
     }
@@ -93,10 +104,6 @@ export default function GroupSettingsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const resetForm = () => {
-    setEditingConfigId(null)
-    setForm({ slot: '점심', meal_time: '12:00', end_time: '13:00', duration_minutes: 60, title: '', memo: '', max_people: 4, is_public: false, effective_from: toDateStr(new Date()) })
-  }
 
   const setStartTime = (val) => {
     setForm(f => ({
@@ -130,9 +137,8 @@ export default function GroupSettingsPage() {
       } else {
         await insertGroupDefaultPotConfig({ groupId, ...payload })
       }
-      const cfgs = await getGroupDefaultPotConfigs(groupId)
-      setConfigs(cfgs)
-      resetForm()
+      // 추가/수정 완료 후 메인으로 복귀
+      navigate('/today', { replace: true })
     } catch (e) {
       setError('저장에 실패했어요.')
       console.error(e)
@@ -144,9 +150,8 @@ export default function GroupSettingsPage() {
   const handleDelete = async (id) => {
     setSaving(true)
     try {
-      await deleteGroupDefaultPotConfig(id)
-      setConfigs(c => c.filter(cfg => cfg.id !== id))
-      setConfirmDelete(null)
+      await deleteGroupDefaultPotConfig(id, toDateStr(new Date()))
+      navigate('/today', { replace: true })
     } catch (e) { console.error(e) }
     finally { setSaving(false) }
   }
@@ -157,21 +162,15 @@ export default function GroupSettingsPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>기본 밥팟 추가</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <span style={styles.headerTitle}>{isFutureEdit ? '기본 밥팟 수정' : '기본 밥팟 추가'}</span>
+          <span style={styles.headerSub}>{form.slot}</span>
+        </div>
         <span />
       </div>
 
       <div style={styles.form}>
 
-        {/* 모드 표시 */}
-        <div style={styles.modeBar}>
-          <span style={{ fontWeight: 700, fontSize: 13, color: editingConfigId ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-            {editingConfigId ? '✏️ 기존 설정 수정 중' : '＋ 새 기본 밥팟 추가'}
-          </span>
-          {editingConfigId && (
-            <button style={styles.resetFormBtn} onClick={resetForm}>새로 추가하기</button>
-          )}
-        </div>
 
         {/* 그룹 고정 표시 */}
         <div style={styles.field}>
@@ -187,7 +186,11 @@ export default function GroupSettingsPage() {
               <button
                 key={s}
                 style={{ ...styles.slotBtn, ...(form.slot === s ? styles.slotBtnActive : {}) }}
-                onClick={() => set('slot', s)}
+                onClick={() => {
+                  if (editingConfigId) { set('slot', s); return }
+                  const t = defaultTimeForSlot(s)
+                  setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutes(t, f.duration_minutes) : f.end_time }))
+                }}
               >
                 {s}
               </button>
@@ -285,38 +288,20 @@ export default function GroupSettingsPage() {
         </div>
 
         {error && <p style={{ color: '#f44336', fontSize: 13 }}>{error}</p>}
-
-        {/* 현재 설정된 기본 밥팟 목록 */}
-        {configs.length > 0 && (
-          <div style={styles.configSection}>
-            <div style={styles.configTitle}>현재 설정된 기본 밥팟</div>
-            {configs.map(cfg => (
-              <div key={cfg.id} style={{ ...styles.configRow, borderColor: editingConfigId === cfg.id ? 'var(--color-primary)' : 'var(--color-border)' }}>
-                <div style={styles.configInfo}>
-                  <span style={styles.configSlot}>{cfg.slot}</span>
-                  <span style={styles.configTime}>{cfg.meal_time?.slice(0,5)}{cfg.end_time ? ` ~ ${cfg.end_time.slice(0,5)}` : ''}</span>
-                  <span style={styles.configName}>{cfg.title}</span>
-                  {cfg.users?.nickname && (
-                    <span style={styles.configModifier}>✎ {cfg.users.nickname}</span>
-                  )}
-                </div>
-                <div style={{ display: 'flex', gap: 4 }}>
-                  <button style={styles.editConfigBtn} onClick={() => loadConfigToForm(cfg)}>수정</button>
-                  <button style={styles.deleteBtn} onClick={() => setConfirmDelete(cfg.id)}>삭제</button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
       </div>
 
       <div style={styles.footer}>
+        {editingConfigId && (
+          <button style={styles.deleteBtn} onClick={() => setConfirmDelete(editingConfigId)} disabled={saving}>
+            🗑️
+          </button>
+        )}
         <button
           style={{ ...styles.createBtn, opacity: form.title.trim() && !saving ? 1 : 0.4 }}
           onClick={handleSave}
           disabled={!form.title.trim() || saving}
         >
-          {saving ? '저장 중...' : editingSlotParam ? '수정 완료' : '기본 밥팟 추가 🍚'}
+          {saving ? '저장 중...' : isFutureEdit ? '수정 완료' : '기본 밥팟 추가 🍚'}
         </button>
       </div>
 
@@ -325,8 +310,8 @@ export default function GroupSettingsPage() {
         <div style={styles.overlay} onClick={() => setConfirmDelete(null)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 36 }}>🗑️</div>
-            <div style={styles.dialogTitle}>{confirmDelete} 기본 밥팟 삭제</div>
-            <p style={styles.dialogDesc}>설정을 삭제할게요. 이미 열린 팟에는 영향 없어요.</p>
+            <div style={styles.dialogTitle}>기본 밥팟 설정 삭제</div>
+            <p style={styles.dialogDesc}>오늘 포함 이후 날짜의 기본 밥팟이 모두 사라져요. 과거 기록은 유지돼요.</p>
             <div style={styles.dialogBtns}>
               <button style={styles.dialogBtnDanger} onClick={() => handleDelete(confirmDelete)} disabled={saving}>
                 {saving ? '삭제 중...' : '삭제하기'}
@@ -343,9 +328,10 @@ export default function GroupSettingsPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
   loading: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
+  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   form: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', overflowY: 'auto' },
 
   field: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' },
@@ -373,8 +359,6 @@ const styles = {
   toggleBtn: { flex: 1, padding: 12, border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   toggleActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
 
-  modeBar: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  resetFormBtn: { fontSize: 12, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
   configSection: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   configTitle: { fontWeight: 700, fontSize: 13, marginBottom: 2 },
   configRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px var(--spacing-sm)', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)' },
@@ -384,10 +368,10 @@ const styles = {
   configName: { fontSize: 12, fontWeight: 600 },
   configModifier: { fontSize: 11, color: '#9E9E9E' },
   editConfigBtn: { padding: '4px 10px', background: 'none', color: 'var(--color-primary)', border: '1px solid var(--color-primary)40', borderRadius: 'var(--radius-full)', fontSize: 12, cursor: 'pointer', flexShrink: 0 },
-  deleteBtn: { padding: '4px 10px', background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 'var(--radius-full)', fontSize: 12, cursor: 'pointer', flexShrink: 0 },
+  deleteBtn: { padding: '14px 18px', background: 'none', color: '#f44336', border: '1px solid #f4433660', borderRadius: 'var(--radius-full)', fontSize: 18, cursor: 'pointer', flexShrink: 0 },
 
-  footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },
-  createBtn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 },
+  createBtn: { flex: 1, padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },

@@ -10,40 +10,34 @@ function toDateStr(date) {
   return `${year}-${month}-${day}`
 }
 
-// 인라인 편집 가능한 필드 컴포넌트
-function InlineField({ label, value, displayValue, editable, renderEditor, onEdit, editing, onSave, onCancel }) {
-  return (
-    <div style={iStyles.row}>
-      <span style={iStyles.label}>{label}</span>
-      {editing ? (
-        <div style={iStyles.editorWrap}>
-          {renderEditor()}
-          <button style={iStyles.saveBtn} onClick={onSave}>저장</button>
-          <button style={iStyles.cancelBtn} onClick={onCancel}>✕</button>
-        </div>
-      ) : (
-        <div style={iStyles.valueWrap}>
-          <span style={{ ...iStyles.value, color: value ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-            {displayValue ?? value ?? '미정'}
-          </span>
-          {editable && (
-            <button style={iStyles.editBtn} onClick={onEdit}>수정</button>
-          )}
-        </div>
-      )}
-    </div>
-  )
+function addMinutes(timeStr, minutes) {
+  if (!timeStr) return ''
+  const [h, m] = timeStr.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
+const DURATION_OPTIONS = [
+  { min: 30, label: '30분' },
+  { min: 60, label: '1시간' },
+  { min: 90, label: '1.5시간' },
+  { min: 120, label: '2시간' },
+]
+
+function durationOf(start, end) {
+  if (!start || !end) return 0
+  const [sh, sm] = start.split(':').map(Number)
+  const [eh, em] = end.split(':').map(Number)
+  return (eh * 60 + em) - (sh * 60 + sm)
+}
+
+// 인라인 편집 가능한 필드 컴포넌트
 const iStyles = {
   row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--color-border)' },
   label: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 52, flexShrink: 0 },
   valueWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   value: { fontSize: 'var(--font-size-base)', fontWeight: 600 },
   editBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', flexShrink: 0 },
-  editorWrap: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
-  saveBtn: { padding: '6px 12px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 12, cursor: 'pointer', flexShrink: 0 },
-  cancelBtn: { padding: '6px 8px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', cursor: 'pointer', color: 'var(--color-text-muted)', flexShrink: 0 },
 }
 
 export default function PotDetailPage() {
@@ -58,24 +52,25 @@ export default function PotDetailPage() {
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-
-  // 인라인 편집 상태
-  const [editingField, setEditingField] = useState(null) // 'time'|'end_time'|'title'|'menu'|'max_people'|null
-  const [fieldValue, setFieldValue] = useState('')
-  const [endTimeValue, setEndTimeValue] = useState('')
-  const [tempMaxPeople, setTempMaxPeople] = useState(4)
-  const [tempIsPublic, setTempIsPublic] = useState(false)
+  const [draft, setDraft] = useState(null) // 편집 중인 값
 
   const loadPot = async () => {
     try {
       const data = await getPot(id)
       setPot(data)
-      setTempIsPublic(data.is_public ?? false)
+      setDraft(null)
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
 
   useEffect(() => { loadPot() }, [id])
+
+  // 향후 수정 후 뒤로가기로 돌아왔을 때 최신 데이터 반영
+  useEffect(() => {
+    const onPop = () => loadPot()
+    window.addEventListener('popstate', onPop)
+    return () => window.removeEventListener('popstate', onPop)
+  }, [id])
 
   const participants = pot?.pot_members?.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?' })) ?? []
   const isJoined = participants.some(m => m.id === user?.id)
@@ -90,33 +85,44 @@ export default function PotDetailPage() {
     return new Date() > expiry
   })()
 
-  const startEdit = (field, value) => {
-    setEditingField(field)
-    setFieldValue(value ?? '')
-    if (field === 'max_people') setTempMaxPeople(pot?.max_people ?? 4)
-    if (field === 'time') setEndTimeValue(pot?.end_time?.slice(0, 5) ?? '')
+  // draft 초기화 (수정 시작)
+  const initDraft = () => {
+    if (draft) return
+    setDraft({
+      meal_time: pot.meal_time?.slice(0, 5) ?? '',
+      end_time: pot.end_time?.slice(0, 5) ?? '',
+      title: pot.title ?? '',
+      menu: pot.menu ?? '',
+      memo: pot.memo ?? '',
+      max_people: pot.max_people ?? 4,
+      is_public: pot.is_public ?? false,
+    })
   }
-  const cancelEdit = () => setEditingField(null)
+  const setD = (key, val) => setDraft(d => ({ ...d, [key]: val }))
+  const cancelDraft = () => setDraft(null)
 
-  const saveField = async (field) => {
-    let patch = {}
-    if (field === 'time') patch = { meal_time: fieldValue, end_time: endTimeValue || null, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'title') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: fieldValue || pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'menu') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: fieldValue.trim() || null, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'memo') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'max_people') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: tempMaxPeople, is_public: pot.is_public }
+  const saveDraft = async () => {
+    if (!draft || actionLoading) return
+    setActionLoading(true)
     try {
-      await updatePot(pot.id, patch, pot.is_default ? user.id : null)
+      await updatePot(pot.id, {
+        meal_time: draft.meal_time,
+        end_time: draft.end_time || null,
+        title: draft.title || pot.title,
+        menu: draft.menu.trim() || null,
+        memo: draft.memo.trim() || null,
+        max_people: draft.max_people,
+        is_public: draft.is_public,
+      }, pot.is_default ? user.id : null)
       await loadPot()
-      setEditingField(null)
     } catch (e) { console.error(e) }
+    finally { setActionLoading(false) }
   }
 
-  const togglePublic = async () => {
-    const next = !pot.is_public
-    setTempIsPublic(next)
-    await updatePot(pot.id, { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: next })
-    await loadPot()
+  const togglePublic = () => {
+    if (!canEdit) return
+    const base = draft ?? { meal_time: pot.meal_time?.slice(0,5) ?? '', end_time: pot.end_time?.slice(0,5) ?? '', title: pot.title ?? '', menu: pot.menu ?? '', memo: pot.memo ?? '', max_people: pot.max_people ?? 4, is_public: pot.is_public ?? false }
+    setDraft({ ...base, is_public: !(draft?.is_public ?? pot.is_public) })
   }
 
   // 참여 관련 — 참여 사실은 pot_members로만 기록 (status는 사용자 의향 전용)
@@ -185,11 +191,21 @@ export default function PotDetailPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>밥팟 상세</span>
-        {pot.is_default
-          ? <button style={styles.futureEditBtn} onClick={() => navigate(`/group/${pot.group_id}/settings?slot=${pot.slot}`)}>향후 수정</button>
-          : <span />
+        {draft
+          ? <button style={styles.headerBtn} onClick={cancelDraft}>취소</button>
+          : <button style={styles.back} onClick={() => navigate(-1)}>←</button>
+        }
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <span style={styles.headerTitle}>밥팟 상세</span>
+          <span style={styles.headerSub}>
+            {pot.is_default ? pot.slot : `${pot.date} · ${pot.slot}`}
+          </span>
+        </div>
+        {draft
+          ? <button style={{ ...styles.headerBtn, color: 'var(--color-primary)', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>{actionLoading ? '...' : '완료'}</button>
+          : pot.is_default
+            ? <button style={styles.futureEditBtn} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>향후 수정</button>
+            : <span />
         }
       </div>
 
@@ -211,95 +227,66 @@ export default function PotDetailPage() {
           )}
         </div>
 
-        {/* 인라인 편집 필드들 */}
+        {/* 필드 */}
         <div style={styles.fields}>
-          {/* 시간 */}
-          <InlineField
-            label="시간"
-            value={pot.meal_time?.slice(0, 5)}
-            displayValue={
-              pot.meal_time
-                ? `${pot.meal_time.slice(0, 5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}`
-                : '미정'
-            }
-            editable={canEdit}
-            editing={editingField === 'time'}
-            onEdit={() => startEdit('time', pot.meal_time?.slice(0, 5) ?? '')}
-            onSave={() => saveField('time')}
-            onCancel={cancelEdit}
-            renderEditor={() => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: 1 }}>
-                <input type="time" style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} autoFocus />
-                <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
-                <input type="time" style={styles.inlineInput} value={endTimeValue} onChange={e => setEndTimeValue(e.target.value)} />
+          {[
+            { label: '시간', content: canEdit && draft ? (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <input type="time" style={styles.inlineInput} value={draft.meal_time}
+                    onChange={e => setDraft(d => ({ ...d, meal_time: e.target.value, end_time: durationOf(d.meal_time, d.end_time) > 0 ? addMinutes(e.target.value, durationOf(d.meal_time, d.end_time)) : d.end_time }))} />
+                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
+                  <input type="time" style={styles.inlineInput} value={draft.end_time} onChange={e => setD('end_time', e.target.value)} />
+                </div>
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                  {DURATION_OPTIONS.map(o => {
+                    const active = durationOf(draft.meal_time, draft.end_time) === o.min
+                    return (
+                      <button key={o.min}
+                        style={{ ...styles.durBtn, ...(active ? styles.durBtnActive : {}) }}
+                        onClick={() => setD('end_time', addMinutes(draft.meal_time, o.min))}>
+                        {o.label}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            )}
-          />
-
-          {/* 밥팟 이름 */}
-          <InlineField
-            label="이름"
-            value={pot.title}
-            editable={canEdit}
-            editing={editingField === 'title'}
-            onEdit={() => startEdit('title', pot.title ?? '')}
-            onSave={() => saveField('title')}
-            onCancel={cancelEdit}
-            renderEditor={() => (
-              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={20} autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') saveField('title'); if (e.key === 'Escape') cancelEdit() }} />
-            )}
-          />
-
-          {/* 메뉴 */}
-          <InlineField
-            label="메뉴"
-            value={pot.menu}
-            displayValue={pot.menu || '미정'}
-            editable={canEdit}
-            editing={editingField === 'menu'}
-            onEdit={() => startEdit('menu', pot.menu ?? '')}
-            onSave={() => saveField('menu')}
-            onCancel={cancelEdit}
-            renderEditor={() => (
-              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={20} autoFocus placeholder="미입력 시 미정"
-                onKeyDown={e => { if (e.key === 'Enter') saveField('menu'); if (e.key === 'Escape') cancelEdit() }} />
-            )}
-          />
-
-          {/* 최대 인원 */}
-          <InlineField
-            label="최대"
-            value={`${pot.max_people}명`}
-            editable={canEdit}
-            editing={editingField === 'max_people'}
-            onEdit={() => startEdit('max_people')}
-            onSave={() => saveField('max_people')}
-            onCancel={cancelEdit}
-            renderEditor={() => (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <button style={styles.stepperBtn} onClick={() => setTempMaxPeople(v => Math.max(participants.length, 2, v - 1))}>−</button>
-                <span style={{ fontWeight: 700, fontSize: 16, minWidth: 32, textAlign: 'center' }}>{tempMaxPeople}명</span>
-                <button style={styles.stepperBtn} onClick={() => setTempMaxPeople(v => Math.min(10, v + 1))}>+</button>
+            ) : (
+              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>
+                {pot.meal_time ? `${pot.meal_time.slice(0,5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0,5)}` : ''}` : '미정'}
+              </span>
+            )},
+            { label: '이름', content: canEdit && draft ? (
+              <input style={styles.inlineInput} value={draft.title} onChange={e => setD('title', e.target.value)} maxLength={20} />
+            ) : (
+              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>{pot.title}</span>
+            )},
+            { label: '메뉴', content: canEdit && draft ? (
+              <input style={styles.inlineInput} value={draft.menu} onChange={e => setD('menu', e.target.value)} maxLength={20} placeholder="미입력 시 미정" />
+            ) : (
+              <span style={{ ...iStyles.value, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }} onClick={canEdit ? initDraft : undefined}>{pot.menu || '미정'}</span>
+            )},
+            { label: '최대', content: canEdit && draft ? (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <button style={styles.stepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                <span style={{ fontWeight: 700, fontSize: 16, minWidth: 32, textAlign: 'center' }}>{draft.max_people}명</span>
+                <button style={styles.stepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
               </div>
-            )}
-          />
-
-          {/* 메모 */}
-          <InlineField
-            label="메모"
-            value={pot.memo}
-            displayValue={pot.memo || '없음'}
-            editable={canEdit}
-            editing={editingField === 'memo'}
-            onEdit={() => startEdit('memo', pot.memo ?? '')}
-            onSave={() => saveField('memo')}
-            onCancel={cancelEdit}
-            renderEditor={() => (
-              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={50} autoFocus placeholder="메모 입력"
-                onKeyDown={e => { if (e.key === 'Enter') saveField('memo'); if (e.key === 'Escape') cancelEdit() }} />
-            )}
-          />
+            ) : (
+              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>{pot.max_people}명</span>
+            )},
+            { label: '메모', content: canEdit && draft ? (
+              <input style={styles.inlineInput} value={draft.memo} onChange={e => setD('memo', e.target.value)} maxLength={50} placeholder="메모 입력" />
+            ) : (
+              <span style={{ ...iStyles.value, color: pot.memo ? 'var(--color-text)' : 'var(--color-text-muted)' }} onClick={canEdit ? initDraft : undefined}>{pot.memo || '없음'}</span>
+            )},
+          ].map(({ label, content }) => (
+            <div key={label} style={iStyles.row}>
+              <span style={iStyles.label}>{label}</span>
+              <div style={iStyles.valueWrap}>{content}</div>
+              {canEdit && !draft && <button style={iStyles.editBtn} onClick={initDraft}>수정</button>}
+            </div>
+          ))}
         </div>
 
         {!pot.is_default && pot.users && (
@@ -346,7 +333,7 @@ export default function PotDetailPage() {
           🔗 {showShare ? '닫기' : '공유하기'}
         </button>
 
-        {(isMaster || pot.is_default) && !isPotExpired && (
+        {isMaster && !draft && (
           <button style={styles.deleteBtn} onClick={() => setConfirmDelete(true)}>
             🗑️ 밥팟 삭제
           </button>
@@ -371,6 +358,7 @@ export default function PotDetailPage() {
           </div>
         )}
       </div>
+
 
       {/* 밥팟 삭제 확인 */}
       {confirmDelete && (
@@ -418,10 +406,12 @@ export default function PotDetailPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
+  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
+  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   futureEditBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer' },
+  headerBtn: { fontSize: 14, fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' },
   body: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflowY: 'auto' },
 
   tagRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
@@ -433,6 +423,8 @@ const styles = {
   fields: { display: 'flex', flexDirection: 'column' },
   inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' },
   stepperBtn: { width: 32, height: 32, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  durBtn: { padding: '4px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500 },
+  durBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: -4 },
   dotsSection: { padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
@@ -450,6 +442,9 @@ const styles = {
   shareText: { flex: 1, fontSize: 13, color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
   shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
 
+  confirmBar: { display: 'flex', gap: 8, padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', flexShrink: 0 },
+  confirmCancelBtn: { flex: 1, padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
+  confirmSaveBtn: { flex: 2, padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
