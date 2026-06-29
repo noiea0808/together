@@ -258,7 +258,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('group_share_settings')
       .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
-      .select('*, pot_members(user_id, users(nickname))').in('group_id', groupIds).eq('date', date),
+      .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
       .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
@@ -306,7 +306,7 @@ export async function getMyStatuses(userId, date) {
 }
 
 // ── 밥팟 ──────────────────────────────────────────
-export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy }) {
   const { data, error } = await supabase
     .from('meal_pots')
     .insert({
@@ -317,6 +317,7 @@ export async function createPot({ groupId, date, slot, meal_time, end_time, titl
       end_time: end_time || null,
       title,
       menu: menu || null,
+      memo: memo || null,
       max_people,
       is_public,
       is_default,
@@ -331,7 +332,7 @@ export async function createPot({ groupId, date, slot, meal_time, end_time, titl
 export async function getGroupPots(groupId, date) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname))')
+    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
     .eq('group_id', groupId)
     .eq('date', date)
   if (error) throw error
@@ -341,7 +342,7 @@ export async function getGroupPots(groupId, date) {
 export async function getPot(potId) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname))')
+    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
     .eq('id', potId)
     .single()
   if (error) throw error
@@ -518,12 +519,77 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, end_time, title, menu, max_people, is_public }) {
-  const { error } = await supabase
-    .from('meal_pots')
-    .update({ meal_time, end_time: end_time || null, title, menu: menu || null, max_people, is_public })
-    .eq('id', potId)
+export async function updatePot(potId, { meal_time, end_time, title, menu, memo, max_people, is_public }, lastModifiedBy = null) {
+  const patch = { meal_time, end_time: end_time || null, title, menu: menu || null, memo: memo || null, max_people, is_public }
+  if (lastModifiedBy) { patch.last_modified_by = lastModifiedBy; patch.last_modified_at = new Date().toISOString() }
+  const { error } = await supabase.from('meal_pots').update(patch).eq('id', potId)
   if (error) throw error
+}
+
+// ── 그룹 기본 밥팟 설정 ────────────────────────────────
+export async function getGroupDefaultPotConfigs(groupId) {
+  const { data, error } = await supabase
+    .from('group_default_pot_configs')
+    .select('*, users(nickname)')
+    .eq('group_id', groupId)
+    .order('slot')
+  if (error) throw error
+  return data ?? []
+}
+
+export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+  const { error } = await supabase
+    .from('group_default_pot_configs')
+    .insert({
+      group_id: groupId, slot, meal_time, end_time: end_time || null,
+      title, memo: memo || null, max_people, is_public, effective_from,
+      last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+    })
+  if (error) throw error
+}
+
+export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+  const { error } = await supabase
+    .from('group_default_pot_configs')
+    .update({
+      slot, meal_time, end_time: end_time || null,
+      title, memo: memo || null, max_people, is_public, effective_from,
+      last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteGroupDefaultPotConfig(id) {
+  const { error } = await supabase
+    .from('group_default_pot_configs')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+// 기본팟 설정이 있는데 해당 날짜에 아직 팟이 없으면 자동 생성 (slot+meal_time 기준으로 중복 방지)
+export async function ensureDefaultPots(groupId, date, configs) {
+  if (!configs || configs.length === 0) return
+  const applicable = configs.filter(c => c.effective_from <= date)
+  if (applicable.length === 0) return
+
+  const { data: existing } = await supabase
+    .from('meal_pots').select('slot, meal_time').eq('group_id', groupId).eq('date', date).eq('is_default', true)
+  const existingKeys = new Set((existing ?? []).map(p => `${p.slot}|${p.meal_time?.slice(0,5)}`))
+
+  const toCreate = applicable.filter(c => !existingKeys.has(`${c.slot}|${c.meal_time?.slice(0,5)}`))
+  if (toCreate.length === 0) return
+
+  const rows = toCreate.map(c => ({
+    group_id: groupId, date, slot: c.slot,
+    meal_time: c.meal_time, end_time: c.end_time || null,
+    title: c.title, menu: null, memo: c.memo || null,
+    max_people: c.max_people, is_public: c.is_public,
+    is_default: true, created_by: null,
+    last_modified_by: c.last_modified_by,
+  }))
+  await supabase.from('meal_pots').insert(rows)
 }
 
 export async function updatePotMenu(potId, menu) {

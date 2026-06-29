@@ -57,6 +57,7 @@ export default function PotDetailPage() {
   const [conflict, setConflict] = useState(null)
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(null)
+  const [confirmDelete, setConfirmDelete] = useState(false)
 
   // 인라인 편집 상태
   const [editingField, setEditingField] = useState(null) // 'time'|'end_time'|'title'|'menu'|'max_people'|null
@@ -80,6 +81,14 @@ export default function PotDetailPage() {
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
+  const canEdit = isMaster || pot?.is_default
+
+  const isPotExpired = (() => {
+    if (!pot?.end_time || !pot?.date) return false
+    const [h, m] = pot.end_time.slice(0, 5).split(':').map(Number)
+    const expiry = new Date(`${pot.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`)
+    return new Date() > expiry
+  })()
 
   const startEdit = (field, value) => {
     setEditingField(field)
@@ -91,12 +100,13 @@ export default function PotDetailPage() {
 
   const saveField = async (field) => {
     let patch = {}
-    if (field === 'time') patch = { meal_time: fieldValue, end_time: endTimeValue || null, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'title') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: fieldValue || pot.title, menu: pot.menu, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'menu') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
-    if (field === 'max_people') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, max_people: tempMaxPeople, is_public: pot.is_public }
+    if (field === 'time') patch = { meal_time: fieldValue, end_time: endTimeValue || null, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'title') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: fieldValue || pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'menu') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: fieldValue.trim() || null, memo: pot.memo, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'memo') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: fieldValue.trim() || null, max_people: pot.max_people, is_public: pot.is_public }
+    if (field === 'max_people') patch = { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: tempMaxPeople, is_public: pot.is_public }
     try {
-      await updatePot(pot.id, patch)
+      await updatePot(pot.id, patch, pot.is_default ? user.id : null)
       await loadPot()
       setEditingField(null)
     } catch (e) { console.error(e) }
@@ -105,7 +115,7 @@ export default function PotDetailPage() {
   const togglePublic = async () => {
     const next = !pot.is_public
     setTempIsPublic(next)
-    await updatePot(pot.id, { meal_time: pot.meal_time, title: pot.title, menu: pot.menu, max_people: pot.max_people, is_public: next })
+    await updatePot(pot.id, { meal_time: pot.meal_time, end_time: pot.end_time, title: pot.title, menu: pot.menu, memo: pot.memo, max_people: pot.max_people, is_public: next })
     await loadPot()
   }
 
@@ -126,6 +136,15 @@ export default function PotDetailPage() {
   const handleConflictJoinBoth = async () => {
     setActionLoading(true); setConflict(null)
     await doJoin()
+  }
+
+  const handleDeletePot = async () => {
+    setActionLoading(true)
+    try {
+      await deletePot(pot.id)
+      navigate(-1)
+    } catch (e) { console.error(e) }
+    finally { setActionLoading(false) }
   }
 
   const handleJoinToggle = async () => {
@@ -168,7 +187,10 @@ export default function PotDetailPage() {
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
         <span style={styles.headerTitle}>밥팟 상세</span>
-        <span />
+        {pot.is_default
+          ? <button style={styles.futureEditBtn} onClick={() => navigate(`/group/${pot.group_id}/settings?slot=${pot.slot}`)}>향후 수정</button>
+          : <span />
+        }
       </div>
 
       <div style={styles.body}>
@@ -200,7 +222,7 @@ export default function PotDetailPage() {
                 ? `${pot.meal_time.slice(0, 5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}`
                 : '미정'
             }
-            editable={isMaster}
+            editable={canEdit}
             editing={editingField === 'time'}
             onEdit={() => startEdit('time', pot.meal_time?.slice(0, 5) ?? '')}
             onSave={() => saveField('time')}
@@ -218,7 +240,7 @@ export default function PotDetailPage() {
           <InlineField
             label="이름"
             value={pot.title}
-            editable={isMaster}
+            editable={canEdit}
             editing={editingField === 'title'}
             onEdit={() => startEdit('title', pot.title ?? '')}
             onSave={() => saveField('title')}
@@ -234,7 +256,7 @@ export default function PotDetailPage() {
             label="메뉴"
             value={pot.menu}
             displayValue={pot.menu || '미정'}
-            editable={isMaster}
+            editable={canEdit}
             editing={editingField === 'menu'}
             onEdit={() => startEdit('menu', pot.menu ?? '')}
             onSave={() => saveField('menu')}
@@ -249,7 +271,7 @@ export default function PotDetailPage() {
           <InlineField
             label="최대"
             value={`${pot.max_people}명`}
-            editable={isMaster}
+            editable={canEdit}
             editing={editingField === 'max_people'}
             onEdit={() => startEdit('max_people')}
             onSave={() => saveField('max_people')}
@@ -262,10 +284,29 @@ export default function PotDetailPage() {
               </div>
             )}
           />
+
+          {/* 메모 */}
+          <InlineField
+            label="메모"
+            value={pot.memo}
+            displayValue={pot.memo || '없음'}
+            editable={canEdit}
+            editing={editingField === 'memo'}
+            onEdit={() => startEdit('memo', pot.memo ?? '')}
+            onSave={() => saveField('memo')}
+            onCancel={cancelEdit}
+            renderEditor={() => (
+              <input style={styles.inlineInput} value={fieldValue} onChange={e => setFieldValue(e.target.value)} maxLength={50} autoFocus placeholder="메모 입력"
+                onKeyDown={e => { if (e.key === 'Enter') saveField('memo'); if (e.key === 'Escape') cancelEdit() }} />
+            )}
+          />
         </div>
 
         {!pot.is_default && pot.users && (
           <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
+        )}
+        {pot.is_default && pot.modifier?.nickname && (
+          <p style={styles.creatorLine}>✎ {pot.modifier.nickname} 마지막 수정</p>
         )}
 
         {/* 인원 점 UI */}
@@ -287,7 +328,11 @@ export default function PotDetailPage() {
           </div>
         </div>
 
-        {isJoined ? (
+        {isPotExpired ? (
+          <button style={{ ...styles.btn, background: '#E0E0E0', color: '#9E9E9E' }} disabled>
+            종료된 밥팟이에요
+          </button>
+        ) : isJoined ? (
           <button style={{ ...styles.btn, background: 'var(--color-surface-2)', color: 'var(--color-text)' }} onClick={handleJoinToggle} disabled={actionLoading}>
             {actionLoading ? '처리 중...' : '참여 취소'}
           </button>
@@ -300,6 +345,12 @@ export default function PotDetailPage() {
         <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
           🔗 {showShare ? '닫기' : '공유하기'}
         </button>
+
+        {(isMaster || pot.is_default) && !isPotExpired && (
+          <button style={styles.deleteBtn} onClick={() => setConfirmDelete(true)}>
+            🗑️ 밥팟 삭제
+          </button>
+        )}
 
         {showShare && (
           <div style={styles.sharePanel}>
@@ -320,6 +371,27 @@ export default function PotDetailPage() {
           </div>
         )}
       </div>
+
+      {/* 밥팟 삭제 확인 */}
+      {confirmDelete && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <div style={{ fontSize: 36 }}>🗑️</div>
+            <div style={styles.dialogTitle}>밥팟을 삭제할까요?</div>
+            <p style={styles.dialogDesc}>
+              {pot.is_default
+                ? '오늘 기본 밥팟만 삭제돼요.\n기본 밥팟 설정은 유지되어 내일부터 계속 열려요.'
+                : '팟과 참여 기록이 모두 삭제돼요.'}
+            </p>
+            <div style={styles.dialogBtns}>
+              <button style={{ ...styles.dialogBtnPrimary, background: '#f44336' }} onClick={handleDeletePot} disabled={actionLoading}>
+                {actionLoading ? '삭제 중...' : '삭제하기'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConfirmDelete(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 중복 참여 충돌 */}
       {conflict && (
@@ -349,6 +421,7 @@ const styles = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  futureEditBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer' },
   body: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflowY: 'auto' },
 
   tagRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
@@ -370,6 +443,7 @@ const styles = {
   dotName: { fontSize: 10, color: 'var(--color-text-muted)' },
   btn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
   shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
+  deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
   sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
   shareLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },

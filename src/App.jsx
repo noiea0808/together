@@ -9,6 +9,7 @@ import CreatePotPage from './pages/CreatePotPage'
 import PotDetailPage from './pages/PotDetailPage'
 import GroupPage from './pages/GroupPage'
 import GroupSetupPage from './pages/GroupSetupPage'
+import GroupSettingsPage from './pages/GroupSettingsPage'
 import JoinPage from './pages/JoinPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import StatusGuidePage from './pages/admin/guide/StatusGuidePage'
@@ -32,6 +33,7 @@ function AppRoutes() {
       <Route path="/pot/:id"  element={auth(<PotDetailPage />)} />
       <Route path="/group"    element={auth(<GroupPage />)} />
       <Route path="/group-setup" element={auth(<GroupSetupPage />)} />
+      <Route path="/group/:id/settings" element={auth(<GroupSettingsPage />)} />
       <Route path="/join/:code"  element={<JoinPage />} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="/admin/guide/status" replace />} />

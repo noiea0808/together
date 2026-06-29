@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
@@ -45,9 +45,15 @@ function sortPots(pots) {
 
 export default function TodayPage() {
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useUser()
 
-  const [currentDate, setCurrentDate] = useState(TODAY)
+  const initialDate = (() => {
+    const d = searchParams.get('date')
+    if (d) { const parsed = new Date(d); parsed.setHours(0,0,0,0); if (!isNaN(parsed)) return parsed }
+    return TODAY
+  })()
+  const [currentDate, setCurrentDate] = useState(initialDate)
   const [selectedSlot, setSelectedSlot] = useState('점심')
   const [openDropdown, setOpenDropdown] = useState(null)
   const [allCollapsed, setAllCollapsed] = useState(false)
@@ -73,6 +79,11 @@ export default function TodayPage() {
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
 
+  useEffect(() => {
+    if (isToday) setSearchParams({}, { replace: true })
+    else setSearchParams({ date: dateStr }, { replace: true })
+  }, [dateStr])
+
   // 데이터 로드
   const loadData = useCallback(async () => {
     if (!user) return
@@ -96,6 +107,15 @@ export default function TodayPage() {
       setMembersMap(board.membersMap)
       setStatusesMap(board.statusesMap)
       setPotsMap(board.potsMap)
+
+      // 기본 밥팟 자동 생성
+      await Promise.all(myGroups.map(async g => {
+        const configs = await getGroupDefaultPotConfigs(g.id)
+        await ensureDefaultPots(g.id, dateStr, configs)
+      }))
+      // 자동 생성 후 팟 목록 재조회
+      const refreshed = await getTodayBoard(myGroups.map(g => g.id), dateStr)
+      setPotsMap(refreshed.potsMap)
 
       // 내 상태 (사용자 의향 원본)
       const slots = {}
@@ -332,7 +352,7 @@ export default function TodayPage() {
   return (
     <div style={styles.wrap}>
     <div style={styles.page}>
-      {/* 날짜 네비 */}
+      {/* 날짜 네비 — sticky 고정 */}
       <div style={styles.dateNav}>
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>←</button>
         <div style={styles.dateText}>
@@ -359,6 +379,7 @@ export default function TodayPage() {
             const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
             const isSelected = selectedSlot === slot
             const isDropOpen = openDropdown === slot
+            const isPastDate = currentDate < TODAY
 
             // 내가 참여 중인 밥팟 목록 (슬롯 기준, 시간순 정렬)
             const myPotsInSlot = Object.values(potsMap).flat()
@@ -374,15 +395,16 @@ export default function TodayPage() {
                 key={slot}
                 style={{
                   ...styles.slotCard,
-                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                  borderWidth: isSelected ? 2 : 1.5,
-                  background: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '0d' : 'var(--color-surface)',
+                  borderColor: isPastDate ? '#E0E0E0' : isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  borderWidth: isSelected && !isPastDate ? 2 : 1.5,
+                  background: isPastDate ? '#F5F5F5' : (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '0d' : 'var(--color-surface)',
+                  opacity: isPastDate ? 0.6 : 1,
                 }}
-                onClick={() => setSelectedSlot(slot)}
+                onClick={() => !isPastDate && setSelectedSlot(slot)}
               >
                 <div style={styles.slotName}>
                   {slot}
-                  {(data?.status || isInPot) && (
+                  {!isPastDate && (data?.status || isInPot) && (
                     <span
                       style={styles.slotResetBtn}
                       onClick={e => { e.stopPropagation(); resetSlot(slot) }}
@@ -395,14 +417,14 @@ export default function TodayPage() {
                   <button
                     style={{
                       ...styles.slotStatusBtn,
-                      color: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color : 'var(--color-text-muted)',
-                      borderColor: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '55' : 'var(--color-border)',
-                      background: (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '12' : 'var(--color-surface-2)',
-                      cursor: isInPot ? 'default' : 'pointer',
+                      color: isPastDate ? '#9E9E9E' : (lockedOpt ?? opt) ? (lockedOpt ?? opt).color : 'var(--color-text-muted)',
+                      borderColor: isPastDate ? '#E0E0E0' : (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '55' : 'var(--color-border)',
+                      background: isPastDate ? '#EEEEEE' : (lockedOpt ?? opt) ? (lockedOpt ?? opt).color + '12' : 'var(--color-surface-2)',
+                      cursor: isPastDate || isInPot ? 'default' : 'pointer',
                     }}
                     onClick={(e) => {
                       e.stopPropagation()
-                      if (isInPot) return // 참여중이면 드롭다운 막기
+                      if (isPastDate || isInPot) return
                       setSelectedSlot(slot)
                       setOpenDropdown(prev => prev === slot ? null : slot)
                     }}
@@ -461,21 +483,21 @@ export default function TodayPage() {
                     <>
                       <input
                         type="time"
-                        style={{ ...styles.slotTimeInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
+                        style={{ ...styles.slotTimeInput, opacity: (isPastDate || !data?.status || data?.status === 'skip') ? 0.3 : 1 }}
                         value={data?.time ?? ''}
                         onChange={e => setSlotField(slot, 'time', e.target.value)}
                         onBlur={() => commitSlotField(slot)}
-                        disabled={!data?.status || data?.status === 'skip'}
+                        disabled={isPastDate || !data?.status || data?.status === 'skip'}
                       />
                       <input
-                        style={{ ...styles.slotMenuInput, opacity: (!data?.status || data?.status === 'skip') ? 0.3 : 1 }}
+                        style={{ ...styles.slotMenuInput, opacity: (isPastDate || !data?.status || data?.status === 'skip') ? 0.3 : 1 }}
                         placeholder="메뉴"
                         value={data?.menu ?? ''}
                         onChange={e => setSlotField(slot, 'menu', e.target.value)}
                         onBlur={() => commitSlotField(slot)}
                         onKeyDown={e => { if (e.key === 'Enter') e.currentTarget.blur() }}
                         maxLength={10}
-                        disabled={!data?.status || data?.status === 'skip'}
+                        disabled={isPastDate || !data?.status || data?.status === 'skip'}
                       />
                     </>
                   )}
@@ -728,6 +750,10 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               👑 {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
             </div>
 
+            <button style={styles.sheetRow} onClick={() => { setShowSettings(false); onNavigate(`/group/${group.id}/settings`) }}>
+              <span>🍚</span><span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
+            </button>
+
             {isMaster && !editingName && (
               <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
                 <span>✏️</span><span style={styles.sheetRowLabel}>그룹명 변경</span>
@@ -837,12 +863,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 }
 
 const styles = {
-  wrap: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  page: { flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80 },
+  wrap: { flex: 1, display: 'flex', flexDirection: 'column' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80 },
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
   emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
   navBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 12px' },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
