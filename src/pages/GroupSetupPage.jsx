@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { useUser } from '../lib/UserContext'
+import { invalidateCache } from '../lib/cache'
 
 export default function GroupSetupPage() {
   const navigate = useNavigate()
@@ -18,6 +19,7 @@ export default function GroupSetupPage() {
     setError(null)
     try {
       await createGroup(groupName.trim(), user.id)
+      invalidateCache(`board:${user.id}:`, { prefix: true })
       navigate('/today', { replace: true })
     } catch (e) {
       setError('그룹 생성에 실패했어요.')
@@ -33,6 +35,7 @@ export default function GroupSetupPage() {
     try {
       const group = await getGroupByInviteCode(inviteCode.trim())
       await joinGroup(group.id, user.id)
+      invalidateCache(`board:${user.id}:`, { prefix: true })
       navigate('/today', { replace: true })
     } catch (e) {
       setError('초대 코드를 찾을 수 없어요.')

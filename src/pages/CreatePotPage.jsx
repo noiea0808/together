@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, joinPot } from '../lib/db'
+import { getMyGroups, createPot, joinPot, setGroupShareSetting } from '../lib/db'
+import { invalidateCache } from '../lib/cache'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -12,23 +13,47 @@ function toDateStr(date) {
   return `${year}-${month}-${day}`
 }
 
+// 현재 시각 기준 다음 정시 (예: 14:20 → 15:00)
+function nextFullHour() {
+  const h = (new Date().getHours() + 1) % 24
+  return `${String(h).padStart(2, '0')}:00`
+}
+
+// 슬롯별 기본 시각 — 아침 7시, 점심 12시, 저녁 19시, 간식류는 다음 정시
+function defaultTimeForSlot(slot) {
+  if (slot === '아침') return '07:00'
+  if (slot === '점심') return '12:00'
+  if (slot === '저녁') return '19:00'
+  return nextFullHour()
+}
+
+function addMinutesStr(timeStr, minutes) {
+  if (!timeStr) return ''
+  const [h, m] = timeStr.split(':').map(Number)
+  const total = h * 60 + m + minutes
+  return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+}
+
 export default function CreatePotPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user } = useUser()
 
+  const initialSlot = searchParams.get('slot') ?? '점심'
+  const initialDate = searchParams.get('date') ?? toDateStr(new Date())
+  const initialTime = defaultTimeForSlot(initialSlot)
   const [groups, setGroups] = useState([])
   const [form, setForm] = useState({
     group_id: searchParams.get('group_id') ?? '',
-    slot: searchParams.get('slot') ?? '점심',
-    meal_time: '12:00',
-    end_time: '13:00',
+    slot: initialSlot,
+    meal_time: initialTime,
+    end_time: addMinutesStr(initialTime, 60),
     duration_minutes: 60, // 0 = 직접입력
     title: '',
     menu: '',
+    memo: '',
     max_people: 4,
     is_public: false,
-    is_default: false,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -72,25 +97,26 @@ export default function CreatePotPage() {
     setLoading(true)
     setError(null)
     try {
-      const dateStr = toDateStr(new Date())
       const pot = await createPot({
         groupId: form.group_id,
-        date: dateStr,
+        date: initialDate,
         slot: form.slot,
         meal_time: form.meal_time,
         end_time: form.end_time,
         title: form.title.trim() || `${form.slot} ${form.meal_time}`,
         menu: form.menu.trim(),
+        memo: form.memo.trim(),
         max_people: form.max_people,
         is_public: form.is_public,
-        is_default: form.is_default,
+        is_default: false,
         createdBy: user.id,
       })
-      if (!form.is_default) {
-        // 참여 사실은 pot_members로 기록 — daily_status.status는 사용자 의향 전용
-        await joinPot(pot.id, user.id)
-      }
-      navigate('/today')
+      await joinPot(pot.id, user.id)
+      // 해당 그룹·슬롯·날짜의 공유 설정이 비공유였어도 공유로 전환
+      await setGroupShareSetting(user.id, form.group_id, initialDate, form.slot, true).catch(() => {})
+      invalidateCache(`board:${user.id}:`, { prefix: true })
+      const today = toDateStr(new Date())
+      navigate(initialDate === today ? '/today' : `/today?date=${initialDate}`)
     } catch (e) {
       setError('밥팟 생성에 실패했어요.')
       console.error(e)
@@ -108,30 +134,14 @@ export default function CreatePotPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <span style={styles.headerTitle}>밥팟 만들기</span>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+          <span style={styles.headerTitle}>밥팟 만들기</span>
+          <span style={styles.headerSub}>{initialDate !== toDateStr(new Date()) ? `${initialDate} · ` : ''}{form.slot}</span>
+        </div>
         <span />
       </div>
 
       <div style={styles.form}>
-        {/* 기본 밥팟 */}
-        <div
-          style={{ ...styles.defaultCard, borderColor: form.is_default ? '#4CAF50' : 'var(--color-border)', background: form.is_default ? '#E8F5E918' : 'var(--color-surface-2)' }}
-          onClick={() => set('is_default', !form.is_default)}
-        >
-          <div style={styles.defaultCardLeft}>
-            <div style={styles.defaultCardTitle}>
-              <span style={{ ...styles.defaultTag, opacity: form.is_default ? 1 : 0.4 }}>기본팟</span>
-              기본 밥팟으로 열기
-            </div>
-            <div style={styles.defaultCardDesc}>
-              개설자 없이 열리는 팟 · 개설자도 나중에 참여자로만 참가 가능
-            </div>
-          </div>
-          <div style={{ ...styles.checkbox, borderColor: form.is_default ? '#4CAF50' : 'var(--color-border)', background: form.is_default ? '#4CAF50' : 'transparent' }}>
-            {form.is_default && <span style={styles.checkmark}>✓</span>}
-          </div>
-        </div>
-
         {/* 그룹 선택 */}
         {groups.length > 1 && (
           <div style={styles.field}>
@@ -150,7 +160,10 @@ export default function CreatePotPage() {
               <button
                 key={s}
                 style={{ ...styles.slotBtn, ...(form.slot === s ? styles.slotBtnActive : {}) }}
-                onClick={() => set('slot', s)}
+                onClick={() => {
+                  const t = defaultTimeForSlot(s)
+                  setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutesStr(t, f.duration_minutes) : f.end_time }))
+                }}
               >
                 {s}
               </button>
@@ -209,6 +222,17 @@ export default function CreatePotPage() {
         </div>
 
         <div style={styles.field}>
+          <label style={styles.label}>메모 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span></label>
+          <input
+            style={styles.input}
+            placeholder="예: 1층 로비 집합, 더치페이"
+            value={form.memo}
+            onChange={e => set('memo', e.target.value)}
+            maxLength={50}
+          />
+        </div>
+
+        <div style={styles.field}>
           <label style={styles.label}>최대 인원</label>
           <div style={styles.stepper}>
             <button style={styles.step} onClick={() => set('max_people', Math.max(2, form.max_people - 1))}>−</button>
@@ -235,7 +259,7 @@ export default function CreatePotPage() {
           onClick={handleCreate}
           disabled={loading}
         >
-          {loading ? '생성 중...' : form.is_default ? '기본 밥팟 열기 🍚' : '밥팟 열기 🍚'}
+          {loading ? '생성 중...' : '밥팟 열기 🍚'}
         </button>
       </div>
 
@@ -245,8 +269,9 @@ export default function CreatePotPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
-  header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
+  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
   back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
+  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
   headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   form: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', overflowY: 'auto' },
   defaultCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', border: '1.5px solid', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.15s' },
