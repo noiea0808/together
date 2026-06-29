@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, createPot, joinPot } from '../lib/db'
+import { getMyGroups, createPot, joinPot, setGroupShareSetting } from '../lib/db'
+import { invalidateCache } from '../lib/cache'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -111,6 +112,9 @@ export default function CreatePotPage() {
         createdBy: user.id,
       })
       await joinPot(pot.id, user.id)
+      // 해당 그룹·슬롯·날짜의 공유 설정이 비공유였어도 공유로 전환
+      await setGroupShareSetting(user.id, form.group_id, initialDate, form.slot, true).catch(() => {})
+      invalidateCache(`board:${user.id}:`, { prefix: true })
       const today = toDateStr(new Date())
       navigate(initialDate === today ? '/today' : `/today?date=${initialDate}`)
     } catch (e) {

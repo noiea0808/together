@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMySchedule } from '../lib/db'
+import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 
@@ -15,11 +16,15 @@ function toDateStr(d) {
   return `${year}-${month}-${day}`
 }
 
-function getDates(days = 21) {
-  return Array.from({ length: days }, (_, i) => {
-    const d = new Date()
-    d.setHours(0, 0, 0, 0)
-    d.setDate(d.getDate() - 2 + i) // 이틀 전 ~ 18일 후
+// 이번 주 일요일부터 다음 주 토요일까지 14일
+function getTwoWeekDates() {
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  // 이번 주 일요일 (day=0)
+  const sunday = new Date(today)
+  sunday.setDate(today.getDate() - today.getDay())
+  return Array.from({ length: 14 }, (_, i) => {
+    const d = new Date(sunday)
+    d.setDate(sunday.getDate() + i)
     return d
   })
 }
@@ -33,21 +38,30 @@ export default function MySchedulePage() {
   const [loading, setLoading] = useState(true)
   const [expandedDates, setExpandedDates] = useState(new Set())
 
-  const dates = getDates(21)
+  const dates = getTwoWeekDates()
   const fromDate = toDateStr(dates[0])
   const toDate = toDateStr(dates[dates.length - 1])
 
   useEffect(() => {
     if (!user) return
+    const key = `schedule:${user.id}:${fromDate}:${toDate}`
+
+    // 캐시 우선 — 탭 재방문 시 즉시 표시(스피너 생략) 후 백그라운드 재검증
+    const cached = getCache(key)
+    if (cached) {
+      setStatuses(cached.data)
+      setLoading(false)
+      if (!cached.stale) return
+    }
+
     getMySchedule(user.id, fromDate, toDate)
       .then(data => {
         setStatuses(data)
-        // 상태가 있는 날짜 자동 펼치기
-        const withStatus = new Set(data.map(s => s.date))
-        setExpandedDates(withStatus)
+        setCache(key, data)
+        // 날짜 상세는 기본 닫힘
       })
       .finally(() => setLoading(false))
-  }, [user])
+  }, [user, fromDate, toDate])
 
   // date별 grouping
   const byDate = {}
@@ -73,28 +87,41 @@ export default function MySchedulePage() {
       <div style={styles.list}>
         {loading ? (
           <div style={styles.empty}>🍚</div>
-        ) : dates.map(date => {
+        ) : dates.map((date, idx) => {
           const dateStr = toDateStr(date)
           const dayStatuses = byDate[dateStr] ?? {}
           const hasStatus = Object.keys(dayStatuses).length > 0
           const isToday = date.getTime() === TODAY.getTime()
           const isPast = date < TODAY
           const isExpanded = expandedDates.has(dateStr)
+          const dow = date.getDay() // 0=일, 6=토
+          const isWeekend = dow === 0 || dow === 6
+          // 첫 번째 날짜이거나 해당 월의 1일인 경우에만 월 표시
+          const showMonth = idx === 0 || date.getDate() === 1
 
           return (
             <div key={dateStr} style={{ ...styles.dayBlock, opacity: isPast && !hasStatus ? 0.4 : 1 }}>
               {/* 날짜 행 */}
-              <div style={styles.dayRow} onClick={() => toggleDate(dateStr)}>
+              <div style={{ ...styles.dayRow, background: isToday ? 'rgba(255,107,53,0.1)' : 'transparent' }} onClick={() => toggleDate(dateStr)}>
                 {/* 날짜 */}
                 <div style={styles.dateCol}>
-                  <div style={styles.dateMonth}>{date.getMonth() + 1}월</div>
+                  <div style={{ ...styles.dateMonth, visibility: showMonth ? 'visible' : 'hidden' }}>
+                    {date.getMonth() + 1}월
+                  </div>
                   <div style={{
                     ...styles.dateNum,
-                    color: isToday ? 'var(--color-primary)' : isPast ? 'var(--color-text-muted)' : 'var(--color-text)'
+                    color: isToday
+                      ? 'var(--color-primary)'
+                      : isWeekend
+                      ? '#E53935'
+                      : isPast ? 'var(--color-text-muted)' : 'var(--color-text)'
                   }}>
                     {date.getDate()}
                   </div>
-                  <div style={styles.dateDay}>
+                  <div style={{
+                    ...styles.dateDay,
+                    color: isWeekend ? '#E53935' : 'var(--color-text-muted)'
+                  }}>
                     {date.toLocaleDateString('ko-KR', { weekday: 'short' })}
                   </div>
                   {isToday && <div style={styles.todayDot} />}
@@ -128,27 +155,34 @@ export default function MySchedulePage() {
               {isExpanded && (
                 <div style={styles.detail}>
                   {hasStatus ? (
-                    SLOT_ORDER.filter(slot => dayStatuses[slot]).map(slot => {
-                      const s = dayStatuses[slot]
-                      const opt = SLOT_STATUS_OPTIONS.find(o => o.key === s.status)
-                      return (
-                        <div key={slot} style={styles.detailRow}>
-                          <span style={styles.detailSlot}>{slot}</span>
-                          <span style={styles.detailTime}>{s.meal_time?.slice(0, 5) || '—'}</span>
-                          <span style={styles.detailMenu}>{s.menu || '—'}</span>
-                          {opt && (
-                            <span style={{ ...styles.detailStatus, color: opt.color, background: opt.color + '15' }}>
-                              {opt.emoji} {opt.label}
-                            </span>
-                          )}
-                        </div>
-                      )
-                    })
+                    <>
+                      {SLOT_ORDER.filter(slot => dayStatuses[slot]).map(slot => {
+                        const s = dayStatuses[slot]
+                        const opt = SLOT_STATUS_OPTIONS.find(o => o.key === s.status)
+                        return (
+                          <div key={slot} style={styles.detailRow}>
+                            <span style={styles.detailSlot}>{slot}</span>
+                            <span style={styles.detailTime}>{s.meal_time?.slice(0, 5) || '—'}</span>
+                            <span style={styles.detailMenu}>{s.menu || '—'}</span>
+                            {opt && (
+                              <span style={{ ...styles.detailStatus, color: opt.color, background: opt.color + '15' }}>
+                                {opt.emoji} {opt.label}
+                              </span>
+                            )}
+                          </div>
+                        )
+                      })}
+                      <div style={styles.detailGoRow}>
+                        <button style={styles.detailGoBtn} onClick={() => navigate(`/today?date=${dateStr}`)}>
+                          해당 일자로 이동하기 →
+                        </button>
+                      </div>
+                    </>
                   ) : (
                     <div style={styles.detailEmpty}>
                       <span>설정된 상태가 없어요</span>
-                      <button style={styles.detailSetBtn} onClick={() => navigate('/today')}>
-                        상태 설정하기 →
+                      <button style={styles.detailSetBtn} onClick={() => navigate(`/today?date=${dateStr}`)}>
+                        해당 일자로 이동하기 →
                       </button>
                     </div>
                   )}
@@ -222,6 +256,14 @@ const styles = {
     fontSize: 12, color: 'var(--color-text-muted)',
   },
   detailSetBtn: {
+    fontSize: 12, fontWeight: 700, color: 'var(--color-primary)',
+    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+  },
+  detailGoRow: {
+    display: 'flex', justifyContent: 'flex-end',
+    padding: '8px var(--spacing-md)',
+  },
+  detailGoBtn: {
     fontSize: 12, fontWeight: 700, color: 'var(--color-primary)',
     background: 'none', border: 'none', cursor: 'pointer', padding: 0,
   },

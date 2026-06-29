@@ -108,26 +108,46 @@ export async function leaveGroup(groupId, userId) {
 export async function joinGroup(groupId, userId) {
   const { error } = await supabase
     .from('group_members')
-    .upsert({ group_id: groupId, user_id: userId })
+    .upsert(
+      { group_id: groupId, user_id: userId },
+      { onConflict: 'group_id,user_id', ignoreDuplicates: true }
+    )
   if (error) throw error
 }
 
 export async function getMyGroups(userId) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('group_id, groups(*)')
+    .select('group_id, sort_order, groups(*)')
     .eq('user_id', userId)
   if (error) throw error
-  return data.map(d => d.groups)
+  return data
+    .sort((a, b) => (a.sort_order ?? 9999) - (b.sort_order ?? 9999))
+    .map(d => d.groups)
+}
+
+export async function updateGroupOrder(userId, orders) {
+  // orders: [{ groupId, sort_order }, ...]
+  await Promise.all(orders.map(({ groupId, sort_order }) =>
+    supabase
+      .from('group_members')
+      .update({ sort_order })
+      .match({ user_id: userId, group_id: groupId })
+  ))
 }
 
 export async function getGroupMembers(groupId) {
   const { data, error } = await supabase
     .from('group_members')
-    .select('user_id, users(*)')
+    .select('user_id, nickname, users(*)')
     .eq('group_id', groupId)
   if (error) throw error
-  return data.map(d => d.users)
+  return data.map(d => ({
+    ...d.users,
+    nickname: d.nickname || d.users.nickname,
+    group_nickname: d.nickname || null,
+    default_nickname: d.users.nickname,
+  }))
 }
 
 // ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
@@ -235,7 +255,7 @@ export async function getTodayBoard(groupIds, date) {
   // 1) 멤버 (그룹 전체 한 번에) — 멤버 ID 집합 확보
   const { data: memberRows, error: mErr } = await supabase
     .from('group_members')
-    .select('group_id, user_id, users(*)')
+    .select('group_id, user_id, nickname, users(*)')
     .in('group_id', groupIds)
   if (mErr) throw mErr
 
@@ -244,7 +264,12 @@ export async function getTodayBoard(groupIds, date) {
   const memberIdSet = new Set()
   groupIds.forEach(gid => { membersMap[gid] = []; membersByGroup[gid] = [] })
   memberRows.forEach(r => {
-    membersMap[r.group_id].push(r.users)
+    membersMap[r.group_id].push({
+      ...r.users,
+      nickname: r.nickname || r.users.nickname,       // 표시 닉네임 (그룹 전용 우선)
+      group_nickname: r.nickname || null,             // 그룹 전용 닉네임 (없으면 null)
+      default_nickname: r.users.nickname,             // 기본 닉네임
+    })
     membersByGroup[r.group_id].push(r.user_id)
     memberIdSet.add(r.user_id)
   })
@@ -306,7 +331,14 @@ export async function getMyStatuses(userId, date) {
 }
 
 // ── 밥팟 ──────────────────────────────────────────
+function generatePotCode() {
+  // 읽기 쉬운 6자리 대문자 코드 (O/0, I/1/L 제외)
+  const chars = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
+}
+
 export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy }) {
+  const invite_code = is_default ? null : generatePotCode()
   const { data, error } = await supabase
     .from('meal_pots')
     .insert({
@@ -322,10 +354,33 @@ export async function createPot({ groupId, date, slot, meal_time, end_time, titl
       is_public,
       is_default,
       created_by: is_default ? null : createdBy,
+      invite_code,
     })
     .select()
     .single()
   if (error) throw error
+  return data
+}
+
+export async function generatePotInviteCode(potId) {
+  const code = generatePotCode()
+  const { data, error } = await supabase
+    .from('meal_pots')
+    .update({ invite_code: code })
+    .eq('id', potId)
+    .select('invite_code')
+    .single()
+  if (error) throw error
+  return data.invite_code
+}
+
+export async function getPotByInviteCode(code) {
+  const { data, error } = await supabase
+    .from('meal_pots')
+    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
+    .eq('invite_code', code.toUpperCase().trim())
+    .single()
+  if (error) return null
   return data
 }
 
@@ -476,6 +531,15 @@ export async function updateNickname(userId, nickname) {
     .from('users')
     .update({ nickname })
     .eq('id', userId)
+  if (error) throw error
+}
+
+// 그룹 전용 닉네임 설정 (null 이면 기본 닉네임으로 복원)
+export async function updateGroupNickname(userId, groupId, nickname) {
+  const { error } = await supabase
+    .from('group_members')
+    .update({ nickname: nickname?.trim() || null })
+    .match({ user_id: userId, group_id: groupId })
   if (error) throw error
 }
 

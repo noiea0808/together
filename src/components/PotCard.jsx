@@ -23,11 +23,17 @@ export default function PotCard({ pot }) {
 
   return (
     <div
-      style={{ ...styles.card, ...(pot.is_default ? styles.defaultCard : {}), ...(expired ? styles.expiredCard : {}) }}
+      style={{
+        ...styles.card,
+        ...(pot.is_default ? styles.defaultCard : {}),
+        ...(expired ? (pot.is_default ? styles.expiredDefaultCard : styles.expiredNormalCard) : {}),
+      }}
       onClick={() => navigate(`/pot/${pot.id}`)}
     >
       <div style={styles.top}>
-        <span style={{ ...styles.time, color: expired ? '#9E9E9E' : pot.is_default ? '#4CAF50' : 'var(--color-primary)' }}>
+        <span style={{ ...styles.time, color: expired
+          ? (pot.is_default ? '#A5C8A5' : '#E0A98F')
+          : (pot.is_default ? '#4CAF50' : 'var(--color-primary)') }}>
           {typeof pot.meal_time === 'string' ? pot.meal_time.slice(0, 5) : pot.meal_time}
           {pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}
         </span>
@@ -75,7 +81,10 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 8,
   },
   defaultCard: { background: '#F1F8F1', border: '1px solid #C8E6C9', boxShadow: 'none' },
-  expiredCard: { background: '#F5F5F5', border: '1px solid #E0E0E0', boxShadow: 'none', opacity: 0.65 },
+  // 경과 일반팟 — 주황 톤 유지하며 흐리게
+  expiredNormalCard: { background: '#FBF6F3', border: '1px solid #ECDDD4', boxShadow: 'none', opacity: 0.6 },
+  // 경과 기본팟 — 초록 톤 유지하며 흐리게
+  expiredDefaultCard: { background: '#EDF4ED', border: '1px solid #D5E5D5', boxShadow: 'none', opacity: 0.6 },
   top: { display: 'flex', alignItems: 'center', gap: 6 },
   time: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
   title: { fontSize: 13, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },

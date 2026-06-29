@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getGroupByInviteCode, joinGroup } from '../lib/db'
+import { invalidateCache } from '../lib/cache'
 
 export default function JoinPage() {
   const { code } = useParams()
@@ -27,6 +28,7 @@ export default function JoinPage() {
         }
 
         await joinGroup(group.id, user.id)
+        invalidateCache(`board:${user.id}:`, { prefix: true })
         setStatus('success')
         setTimeout(() => navigate('/today'), 1500)
       } catch (e) {

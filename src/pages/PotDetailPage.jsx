@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting } from '../lib/db'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -128,6 +128,8 @@ export default function PotDetailPage() {
   // 참여 관련 — 참여 사실은 pot_members로만 기록 (status는 사용자 의향 전용)
   const doJoin = async () => {
     await joinPot(pot.id, user.id)
+    // 비공유 상태였다면 해당 일자/슬롯만 공유로 전환
+    await setGroupShareSetting(user.id, pot.group_id, pot.date, pot.slot, true).catch(e => console.warn('share setting:', e))
     await loadPot()
     setActionLoading(false)
   }
@@ -170,6 +172,10 @@ export default function PotDetailPage() {
           }
         }
         await leavePotWithCleanup(pot.id, user.id)
+        // 비기본팟이고 내가 마지막 멤버였으면 팟이 삭제됨 → 뒤로 이동
+        if (!pot.is_default && participants.length <= 1) {
+          navigate(-1); return
+        }
       } else {
         const myPots = await getMyPotsForSlotAllGroups(user.id, dateStr, pot.slot)
         const otherPot = myPots.find(p => p.pot_id !== pot.id)
@@ -182,7 +188,6 @@ export default function PotDetailPage() {
   }
 
   const potLink = `${window.location.origin}/pot/${pot?.id}`
-  const kakaoText = pot ? `🍚 ${pot.meal_time?.slice(0, 5)} ${pot.title} · ${participants.length}/${pot.max_people}명 · 같이먹자 → ${potLink}` : ''
   const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
 
   if (loading) return <div style={styles.loadingPage}>🍚</div>
@@ -329,9 +334,11 @@ export default function PotDetailPage() {
           </button>
         )}
 
-        <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
-          🔗 {showShare ? '닫기' : '공유하기'}
-        </button>
+        {!isPotExpired && (
+          <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
+            📣 {showShare ? '닫기' : '모집하기'}
+          </button>
+        )}
 
         {isMaster && !draft && (
           <button style={styles.deleteBtn} onClick={() => setConfirmDelete(true)}>
@@ -341,18 +348,30 @@ export default function PotDetailPage() {
 
         {showShare && (
           <div style={styles.sharePanel}>
-            <div style={styles.shareLabel}>밥팟 링크</div>
+            <div style={styles.shareLabel}>초대 코드</div>
+            {pot.invite_code ? (
+              <div style={styles.shareRow}>
+                <span style={{ ...styles.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
+                <button style={{ ...styles.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }} onClick={() => copyText(pot.invite_code, 'code')}>
+                  {copied === 'code' ? '✓' : '복사'}
+                </button>
+              </div>
+            ) : (
+              <button
+                style={{ ...styles.shareCopyBtn, background: 'var(--color-primary)', padding: '8px 16px', fontSize: 13 }}
+                onClick={async () => {
+                  const code = await generatePotInviteCode(pot.id)
+                  setPot(prev => ({ ...prev, invite_code: code }))
+                }}
+              >
+                코드 생성하기
+              </button>
+            )}
+            <div style={{ ...styles.shareLabel, marginTop: 6 }}>밥팟 링크</div>
             <div style={styles.shareRow}>
               <span style={styles.shareText}>{potLink}</span>
               <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }} onClick={() => copyText(potLink, 'link')}>
                 {copied === 'link' ? '✓' : '복사'}
-              </button>
-            </div>
-            <div style={styles.shareLabel}>카톡 공유용</div>
-            <div style={styles.shareRow}>
-              <span style={{ ...styles.shareText, fontSize: 12 }}>{kakaoText}</span>
-              <button style={{ ...styles.shareCopyBtn, background: copied === 'kakao' ? '#4CAF50' : '#FEE500', color: copied === 'kakao' ? '#fff' : '#3C1E1E' }} onClick={() => copyText(kakaoText, 'kakao')}>
-                {copied === 'kakao' ? '✓' : '복사'}
               </button>
             </div>
           </div>
