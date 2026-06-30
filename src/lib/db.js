@@ -275,7 +275,7 @@ export async function getGroupMembers(groupId) {
 }
 
 // ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
-export async function upsertStatus({ userId, date, slot, status, meal_time, menu }) {
+export async function upsertStatus({ userId, date, slot, status, meal_time, end_time, menu }) {
   const { error } = await supabase
     .from('daily_status')
     .upsert({
@@ -284,6 +284,7 @@ export async function upsertStatus({ userId, date, slot, status, meal_time, menu
       slot,
       status,
       meal_time: meal_time || null,
+      end_time: end_time || null,
       menu: menu || null,
     }, { onConflict: 'user_id,date,slot' })
   if (error) throw error

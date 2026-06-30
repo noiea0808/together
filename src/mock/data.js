@@ -3,7 +3,7 @@ export const ME = { id: 'user-1', nickname: '나' }
 export const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
 export const SLOT_STATUS_OPTIONS = [
-  { key: 'open',   label: '약속 없음', emoji: '🟢', color: '#BDBDBD', selectable: true },
+  { key: 'open',   label: '열려있음', emoji: '🟢', color: '#BDBDBD', selectable: true },
   { key: 'skip',   label: '패스',      emoji: '🙅', color: '#BDBDBD', selectable: true },
   { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2196F3', selectable: true },
   { key: '참여중', label: '참여중',    emoji: '✅', color: '#4CAF50', selectable: false },

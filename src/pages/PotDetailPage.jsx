@@ -1,9 +1,11 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
+import { useEscKey } from '../lib/useEscKey'
+import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -125,9 +127,18 @@ export default function PotDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmKick, setConfirmKick] = useState(null) // { id, nickname }
   const [draft, setDraft] = useState(null) // 편집 중인 값
+  const [timePicker, setTimePicker] = useState(null) // null | 'start' | 'end'
+  const [pickerSnapshot, setPickerSnapshot] = useState(null)
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(confirmDelete || conflict || confirmKick))
+  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker))
+  useEscKey(useCallback(() => {
+    if (timePicker) { cancelDetailTimePicker(); return }
+    if (confirmKick) { setConfirmKick(null); return }
+    if (confirmDelete) { setConfirmDelete(false); return }
+    if (conflict) { setConflict(null); return }
+    if (showShare) { setShowShare(false); return }
+  }, [timePicker, confirmKick, confirmDelete, conflict, showShare]))
 
   // 내 행동을 오늘 화면에 즉시 반영하기 위해 board 캐시 무효화
   const invalidateBoard = () => {
@@ -179,15 +190,48 @@ export default function PotDetailPage() {
   // draft 초기화 (수정 시작)
   const initDraft = () => {
     if (draft) return
+    const mt = pot.meal_time?.slice(0, 5) ?? ''
+    const et = pot.end_time?.slice(0, 5) ?? ''
     setDraft({
-      meal_time: pot.meal_time?.slice(0, 5) ?? '',
-      end_time: pot.end_time?.slice(0, 5) ?? '',
+      meal_time: mt,
+      end_time: et,
+      duration_minutes: durationOf(mt, et) || 60,
       title: pot.title ?? '',
       menu: pot.menu ?? '',
       memo: pot.memo ?? '',
       max_people: pot.max_people ?? 4,
       is_public: pot.is_public ?? false,
     })
+  }
+
+  const openDetailTimePicker = (which) => {
+    setPickerSnapshot({ meal_time: draft.meal_time, end_time: draft.end_time, duration_minutes: draft.duration_minutes })
+    setTimePicker(which)
+  }
+  const cancelDetailTimePicker = () => {
+    if (pickerSnapshot) setDraft(d => ({ ...d, ...pickerSnapshot }))
+    setTimePicker(null); setPickerSnapshot(null)
+  }
+  const confirmDetailTimePicker = () => { setTimePicker(null); setPickerSnapshot(null) }
+
+  const applyDetailPickerTime = (which, timeStr) => {
+    if (which === 'start') {
+      setDraft(d => ({
+        ...d,
+        meal_time: timeStr,
+        end_time: d.duration_minutes > 0 ? addMinutes(timeStr, d.duration_minutes) : d.end_time,
+      }))
+    } else {
+      setDraft(d => ({ ...d, end_time: timeStr, duration_minutes: 0 }))
+    }
+  }
+
+  const setDetailDuration = (min) => {
+    setDraft(d => ({
+      ...d,
+      duration_minutes: min,
+      end_time: min > 0 ? addMinutes(d.meal_time, min) : d.end_time,
+    }))
   }
   const setD = (key, val) => setDraft(d => ({ ...d, [key]: val }))
   const cancelDraft = () => setDraft(null)
@@ -349,22 +393,30 @@ export default function PotDetailPage() {
             { label: '시간', content: canEdit && draft ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <input type="time" style={styles.inlineInput} value={draft.meal_time}
-                    onChange={e => setDraft(d => ({ ...d, meal_time: e.target.value, end_time: durationOf(d.meal_time, d.end_time) > 0 ? addMinutes(e.target.value, durationOf(d.meal_time, d.end_time)) : d.end_time }))} />
+                  <button type="button" style={styles.inlineTimeBtn} onClick={() => openDetailTimePicker('start')}>
+                    {draft.meal_time || '--:--'}
+                  </button>
                   <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
-                  <input type="time" style={styles.inlineInput} value={draft.end_time} onChange={e => setD('end_time', e.target.value)} />
+                  <button type="button" style={{ ...styles.inlineTimeBtn, color: draft.duration_minutes > 0 ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => openDetailTimePicker('end')}>
+                    {draft.end_time || '--:--'}
+                  </button>
                 </div>
-                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
                   {DURATION_OPTIONS.map(o => {
-                    const active = durationOf(draft.meal_time, draft.end_time) === o.min
+                    const active = draft.duration_minutes === o.min
                     return (
                       <button key={o.min}
                         style={{ ...styles.durBtn, ...(active ? styles.durBtnActive : {}) }}
-                        onClick={() => setD('end_time', addMinutes(draft.meal_time, o.min))}>
+                        onClick={() => setDetailDuration(o.min)}>
                         {o.label}
                       </button>
                     )
                   })}
+                  <button
+                    style={{ ...styles.durBtn, ...(draft.duration_minutes === 0 ? styles.durBtnActive : {}) }}
+                    onClick={() => setDetailDuration(0)}>
+                    직접입력
+                  </button>
                 </div>
               </div>
             ) : (
@@ -500,6 +552,27 @@ export default function PotDetailPage() {
       </div>
 
 
+      {/* 시간 캐러셀 팝업 */}
+      {timePicker && draft && (() => {
+        const ct = getCarouselTime(timePicker === 'start' ? draft.meal_time : draft.end_time)
+        const update = (patch) => applyDetailPickerTime(timePicker, carouselTimeToStr({ ...ct, ...patch }))
+        return (
+          <div style={styles.overlay} onClick={cancelDetailTimePicker}>
+            <div style={styles.timeDialog} onClick={e => e.stopPropagation()}>
+              <div style={styles.timeDialogTitle}>{timePicker === 'start' ? '시작 시간' : '종료 시간'}</div>
+              <div style={styles.timeCarouselRow}>
+                <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => update({ ampm })} width={56} />
+                <div style={{ width: 4 }} />
+                <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => update({ hour })} width={56} />
+                <span style={styles.timeColon}>:</span>
+                <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => update({ minute })} width={56} />
+              </div>
+              <button style={styles.timeDoneBtn} onClick={confirmDetailTimePicker}>확인</button>
+            </div>
+          </div>
+        )
+      })()}
+
       {/* 멤버 퇴장 확인 */}
       {confirmKick && (
         <div style={styles.overlay}>
@@ -579,8 +652,14 @@ const styles = {
 
   fields: { display: 'flex', flexDirection: 'column' },
   inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' },
+  inlineTimeBtn: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600, background: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'center' },
+  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
+  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
+  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   stepperBtn: { width: 32, height: 32, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  durBtn: { padding: '4px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500 },
+  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
   durBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: -4 },
