@@ -9,6 +9,17 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
+const SLOT_TIME_PRESETS = {
+  '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
+  '오전간식': ['09:30', '10:00', '10:30', '11:00'],
+  '점심':    ['11:30', '12:00', '12:30', '13:00'],
+  '오후간식': ['14:00', '14:30', '15:00', '15:30'],
+  '저녁':    ['17:30', '18:00', '18:30', '19:00', '19:30'],
+  '야식':    ['21:00', '21:30', '22:00', '23:00'],
+}
+
+const MAX_PEOPLE_OPTIONS = [2, 3, 4, 5, 6, 8]
+
 function toDateStr(date) {
   const year = date.getFullYear()
   const month = String(date.getMonth() + 1).padStart(2, '0')
@@ -16,13 +27,11 @@ function toDateStr(date) {
   return `${year}-${month}-${day}`
 }
 
-// 현재 시각 기준 다음 정시 (예: 14:20 → 15:00)
 function nextFullHour() {
   const h = (new Date().getHours() + 1) % 24
   return `${String(h).padStart(2, '0')}:00`
 }
 
-// 슬롯별 기본 시각 — 아침 7시, 점심 12시, 저녁 19시, 간식류는 다음 정시
 function defaultTimeForSlot(slot) {
   if (slot === '아침') return '07:00'
   if (slot === '점심') return '12:00'
@@ -30,7 +39,7 @@ function defaultTimeForSlot(slot) {
   return nextFullHour()
 }
 
-function addMinutesStr(timeStr, minutes) {
+function addMins(timeStr, minutes) {
   if (!timeStr) return ''
   const [h, m] = timeStr.split(':').map(Number)
   const total = h * 60 + m + minutes
@@ -45,13 +54,14 @@ export default function CreatePotPage() {
   const initialSlot = searchParams.get('slot') ?? '점심'
   const initialDate = searchParams.get('date') ?? toDateStr(new Date())
   const initialTime = defaultTimeForSlot(initialSlot)
+
   const [groups, setGroups] = useState([])
   const [form, setForm] = useState({
     group_id: searchParams.get('group_id') ?? '',
     slot: initialSlot,
     meal_time: initialTime,
-    end_time: addMinutesStr(initialTime, 60),
-    duration_minutes: 60, // 0 = 직접입력
+    end_time: addMins(initialTime, 60),
+    duration_minutes: 60,
     title: '',
     menu: '',
     memo: '',
@@ -61,8 +71,9 @@ export default function CreatePotPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [timeEnabled, setTimeEnabled] = useState(true)
-  const [timePicker, setTimePicker] = useState(null) // null | 'start' | 'end'
-  const [pickerSnapshot, setPickerSnapshot] = useState(null) // 팝업 열릴 때 원본 시간 저장
+  const [timePicker, setTimePicker] = useState(null)
+  const [pickerSnapshot, setPickerSnapshot] = useState(null)
+
   useScrollLock(!!timePicker)
   useEscKey(useCallback(() => {
     if (timePicker) cancelTimePicker()
@@ -84,7 +95,6 @@ export default function CreatePotPage() {
     setPickerSnapshot(null)
   }
 
-  // 캐러셀에서 시간 선택 시 적용
   const applyPickerTime = (which, timeStr) => {
     if (which === 'start') setStartTime(timeStr)
     else setForm(f => ({ ...f, end_time: timeStr, duration_minutes: 0 }))
@@ -93,36 +103,23 @@ export default function CreatePotPage() {
   useEffect(() => {
     getMyGroups(user.id).then(g => {
       setGroups(g)
-      if (g.length > 0) setForm(f => ({
-        ...f,
-        group_id: f.group_id || g[0].id,
-      }))
+      if (g.length > 0) setForm(f => ({ ...f, group_id: f.group_id || g[0].id }))
     })
   }, [user.id])
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
-  const addMinutes = (timeStr, minutes) => {
-    if (!timeStr) return ''
-    const [h, m] = timeStr.split(':').map(Number)
-    const total = h * 60 + m + minutes
-    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
-  }
-
   const setStartTime = (val) => {
     setForm(f => ({
       ...f,
       meal_time: val,
-      end_time: f.duration_minutes > 0 ? addMinutes(val, f.duration_minutes) : f.end_time,
+      end_time: f.duration_minutes > 0 ? addMins(val, f.duration_minutes) : f.end_time,
     }))
   }
 
-  const setDuration = (minutes) => {
-    setForm(f => ({
-      ...f,
-      duration_minutes: minutes,
-      end_time: minutes > 0 ? addMinutes(f.meal_time, minutes) : f.end_time,
-    }))
+  const selectSlot = (s) => {
+    const t = defaultTimeForSlot(s)
+    setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMins(t, f.duration_minutes) : f.end_time }))
   }
 
   const doCreate = async () => {
@@ -144,7 +141,6 @@ export default function CreatePotPage() {
         createdBy: user.id,
       })
       await joinPot(pot.id, user.id)
-      // 해당 그룹·슬롯·날짜의 공유 설정이 비공유였어도 공유로 전환
       await setGroupShareSetting(user.id, form.group_id, initialDate, form.slot, true).catch(() => {})
       invalidateCache(`board:${user.id}:`, { prefix: true })
       const today = toDateStr(new Date())
@@ -158,166 +154,173 @@ export default function CreatePotPage() {
   }
 
   const handleCreate = async () => {
-    if (!form.title.trim() && !form.meal_time && timeEnabled) return
     if (!form.group_id || loading) return
     await doCreate()
   }
 
+  const presets = SLOT_TIME_PRESETS[form.slot] ?? []
+  const isCustomTime = timeEnabled && !presets.includes(form.meal_time)
+
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <button style={styles.back} onClick={() => navigate(-1)}>←</button>
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <span style={styles.headerTitle}>밥팟 만들기</span>
-          <span style={styles.headerSub}>{initialDate !== toDateStr(new Date()) ? `${initialDate} · ` : ''}{form.slot}</span>
-        </div>
-        <span />
+    <div style={S.page}>
+      <div style={S.header}>
+        <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
+        <div style={S.headerTitle}>밥팟 열기</div>
+        <div style={{ width: 34 }} />
       </div>
 
-      <div style={styles.form}>
-        {/* 그룹 선택 */}
-        {groups.length > 1 && (
-          <div style={styles.field}>
-            <label style={styles.label}>그룹</label>
-            <div style={styles.fieldContent}>
-              <select style={styles.input} value={form.group_id} onChange={e => set('group_id', e.target.value)}>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* 슬롯 */}
-        <div style={styles.field}>
-          <label style={styles.label}>식사 슬롯</label>
-          <div style={styles.fieldContent}>
-            <div style={styles.slotRow}>
-              {SLOT_KEYS.map(s => (
-                <button
-                  key={s}
-                  style={{ ...styles.slotBtn, ...(form.slot === s ? styles.slotBtnActive : {}) }}
-                  onClick={() => {
-                    const t = defaultTimeForSlot(s)
-                    setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutesStr(t, f.duration_minutes) : f.end_time }))
-                  }}
-                >
-                  {s}
-                </button>
-              ))}
-            </div>
-          </div>
+      <div style={S.body}>
+        <div style={S.hero}>
+          <div style={S.heroTitle}>{'오늘 같이\n밥 먹어요 🍚'}</div>
+          <div style={S.heroSub}>몇 가지만 답하면 밥팟이 열려요</div>
         </div>
 
-        <div style={styles.field}>
-          <div style={{ width: 68, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingTop: 12, gap: 4 }}>
-            <label style={{ ...styles.label, width: 'auto', paddingTop: 0 }}>시간</label>
-            <button
-              style={{ fontSize: 10, fontWeight: 700, background: timeEnabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: timeEnabled ? '#fff' : 'var(--color-text-muted)', border: `1px solid ${timeEnabled ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 99, padding: '2px 8px', cursor: 'pointer', lineHeight: 1.6 }}
-              onClick={() => setTimeEnabled(v => !v)}
-            >{timeEnabled ? 'ON' : 'OFF'}</button>
-          </div>
-          <div style={{ ...styles.fieldContent, opacity: timeEnabled ? 1 : 0.3, pointerEvents: timeEnabled ? 'auto' : 'none' }}>
-            <div style={styles.timeRange}>
-              <button type="button" style={styles.timeBtn} onClick={() => openTimePicker('start')}>{form.meal_time}</button>
-              <span style={styles.timeSep}>~</span>
-              <button type="button" style={{ ...styles.timeBtn, color: form.duration_minutes > 0 ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => openTimePicker('end')}>{form.end_time}</button>
+        <div style={S.sections}>
+          {/* 그룹 선택 */}
+          {groups.length > 1 && (
+            <div style={S.section}>
+              <div style={S.sectionLabel}>어떤 그룹에 열까요?</div>
+              <div style={S.groupRow}>
+                {groups.map(g => {
+                  const active = form.group_id === g.id
+                  return (
+                    <button key={g.id} style={{ ...S.groupBtn, ...(active ? S.groupBtnActive : {}) }} onClick={() => set('group_id', g.id)}>
+                      {g.name}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
-            <div style={styles.durationRow}>
-              {[30, 60, 90, 120].map(min => (
-                <button
-                  key={min}
-                  style={{ ...styles.durationBtn, ...(form.duration_minutes === min ? styles.durationBtnActive : {}) }}
-                  onClick={() => setDuration(min)}
-                >
-                  {min < 60 ? `${min}분` : min === 60 ? '1시간' : min === 90 ? '1.5시간' : '2시간'}
-                </button>
-              ))}
+          )}
+
+          {/* 식사 슬롯 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>어떤 식사예요?</div>
+            <div style={S.chipRow}>
+              {SLOT_KEYS.map(s => {
+                const active = form.slot === s
+                return (
+                  <button key={s} style={{ ...S.chip, ...(active ? S.chipActive : {}) }} onClick={() => selectSlot(s)}>
+                    {s}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+
+          {/* 시간 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>언제 먹을까요?</div>
+            <div style={S.chipRow}>
+              {presets.map(t => {
+                const active = timeEnabled && form.meal_time === t
+                return (
+                  <button
+                    key={t}
+                    style={{ ...S.chip, ...(active ? S.chipActive : {}) }}
+                    onClick={() => { setTimeEnabled(true); setStartTime(t) }}
+                  >
+                    {t}
+                  </button>
+                )
+              })}
               <button
-                style={{ ...styles.durationBtn, ...(form.duration_minutes === 0 ? styles.durationBtnActive : {}) }}
-                onClick={() => setDuration(0)}
+                style={{ ...S.chip, ...(isCustomTime ? S.chipActive : {}) }}
+                onClick={() => { setTimeEnabled(true); openTimePicker('start') }}
               >
                 직접입력
               </button>
+              <button
+                style={{ ...S.chip, ...(!timeEnabled ? S.chipActive : {}) }}
+                onClick={() => setTimeEnabled(false)}
+              >
+                미정
+              </button>
+            </div>
+            {isCustomTime && (
+              <div style={{ fontSize: 11, color: '#FF6B35', marginTop: 6, fontWeight: 700 }}>
+                {form.meal_time} 선택됨
+              </div>
+            )}
+          </div>
+
+          {/* 최대 인원 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>몇 명까지?</div>
+            <div style={S.groupRow}>
+              {MAX_PEOPLE_OPTIONS.map(n => {
+                const active = form.max_people === n
+                return (
+                  <button key={n} style={{ ...S.groupBtn, ...(active ? S.groupBtnActive : {}) }} onClick={() => set('max_people', n)}>
+                    {n}명
+                  </button>
+                )
+              })}
             </div>
           </div>
-        </div>
 
-        <div style={styles.field}>
-          <label style={styles.label}>밥팟 이름</label>
-          <div style={styles.fieldContent}>
+          {/* 밥팟 이름 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>
+              밥팟 이름 <span style={S.optLabel}>(선택)</span>
+            </div>
             <input
-              style={styles.input}
-              placeholder="예: 점심팟, 저녁 한판"
+              style={S.sectionInput}
+              placeholder={`${form.slot} 밥팟`}
               value={form.title}
               onChange={e => set('title', e.target.value)}
               maxLength={20}
             />
-            <div style={styles.hint}>{form.title.length}/20</div>
           </div>
-        </div>
 
-        <div style={styles.field}>
-          <label style={styles.label}>메뉴 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span></label>
-          <div style={styles.fieldContent}>
+          {/* 메뉴 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>
+              뭐 먹을까요? <span style={S.optLabel}>(선택)</span>
+            </div>
             <input
-              style={styles.input}
-              placeholder="예: 김치찌개, 삼겹살 — 미입력 시 미정"
+              style={S.sectionInput}
+              placeholder="메뉴를 자유롭게 입력해요"
               value={form.menu}
               onChange={e => set('menu', e.target.value)}
               maxLength={20}
             />
           </div>
-        </div>
 
-        <div style={styles.field}>
-          <label style={styles.label}>메모 <span style={{ color: 'var(--color-text-muted)', fontWeight: 400 }}>(선택)</span></label>
-          <div style={styles.fieldContent}>
+          {/* 메모 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>
+              한마디 <span style={S.optLabel}>(선택)</span>
+            </div>
             <input
-              style={styles.input}
-              placeholder="예: 1층 로비 집합, 더치페이"
+              style={S.sectionInput}
+              placeholder="예) 빠르게 먹고 와요!"
               value={form.memo}
               onChange={e => set('memo', e.target.value)}
               maxLength={50}
             />
           </div>
-        </div>
 
-        <div style={styles.field}>
-          <label style={styles.label}>최대 인원</label>
-          <div style={styles.fieldContent}>
-            <div style={styles.stepper}>
-              <button style={styles.step} onClick={() => set('max_people', Math.max(2, form.max_people - 1))}>−</button>
-              <span style={styles.stepVal}>{form.max_people}명</span>
-              <button style={styles.step} onClick={() => set('max_people', Math.min(10, form.max_people + 1))}>+</button>
+          {/* 공개 범위 */}
+          <div style={S.section}>
+            <div style={S.sectionLabel}>공개 범위</div>
+            <div style={S.groupRow}>
+              <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
+              <button style={{ ...S.groupBtn, ...(form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
             </div>
+            {form.is_public && <p style={{ fontSize: 11, color: '#A89E94', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
           </div>
+
+          {error && <p style={{ color: '#f44336', fontSize: 13, margin: 0 }}>{error}</p>}
+
+          <button
+            style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1, marginTop: 6 }}
+            onClick={handleCreate}
+            disabled={loading}
+          >
+            {loading ? '생성 중...' : '밥팟 열기 🍚'}
+          </button>
         </div>
-
-        <div style={styles.field}>
-          <label style={styles.label}>공개 범위</label>
-          <div style={styles.fieldContent}>
-            <div style={styles.toggleRow}>
-              <button style={{ ...styles.toggleBtn, ...(!form.is_public ? styles.toggleActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
-              <button style={{ ...styles.toggleBtn, ...(form.is_public ? styles.toggleActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
-            </div>
-            {form.is_public && <p style={styles.publicNote}>링크로 누구든 참여할 수 있어요.</p>}
-          </div>
-        </div>
-
-        {error && <p style={{ color: '#f44336', fontSize: 13 }}>{error}</p>}
-      </div>
-
-      <div style={styles.footer}>
-        <button
-          style={{ ...styles.createBtn, opacity: !loading ? 1 : 0.4 }}
-          onClick={handleCreate}
-          disabled={loading}
-        >
-          {loading ? '생성 중...' : '밥팟 열기 🍚'}
-        </button>
-        <button style={styles.cancelBtn} onClick={() => navigate(-1)} disabled={loading}>
-          취소
-        </button>
       </div>
 
       {/* 시간 캐러셀 팝업 */}
@@ -325,76 +328,81 @@ export default function CreatePotPage() {
         const ct = getCarouselTime(timePicker === 'start' ? form.meal_time : form.end_time)
         const update = (patch) => applyPickerTime(timePicker, carouselTimeToStr({ ...ct, ...patch }))
         return (
-          <div style={styles.overlay} onClick={cancelTimePicker}>
-            <div style={styles.timeDialog} onClick={e => e.stopPropagation()}>
-              <div style={styles.timeDialogTitle}>{timePicker === 'start' ? '시작 시간' : '종료 시간'}</div>
-              <div style={styles.timeCarouselRow}>
+          <div style={S.overlay} onClick={cancelTimePicker}>
+            <div style={S.timeDialog} onClick={e => e.stopPropagation()}>
+              <div style={S.timeDialogTitle}>{timePicker === 'start' ? '시작 시간' : '종료 시간'}</div>
+              <div style={S.timeCarouselRow}>
                 <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => update({ ampm })} width={56} />
-                <div style={styles.timeCarouselSep} />
+                <div style={{ width: 4 }} />
                 <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => update({ hour })} width={56} />
-                <span style={styles.timeColon}>:</span>
+                <span style={S.timeColon}>:</span>
                 <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => update({ minute })} width={56} />
               </div>
-              <button style={styles.timeDoneBtn} onClick={confirmTimePicker}>확인</button>
+              <button style={S.timeDoneBtn} onClick={confirmTimePicker}>확인</button>
             </div>
           </div>
         )
       })()}
-
     </div>
   )
 }
 
-const styles = {
+const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
-  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
-  back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
-  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  form: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', overflowY: 'auto' },
-  defaultCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', border: '1.5px solid', borderRadius: 'var(--radius-md)', cursor: 'pointer', transition: 'all 0.15s' },
-  defaultCardLeft: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4 },
-  defaultCardTitle: { display: 'flex', alignItems: 'center', gap: 8, fontWeight: 700, fontSize: 'var(--font-size-sm)' },
-  defaultCardDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5 },
-  defaultTag: { fontSize: 10, background: '#E8F5E9', color: '#4CAF50', borderRadius: 4, padding: '1px 6px', fontWeight: 700 },
-  checkbox: { width: 22, height: 22, borderRadius: 6, border: '2px solid', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, transition: 'all 0.15s' },
-  checkmark: { color: '#fff', fontSize: 13, fontWeight: 700 },
-  field: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 'var(--spacing-md)' },
-  fieldContent: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xs)' },
-  label: { width: 68, flexShrink: 0, fontWeight: 700, fontSize: 'var(--font-size-sm)', paddingTop: 12, lineHeight: 1.3 },
-  input: { padding: '10px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
-  hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
-  timeRange: { display: 'flex', alignItems: 'center', gap: 8 },
-  timeBtn: { flex: 1, padding: '10px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', background: 'var(--color-surface)', color: 'var(--color-text)', fontWeight: 600, cursor: 'pointer', textAlign: 'center' },
-  timeSep: { fontSize: 16, fontWeight: 700, color: 'var(--color-text-muted)', flexShrink: 0 },
-  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  header: {
+    padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+    position: 'sticky', top: 0, background: 'rgba(250,248,245,0.95)', zIndex: 10,
+    borderBottom: '1px solid #EDE8E3', backdropFilter: 'blur(8px)',
+  },
+  backBtn: {
+    width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#EDE8E3',
+    color: '#6B7280', fontSize: 20, cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
+    lineHeight: 1,
+  },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
+
+  body: { flex: 1, overflowY: 'auto', paddingBottom: 32 },
+  hero: { padding: '22px 16px 16px' },
+  heroTitle: { fontSize: 22, fontWeight: 900, color: '#1A1A1A', lineHeight: 1.35, letterSpacing: '-0.6px', marginBottom: 5, whiteSpace: 'pre-line' },
+  heroSub: { fontSize: 12, color: '#A89E94' },
+
+  sections: { padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 },
+  section: { background: 'white', border: '1.5px solid #EDE8E3', borderRadius: 16, padding: 14 },
+  sectionLabel: { fontSize: 10, fontWeight: 800, color: '#FF6B35', marginBottom: 9, letterSpacing: '0.4px', textTransform: 'uppercase' },
+  optLabel: { color: '#C8BEB4', fontWeight: 500, textTransform: 'none', letterSpacing: 0 },
+
+  groupRow: { display: 'flex', gap: 7 },
+  groupBtn: {
+    flex: 1, padding: '9px 6px', background: '#FAF8F5', border: '1.5px solid #EDE8E3',
+    borderRadius: 11, fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
+    letterSpacing: '-0.2px',
+  },
+  groupBtnActive: { background: '#FFF4EF', border: '2px solid #FF6B35', fontWeight: 800, color: '#FF6B35' },
+
+  chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
+  chip: {
+    padding: '7px 13px', background: '#FAF8F5', border: '1.5px solid #EDE8E3',
+    borderRadius: 99, fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  chipActive: { background: '#FFF4EF', border: '2px solid #FF6B35', fontWeight: 800, color: '#FF6B35' },
+
+  sectionInput: {
+    width: '100%', padding: '10px 12px', border: '1.5px solid #EDE8E3', borderRadius: 11,
+    fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAF8F5',
+    color: '#1A1A1A', boxSizing: 'border-box',
+  },
+
+  submitBtn: {
+    width: '100%', padding: 15, background: '#FF6B35', color: 'white', border: 'none',
+    borderRadius: 16, fontSize: 15, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
+    letterSpacing: '-0.3px',
+  },
+
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '24px' },
+  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
+  timeDialogTitle: { fontWeight: 800, fontSize: 16 },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeCarouselSep: { width: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  durationRow: { display: 'flex', gap: 4, flexWrap: 'nowrap', marginTop: 6 },
-  durationBtn: { flex: 1, padding: '5px 4px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
-  durationBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
-  slotRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
-  slotBtn: { padding: '7px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  slotBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
-  stepper: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', paddingTop: 2 },
-  step: { width: 40, height: 40, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 20, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  stepVal: { fontSize: 'var(--font-size-lg)', fontWeight: 700, minWidth: 40, textAlign: 'center' },
-  toggleRow: { display: 'flex', gap: 'var(--spacing-sm)' },
-  toggleBtn: { flex: 1, padding: 12, border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  toggleActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
-  publicNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 4 },
-  footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 8 },
-  createBtn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
-  cancelBtn: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', fontWeight: 500 },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
-  dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
-  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
-  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  timeColon: { fontSize: 20, fontWeight: 800, color: '#A89E94' },
+  timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 }

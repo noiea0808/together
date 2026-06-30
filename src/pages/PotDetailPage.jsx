@@ -21,6 +21,13 @@ function addMinutes(timeStr, minutes) {
   return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
+function avBg(name) {
+  const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
+  let h = 0
+  for (const x of name) h = (h * 31 + x.charCodeAt(0)) & 0xfffff
+  return colors[h % colors.length]
+}
+
 const DURATION_OPTIONS = [
   { min: 30, label: '30분' },
   { min: 60, label: '1시간' },
@@ -35,16 +42,13 @@ function durationOf(start, end) {
   return (eh * 60 + em) - (sh * 60 + sm)
 }
 
-// 인라인 편집 가능한 필드 컴포넌트
 const iStyles = {
-  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--color-border)' },
-  label: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 52, flexShrink: 0 },
+  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid #EDE8E3' },
+  label: { fontSize: 12, fontWeight: 700, color: '#A89E94', width: 52, flexShrink: 0 },
   valueWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  value: { fontSize: 'var(--font-size-base)', fontWeight: 600 },
-  editBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', flexShrink: 0 },
+  value: { fontSize: 16, fontWeight: 600 },
 }
 
-// 비로그인 방문자용 게이트: 계정 로그인 또는 임시 닉네임 게스트 참여
 function GuestGate({ potId, onJoined, navigate }) {
   const [nickname, setNickname] = useState('')
   const [loading, setLoading] = useState(false)
@@ -55,7 +59,7 @@ function GuestGate({ potId, onJoined, navigate }) {
     setLoading(true); setError(null)
     try {
       const profile = await joinPotAsGuest(potId, nickname.trim())
-      onJoined(profile) // UserContext.login → 게스트로 재렌더
+      onJoined(profile)
     } catch (e) {
       console.error(e)
       setError('참여에 실패했어요. 잠시 후 다시 시도해주세요.')
@@ -73,7 +77,6 @@ function GuestGate({ potId, onJoined, navigate }) {
       <div style={gateStyles.logo}>🍚</div>
       <h1 style={gateStyles.title}>밥팟에 초대받으셨어요!</h1>
       <p style={gateStyles.sub}>닉네임만 입력하면 바로 참여할 수 있어요.</p>
-
       <div style={gateStyles.card}>
         <input
           style={gateStyles.input}
@@ -102,15 +105,15 @@ function GuestGate({ potId, onJoined, navigate }) {
 }
 
 const gateStyles = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--spacing-lg)', gap: 8, textAlign: 'center' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, textAlign: 'center' },
   logo: { fontSize: 52, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
-  sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', margin: '4px 0 16px' },
-  card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)' },
-  input: { width: '100%', padding: '13px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
-  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', margin: 0 },
-  guestBtn: { width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
-  loginLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
+  title: { fontSize: 22, fontWeight: 900, margin: 0 },
+  sub: { color: '#A89E94', fontSize: 14, margin: '4px 0 16px' },
+  card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: '#fff', border: '1.5px solid #EDE8E3', borderRadius: 20, padding: 24 },
+  input: { width: '100%', padding: '13px 16px', border: '1.5px solid #EDE8E3', borderRadius: 12, fontSize: 16, outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  error: { fontSize: 12, color: '#f44336', margin: 0 },
+  guestBtn: { width: '100%', padding: 14, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
+  loginLink: { background: 'none', border: 'none', color: '#A89E94', fontSize: 14, textDecoration: 'underline', cursor: 'pointer', padding: 4 },
 }
 
 export default function PotDetailPage() {
@@ -125,12 +128,11 @@ export default function PotDetailPage() {
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
-  const [confirmKick, setConfirmKick] = useState(null) // { id, nickname }
-  const [draft, setDraft] = useState(null) // 편집 중인 값
-  const [timePicker, setTimePicker] = useState(null) // null | 'start' | 'end'
+  const [confirmKick, setConfirmKick] = useState(null)
+  const [draft, setDraft] = useState(null)
+  const [timePicker, setTimePicker] = useState(null)
   const [pickerSnapshot, setPickerSnapshot] = useState(null)
 
-  // 팝업 열려 있는 동안 배경 스크롤 잠금
   useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker))
   useEscKey(useCallback(() => {
     if (timePicker) { cancelDetailTimePicker(); return }
@@ -140,7 +142,6 @@ export default function PotDetailPage() {
     if (showShare) { setShowShare(false); return }
   }, [timePicker, confirmKick, confirmDelete, conflict, showShare]))
 
-  // 내 행동을 오늘 화면에 즉시 반영하기 위해 board 캐시 무효화
   const invalidateBoard = () => {
     if (user) invalidateCache(`board:${user.id}:`, { prefix: true })
   }
@@ -156,7 +157,6 @@ export default function PotDetailPage() {
 
   useEffect(() => { loadPot() }, [id])
 
-  // 향후 수정 후 뒤로가기로 돌아왔을 때 최신 데이터 반영
   useEffect(() => {
     const onPop = () => loadPot()
     window.addEventListener('popstate', onPop)
@@ -170,7 +170,6 @@ export default function PotDetailPage() {
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
-  // 기본팟: 첫 번째 비게스트 멤버가 관리자 역할
   const defaultPotAdmin = pot?.is_default
     ? (pot?.pot_members ?? [])
         .sort((a, b) => new Date(a.joined_at ?? 0) - new Date(b.joined_at ?? 0))
@@ -187,7 +186,6 @@ export default function PotDetailPage() {
     return new Date() > expiry
   })()
 
-  // draft 초기화 (수정 시작)
   const initDraft = () => {
     if (draft) return
     const mt = pot.meal_time?.slice(0, 5) ?? ''
@@ -261,10 +259,8 @@ export default function PotDetailPage() {
     setDraft({ ...base, is_public: !(draft?.is_public ?? pot.is_public) })
   }
 
-  // 참여 관련 — 참여 사실은 pot_members로만 기록 (status는 사용자 의향 전용)
   const doJoin = async () => {
     await joinPot(pot.id, user.id)
-    // 비공유 상태였다면 해당 일자/슬롯만 공유로 전환
     await setGroupShareSetting(user.id, pot.group_id, pot.date, pot.slot, true).catch(e => console.warn('share setting:', e))
     invalidateBoard()
     await loadPot()
@@ -324,7 +320,6 @@ export default function PotDetailPage() {
         }
         await leavePotWithCleanup(pot.id, user.id)
         invalidateBoard()
-        // 비기본팟이고 내가 마지막 멤버였으면 팟이 삭제됨 → 뒤로 이동
         if (!pot.is_default && participants.length <= 1) {
           navigate(-1); return
         }
@@ -342,196 +337,246 @@ export default function PotDetailPage() {
   const potLink = `${window.location.origin}/pot/${pot?.id}`
   const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
 
-  // 비로그인 방문자: 게스트 게이트 표시 (계정 로그인 / 게스트 참여 선택)
   if (!user) return <GuestGate potId={id} onJoined={login} navigate={navigate} />
+  if (loading) return <div style={S.loadingPage}>🍚</div>
+  if (!pot) return <div style={S.loadingPage}>밥팟을 찾을 수 없어요.</div>
 
-  if (loading) return <div style={styles.loadingPage}>🍚</div>
-  if (!pot) return <div style={styles.loadingPage}>밥팟을 찾을 수 없어요.</div>
+  const timeStr = pot.meal_time ? `${pot.meal_time.slice(0,5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0,5)}` : ''}` : '미정'
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
+    <div style={S.page}>
+      {/* ── Header ── */}
+      <div style={S.header}>
         {draft
-          ? <button style={styles.headerBtn} onClick={cancelDraft}>취소</button>
-          : <button style={styles.back} onClick={() => navigate(-1)}>←</button>
+          ? <button style={S.headerTextBtn} onClick={cancelDraft}>취소</button>
+          : <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
         }
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
-          <span style={styles.headerTitle}>밥팟 상세</span>
-          <span style={styles.headerSub}>
-            {pot.is_default ? pot.slot : `${pot.date} · ${pot.slot}`}
-          </span>
+        <div style={{ flex: 1, textAlign: 'center' }}>
+          <div style={S.headerTitle}>밥팟 상세</div>
+          <div style={S.headerSub}>{pot.is_default ? pot.slot : `${pot.date} · ${pot.slot}`}</div>
         </div>
         {draft
-          ? <button style={{ ...styles.headerBtn, color: 'var(--color-primary)', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>{actionLoading ? '...' : '완료'}</button>
+          ? <button style={{ ...S.headerTextBtn, color: '#FF6B35', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>
+              {actionLoading ? '...' : '완료'}
+            </button>
           : pot.is_default
-            ? <button style={styles.futureEditBtn} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>향후 수정</button>
-            : <span />
+            ? <button style={S.headerEditPill} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>향후 수정</button>
+            : canEdit
+            ? <button style={S.headerEditPill} onClick={initDraft}>수정</button>
+            : <div style={{ width: 60 }} />
         }
       </div>
 
-      <div style={styles.body}>
-        {/* 태그 행 */}
-        <div style={styles.tagRow}>
-          {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}
-          <span style={styles.slotTag}>{pot.slot}</span>
-          {/* 공개 범위 — 방장만 토글 */}
-          {isMaster ? (
-            <button
-              style={{ ...styles.publicToggle, background: pot.is_public ? '#E3F2FD' : 'var(--color-surface-2)', color: pot.is_public ? '#2196F3' : 'var(--color-text-muted)', borderColor: pot.is_public ? '#2196F3' : 'var(--color-border)' }}
-              onClick={togglePublic}
-            >
-              {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
-            </button>
-          ) : (
-            pot.is_public && <span style={styles.publicTag}>공개</span>
-          )}
-        </div>
+      {/* ── Body ── */}
+      <div style={S.body}>
 
-        {/* 필드 */}
-        <div style={styles.fields}>
-          {[
-            { label: '시간', content: canEdit && draft ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <button type="button" style={styles.inlineTimeBtn} onClick={() => openDetailTimePicker('start')}>
-                    {draft.meal_time || '--:--'}
-                  </button>
-                  <span style={{ fontSize: 13, color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
-                  <button type="button" style={{ ...styles.inlineTimeBtn, color: draft.duration_minutes > 0 ? 'var(--color-primary)' : 'var(--color-text)' }} onClick={() => openDetailTimePicker('end')}>
-                    {draft.end_time || '--:--'}
-                  </button>
-                </div>
-                <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
-                  {DURATION_OPTIONS.map(o => {
-                    const active = draft.duration_minutes === o.min
-                    return (
-                      <button key={o.min}
-                        style={{ ...styles.durBtn, ...(active ? styles.durBtnActive : {}) }}
-                        onClick={() => setDetailDuration(o.min)}>
-                        {o.label}
-                      </button>
-                    )
-                  })}
-                  <button
-                    style={{ ...styles.durBtn, ...(draft.duration_minutes === 0 ? styles.durBtnActive : {}) }}
-                    onClick={() => setDetailDuration(0)}>
-                    직접입력
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>
-                {pot.meal_time ? `${pot.meal_time.slice(0,5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0,5)}` : ''}` : '미정'}
-              </span>
-            )},
-            { label: '이름', content: canEdit && draft ? (
-              <input style={styles.inlineInput} value={draft.title} onChange={e => setD('title', e.target.value)} maxLength={20} />
-            ) : (
-              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>{pot.title}</span>
-            )},
-            { label: '메뉴', content: canEdit && draft ? (
-              <input style={styles.inlineInput} value={draft.menu} onChange={e => setD('menu', e.target.value)} maxLength={20} placeholder="미입력 시 미정" />
-            ) : (
-              <span style={{ ...iStyles.value, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }} onClick={canEdit ? initDraft : undefined}>{pot.menu || '미정'}</span>
-            )},
-            { label: '최대', content: canEdit && draft ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                <button style={styles.stepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
-                <span style={{ fontWeight: 700, fontSize: 16, minWidth: 32, textAlign: 'center' }}>{draft.max_people}명</span>
-                <button style={styles.stepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
-              </div>
-            ) : (
-              <span style={iStyles.value} onClick={canEdit ? initDraft : undefined}>{pot.max_people}명</span>
-            )},
-            { label: '메모', content: canEdit && draft ? (
-              <input style={styles.inlineInput} value={draft.memo} onChange={e => setD('memo', e.target.value)} maxLength={50} placeholder="메모 입력" />
-            ) : (
-              <span style={{ ...iStyles.value, color: pot.memo ? 'var(--color-text)' : 'var(--color-text-muted)' }} onClick={canEdit ? initDraft : undefined}>{pot.memo || '없음'}</span>
-            )},
-          ].map(({ label, content }) => (
-            <div key={label} style={iStyles.row}>
-              <span style={iStyles.label}>{label}</span>
-              <div style={iStyles.valueWrap}>{content}</div>
-              {canEdit && !draft && <button style={iStyles.editBtn} onClick={initDraft}>수정</button>}
+        {/* VIEW MODE: hero gradient card */}
+        {!draft && (
+          <div style={S.heroCard}>
+            {/* Tags */}
+            <div style={S.heroTagRow}>
+              {pot.is_default && <span style={S.defaultTag}>기본팟</span>}
+              <span style={S.slotTag}>{pot.slot}</span>
+              {isMaster ? (
+                <button
+                  style={{ ...S.publicToggle, background: pot.is_public ? '#E3F2FD' : '#F5F0EB', color: pot.is_public ? '#2563EB' : '#A89E94', borderColor: pot.is_public ? '#2563EB' : '#EDE8E3' }}
+                  onClick={togglePublic}
+                >
+                  {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
+                </button>
+              ) : (
+                pot.is_public && <span style={S.publicTag}>공개</span>
+              )}
             </div>
-          ))}
-        </div>
+            {/* Icon + title */}
+            <div style={S.heroHeader}>
+              <div style={S.heroIcon}>🍚</div>
+              <div>
+                <div style={S.heroTitle}>{pot.title}</div>
+                <div style={S.heroSlot}>{pot.slot}</div>
+              </div>
+            </div>
+            {/* 2x2 info grid */}
+            <div style={S.infoGrid}>
+              {[
+                { label: '시간', value: timeStr },
+                { label: '메뉴', value: pot.menu || '미정' },
+                { label: '최대 인원', value: `${pot.max_people}명` },
+                { label: '메모', value: pot.memo || '없음' },
+              ].map(({ label, value }) => (
+                <div key={label} style={S.infoPanel}>
+                  <div style={S.infoPanelLabel}>{label}</div>
+                  <div style={S.infoPanelValue}>{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
+        {/* EDIT MODE: fields card */}
+        {draft && (
+          <div style={S.editCard}>
+            <div style={S.editCardTitle}>정보 수정</div>
+            <div style={S.fields}>
+              {[
+                {
+                  label: '시간',
+                  content: (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <button type="button" style={S.inlineTimeBtn} onClick={() => openDetailTimePicker('start')}>
+                          {draft.meal_time || '--:--'}
+                        </button>
+                        <span style={{ fontSize: 13, color: '#A89E94', flexShrink: 0 }}>~</span>
+                        <button type="button" style={{ ...S.inlineTimeBtn, color: draft.duration_minutes > 0 ? '#FF6B35' : '#1A1A1A' }} onClick={() => openDetailTimePicker('end')}>
+                          {draft.end_time || '--:--'}
+                        </button>
+                      </div>
+                      <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
+                        {DURATION_OPTIONS.map(o => {
+                          const active = draft.duration_minutes === o.min
+                          return (
+                            <button key={o.min} style={{ ...S.durBtn, ...(active ? S.durBtnActive : {}) }} onClick={() => setDetailDuration(o.min)}>
+                              {o.label}
+                            </button>
+                          )
+                        })}
+                        <button style={{ ...S.durBtn, ...(draft.duration_minutes === 0 ? S.durBtnActive : {}) }} onClick={() => setDetailDuration(0)}>
+                          직접입력
+                        </button>
+                      </div>
+                    </div>
+                  ),
+                },
+                {
+                  label: '이름',
+                  content: <input style={S.inlineInput} value={draft.title} onChange={e => setD('title', e.target.value)} maxLength={20} />,
+                },
+                {
+                  label: '메뉴',
+                  content: <input style={S.inlineInput} value={draft.menu} onChange={e => setD('menu', e.target.value)} maxLength={20} placeholder="미입력 시 미정" />,
+                },
+                {
+                  label: '최대',
+                  content: (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <button style={S.stepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                      <span style={{ fontWeight: 700, fontSize: 16, minWidth: 32, textAlign: 'center' }}>{draft.max_people}명</span>
+                      <button style={S.stepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
+                    </div>
+                  ),
+                },
+                {
+                  label: '메모',
+                  content: <input style={S.inlineInput} value={draft.memo} onChange={e => setD('memo', e.target.value)} maxLength={50} placeholder="메모 입력" />,
+                },
+                {
+                  label: '공개',
+                  content: (
+                    <div style={{ display: 'flex', gap: 6 }}>
+                      <button
+                        style={{ ...S.pubBtn, ...(!draft.is_public ? S.pubBtnActive : {}) }}
+                        onClick={() => setD('is_public', false)}
+                      >그룹만</button>
+                      <button
+                        style={{ ...S.pubBtn, ...(draft.is_public ? S.pubBtnActive : {}) }}
+                        onClick={() => setD('is_public', true)}
+                      >전체 공개</button>
+                    </div>
+                  ),
+                },
+              ].map(({ label, content }) => (
+                <div key={label} style={iStyles.row}>
+                  <span style={iStyles.label}>{label}</span>
+                  <div style={iStyles.valueWrap}>{content}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Creator / modifier line */}
         {!pot.is_default && pot.users && (
-          <p style={styles.creatorLine}>👑 {pot.users.nickname} 방장</p>
+          <p style={S.creatorLine}>👑 {pot.users.nickname} 방장</p>
         )}
         {pot.is_default && pot.modifier?.nickname && (
-          <p style={styles.creatorLine}>✎ {pot.modifier.nickname} 마지막 수정</p>
+          <p style={S.creatorLine}>✎ {pot.modifier.nickname} 마지막 수정</p>
         )}
 
-        {/* 인원 점 UI */}
-        <div style={styles.dotsSection}>
-          <div style={styles.dotsLabel}>{participants.length}/{pot.max_people}명</div>
-          <div style={styles.dots}>
+        {/* Members card */}
+        <div style={S.membersCard}>
+          <div style={S.membersHeader}>
+            <span style={S.membersTitle}>참여 멤버</span>
+            <span style={S.membersCount}>{participants.length} / {pot.max_people}명</span>
+          </div>
+          <div style={S.membersList}>
             {Array.from({ length: pot.max_people }).map((_, i) => {
               const member = participants[i]
               const isMe = member?.id === user?.id
               const kickable = canKick && member && !isMe
               return (
-                <div key={i} style={styles.dotWrapper}>
-                  <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
-                    <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
+                <div key={i} style={S.memberItem}>
+                  <div style={{ position: 'relative' }}>
+                    <div style={{
+                      ...S.memberCircle,
+                      background: member ? (isMe ? '#FF6B35' : avBg(member.nickname)) : '#F5F0EB',
+                      border: member ? 'none' : '2px dashed #DDD5CC',
+                    }}>
                       {member ? member.nickname[0] : ''}
-                      {member?.is_guest && <span style={styles.guestBadge}>G</span>}
+                      {member?.is_guest && <span style={S.guestBadge}>G</span>}
                     </div>
                     {kickable && (
                       <button
-                        style={styles.kickBtn}
+                        style={S.kickBtn}
                         onClick={e => { e.stopPropagation(); setConfirmKick({ id: member.id, nickname: member.nickname }) }}
                       >✕</button>
                     )}
                   </div>
-                  <div style={styles.dotName}>{member?.nickname ?? '　'}</div>
+                  <div style={S.memberName}>{member?.nickname ?? ''}</div>
                 </div>
               )
             })}
           </div>
         </div>
 
+        {/* Action buttons */}
         {isPotExpired ? (
-          <button style={{ ...styles.btn, background: '#E0E0E0', color: '#9E9E9E' }} disabled>
-            종료된 밥팟이에요
-          </button>
+          <div style={S.expiredCard}>종료된 밥팟이에요</div>
         ) : isJoined ? (
-          <button style={{ ...styles.btn, background: 'var(--color-surface-2)', color: 'var(--color-text)' }} onClick={handleJoinToggle} disabled={actionLoading}>
+          <button style={S.leaveBtn} onClick={handleJoinToggle} disabled={actionLoading}>
             {actionLoading ? '처리 중...' : '참여 취소'}
           </button>
         ) : (
-          <button style={{ ...styles.btn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
+          <button style={{ ...S.joinBtn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
             {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '참여하기 🙋'}
           </button>
         )}
 
         {!isPotExpired && !user?.is_guest && (
-          <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
+          <button style={S.shareBtn} onClick={() => setShowShare(v => !v)}>
             📣 {showShare ? '닫기' : '모집하기'}
           </button>
         )}
 
         {isMaster && !draft && (
-          <button style={styles.deleteBtn} onClick={() => setConfirmDelete(true)}>
+          <button style={S.deleteBtn} onClick={() => setConfirmDelete(true)}>
             🗑️ 밥팟 삭제
           </button>
         )}
 
         {showShare && (
-          <div style={styles.sharePanel}>
-            <div style={styles.shareLabel}>초대 코드</div>
+          <div style={S.sharePanel}>
+            <div style={S.shareLabel}>초대 코드</div>
             {pot.invite_code ? (
-              <div style={styles.shareRow}>
-                <span style={{ ...styles.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
-                <button style={{ ...styles.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }} onClick={() => copyText(pot.invite_code, 'code')}>
+              <div style={S.shareRow}>
+                <span style={{ ...S.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
+                <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(pot.invite_code, 'code')}>
                   {copied === 'code' ? '✓' : '복사'}
                 </button>
               </div>
             ) : (
               <button
-                style={{ ...styles.shareCopyBtn, background: 'var(--color-primary)', padding: '8px 16px', fontSize: 13 }}
+                style={{ ...S.shareCopyBtn, background: '#FF6B35', padding: '8px 16px', fontSize: 13 }}
                 onClick={async () => {
                   const code = await generatePotInviteCode(pot.id)
                   setPot(prev => ({ ...prev, invite_code: code }))
@@ -540,10 +585,10 @@ export default function PotDetailPage() {
                 코드 생성하기
               </button>
             )}
-            <div style={{ ...styles.shareLabel, marginTop: 6 }}>밥팟 링크</div>
-            <div style={styles.shareRow}>
-              <span style={styles.shareText}>{potLink}</span>
-              <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }} onClick={() => copyText(potLink, 'link')}>
+            <div style={{ ...S.shareLabel, marginTop: 6 }}>밥팟 링크</div>
+            <div style={S.shareRow}>
+              <span style={S.shareText}>{potLink}</span>
+              <button style={{ ...S.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(potLink, 'link')}>
                 {copied === 'link' ? '✓' : '복사'}
               </button>
             </div>
@@ -551,23 +596,22 @@ export default function PotDetailPage() {
         )}
       </div>
 
-
       {/* 시간 캐러셀 팝업 */}
       {timePicker && draft && (() => {
         const ct = getCarouselTime(timePicker === 'start' ? draft.meal_time : draft.end_time)
         const update = (patch) => applyDetailPickerTime(timePicker, carouselTimeToStr({ ...ct, ...patch }))
         return (
-          <div style={styles.overlay} onClick={cancelDetailTimePicker}>
-            <div style={styles.timeDialog} onClick={e => e.stopPropagation()}>
-              <div style={styles.timeDialogTitle}>{timePicker === 'start' ? '시작 시간' : '종료 시간'}</div>
-              <div style={styles.timeCarouselRow}>
+          <div style={S.overlay} onClick={cancelDetailTimePicker}>
+            <div style={S.timeDialog} onClick={e => e.stopPropagation()}>
+              <div style={S.timeDialogTitle}>{timePicker === 'start' ? '시작 시간' : '종료 시간'}</div>
+              <div style={S.timeCarouselRow}>
                 <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => update({ ampm })} width={56} />
                 <div style={{ width: 4 }} />
                 <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => update({ hour })} width={56} />
-                <span style={styles.timeColon}>:</span>
+                <span style={S.timeColon}>:</span>
                 <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => update({ minute })} width={56} />
               </div>
-              <button style={styles.timeDoneBtn} onClick={confirmDetailTimePicker}>확인</button>
+              <button style={S.timeDoneBtn} onClick={confirmDetailTimePicker}>확인</button>
             </div>
           </div>
         )
@@ -575,16 +619,16 @@ export default function PotDetailPage() {
 
       {/* 멤버 퇴장 확인 */}
       {confirmKick && (
-        <div style={styles.overlay}>
-          <div style={styles.dialog}>
+        <div style={S.overlay}>
+          <div style={S.dialog}>
             <div style={{ fontSize: 36 }}>👋</div>
-            <div style={styles.dialogTitle}>{confirmKick.nickname}님을{'\n'}퇴장시킬까요?</div>
-            <p style={styles.dialogDesc}>퇴장하면 밥팟에서 제외돼요.</p>
-            <div style={styles.dialogBtns}>
-              <button style={{ ...styles.dialogBtnPrimary, background: '#f44336' }} onClick={handleKickMember} disabled={actionLoading}>
+            <div style={S.dialogTitle}>{confirmKick.nickname}님을{'\n'}퇴장시킬까요?</div>
+            <p style={S.dialogDesc}>퇴장하면 밥팟에서 제외돼요.</p>
+            <div style={S.dialogBtns}>
+              <button style={{ ...S.dialogBtnPrimary, background: '#f44336' }} onClick={handleKickMember} disabled={actionLoading}>
                 {actionLoading ? '처리 중...' : '퇴장시키기'}
               </button>
-              <button style={styles.dialogBtnCancel} onClick={() => setConfirmKick(null)}>취소</button>
+              <button style={S.dialogBtnCancel} onClick={() => setConfirmKick(null)}>취소</button>
             </div>
           </div>
         </div>
@@ -592,20 +636,20 @@ export default function PotDetailPage() {
 
       {/* 밥팟 삭제 확인 */}
       {confirmDelete && (
-        <div style={styles.overlay}>
-          <div style={styles.dialog}>
+        <div style={S.overlay}>
+          <div style={S.dialog}>
             <div style={{ fontSize: 36 }}>🗑️</div>
-            <div style={styles.dialogTitle}>밥팟을 삭제할까요?</div>
-            <p style={styles.dialogDesc}>
+            <div style={S.dialogTitle}>밥팟을 삭제할까요?</div>
+            <p style={S.dialogDesc}>
               {pot.is_default
                 ? '오늘 기본 밥팟만 삭제돼요.\n기본 밥팟 설정은 유지되어 내일부터 계속 열려요.'
                 : '팟과 참여 기록이 모두 삭제돼요.'}
             </p>
-            <div style={styles.dialogBtns}>
-              <button style={{ ...styles.dialogBtnPrimary, background: '#f44336' }} onClick={handleDeletePot} disabled={actionLoading}>
+            <div style={S.dialogBtns}>
+              <button style={{ ...S.dialogBtnPrimary, background: '#f44336' }} onClick={handleDeletePot} disabled={actionLoading}>
                 {actionLoading ? '삭제 중...' : '삭제하기'}
               </button>
-              <button style={styles.dialogBtnCancel} onClick={() => setConfirmDelete(false)}>취소</button>
+              <button style={S.dialogBtnCancel} onClick={() => setConfirmDelete(false)}>취소</button>
             </div>
           </div>
         </div>
@@ -613,18 +657,18 @@ export default function PotDetailPage() {
 
       {/* 중복 참여 충돌 */}
       {conflict && (
-        <div style={styles.overlay}>
-          <div style={styles.dialog}>
+        <div style={S.overlay}>
+          <div style={S.dialog}>
             <div style={{ fontSize: 40 }}>⚠️</div>
-            <div style={styles.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
-            <p style={styles.dialogDesc}>
+            <div style={S.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
+            <p style={S.dialogDesc}>
               <strong>{pot.slot}</strong> 슬롯에{'\n'}
               <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}에 이미 참여하고 있어요.
             </p>
-            <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>기존 밥팟 나가고 여기 참여</button>
-              <button style={styles.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>중복 참여하기</button>
-              <button style={styles.dialogBtnCancel} onClick={() => setConflict(null)}>참여 취소</button>
+            <div style={S.dialogBtns}>
+              <button style={S.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>기존 밥팟 나가고 여기 참여</button>
+              <button style={S.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>중복 참여하기</button>
+              <button style={S.dialogBtnCancel} onClick={() => setConflict(null)}>참여 취소</button>
             </div>
           </div>
         </div>
@@ -633,62 +677,98 @@ export default function PotDetailPage() {
   )
 }
 
-const styles = {
+const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)' },
-  back: { background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', padding: 4 },
-  headerSub: { fontSize: 11, color: 'var(--color-text-muted)', fontWeight: 600 },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  futureEditBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer' },
-  headerBtn: { fontSize: 14, fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px' },
-  body: { flex: 1, padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflowY: 'auto' },
 
-  tagRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  defaultTag: { fontSize: 12, background: '#E8F5E9', borderRadius: 4, padding: '2px 8px', color: '#4CAF50', fontWeight: 600 },
-  publicTag: { fontSize: 12, background: '#eee', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
-  slotTag: { fontSize: 12, background: 'var(--color-surface-2)', borderRadius: 4, padding: '2px 8px', color: 'var(--color-text-muted)' },
-  publicToggle: { fontSize: 12, fontWeight: 600, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
+  header: {
+    padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+    position: 'sticky', top: 0, background: 'rgba(250,248,245,0.95)', zIndex: 10,
+    borderBottom: '1px solid #EDE8E3', backdropFilter: 'blur(8px)',
+  },
+  backBtn: {
+    width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#EDE8E3',
+    color: '#6B7280', fontSize: 20, cursor: 'pointer', display: 'flex',
+    alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
+    lineHeight: 1,
+  },
+  headerTitle: { fontSize: 15, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
+  headerSub: { fontSize: 10, color: '#A89E94' },
+  headerTextBtn: { fontSize: 14, fontWeight: 600, color: '#A89E94', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
+  headerEditPill: { fontSize: 11, color: '#FF6B35', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 99, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' },
 
+  body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingBottom: 80 },
+
+  /* Hero card (view mode) */
+  heroCard: { background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
+  heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
+  defaultTag: { fontSize: 11, background: '#E8F5E9', borderRadius: 6, padding: '2px 8px', color: '#4CAF50', fontWeight: 700 },
+  slotTag: { fontSize: 11, background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#A89E94' },
+  publicTag: { fontSize: 11, background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#A89E94' },
+  publicToggle: { fontSize: 11, fontWeight: 700, border: '1px solid', borderRadius: 99, padding: '3px 10px', cursor: 'pointer' },
+  heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
+  heroIcon: { width: 48, height: 48, background: '#FF6B35', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 },
+  heroTitle: { fontSize: 18, fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.5px' },
+  heroSlot: { fontSize: 11, color: '#FF6B35', fontWeight: 700, marginTop: 2 },
+  infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  infoPanel: { background: 'rgba(255,255,255,0.7)', borderRadius: 12, padding: '10px 12px' },
+  infoPanelLabel: { fontSize: 10, color: '#A89E94', marginBottom: 3, fontWeight: 600 },
+  infoPanelValue: { fontSize: 13, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
+
+  /* Edit card */
+  editCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 16 },
+  editCardTitle: { fontSize: 13, fontWeight: 800, color: '#1A1A1A', marginBottom: 4, letterSpacing: '-0.3px' },
   fields: { display: 'flex', flexDirection: 'column' },
-  inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none' },
-  inlineTimeBtn: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, fontWeight: 600, background: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'center' },
-  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid #FF6B35', borderRadius: 10, fontSize: 14, outline: 'none' },
+  inlineTimeBtn: { flex: 1, padding: '6px 10px', border: '1.5px solid #FF6B35', borderRadius: 10, fontSize: 14, fontWeight: 600, background: '#fff', color: '#1A1A1A', cursor: 'pointer', textAlign: 'center' },
+  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid #EDE8E3', borderRadius: 99, background: 'transparent', fontSize: 11, cursor: 'pointer', color: '#A89E94', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
+  durBtnActive: { borderColor: '#FF6B35', background: '#FFF4EF', color: '#FF6B35', fontWeight: 700 },
+  stepperBtn: { width: 32, height: 32, border: '1.5px solid #EDE8E3', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  pubBtn: { flex: 1, padding: '8px 10px', border: '1.5px solid #EDE8E3', borderRadius: 10, background: '#F5F0EB', fontSize: 12, fontWeight: 600, cursor: 'pointer', color: '#A89E94' },
+  pubBtnActive: { borderColor: '#FF6B35', background: '#FFF4EF', color: '#FF6B35' },
+
+  creatorLine: { fontSize: 13, color: '#A89E94', margin: '-6px 0 0' },
+
+  /* Members card */
+  membersCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 16 },
+  membersHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
+  membersTitle: { fontSize: 13, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
+  membersCount: { fontSize: 12, color: '#A89E94', fontWeight: 600 },
+  membersList: { display: 'flex', gap: 10, flexWrap: 'wrap' },
+  memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
+  memberCircle: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 14, position: 'relative' },
+  guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
+  kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  memberName: { fontSize: 10, color: '#A89E94' },
+
+  /* Action buttons */
+  joinBtn: { width: '100%', padding: 16, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
+  leaveBtn: { width: '100%', padding: 16, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
+  expiredCard: { background: '#F5F0EB', borderRadius: 14, padding: 15, textAlign: 'center', color: '#A89E94', fontSize: 13, fontWeight: 700, letterSpacing: '-0.2px' },
+  shareBtn: { width: '100%', padding: 14, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
+  deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
+
+  /* Share panel */
+  sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: '#F5F0EB', borderRadius: 14, border: '1px solid #EDE8E3' },
+  shareLabel: { fontSize: 11, fontWeight: 700, color: '#A89E94' },
+  shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, padding: '8px 10px', border: '1px solid #EDE8E3' },
+  shareText: { flex: 1, fontSize: 13, color: '#1A1A1A', wordBreak: 'break-all', lineHeight: 1.4 },
+  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+
+  /* Carousel popup */
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 24 },
+  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
+  timeDialogTitle: { fontWeight: 800, fontSize: 16 },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  stepperBtn: { width: 32, height: 32, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
-  durBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
+  timeColon: { fontSize: 20, fontWeight: 800, color: '#A89E94' },
+  timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 
-  creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: -4 },
-  dotsSection: { padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  dotsLabel: { fontWeight: 700, marginBottom: 'var(--spacing-sm)' },
-  dots: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' },
-  dotWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
-  dot: { position: 'relative', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-sm)' },
-  guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)' },
-  kickBtn: { marginTop: 4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
-  dotName: { fontSize: 10, color: 'var(--color-text-muted)' },
-  btn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
-  shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
-  deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
-  sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
-  shareLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
-  shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
-  shareText: { flex: 1, fontSize: 13, color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
-  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
-
-  confirmBar: { display: 'flex', gap: 8, padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', background: 'var(--color-surface)', flexShrink: 0 },
-  confirmCancelBtn: { flex: 1, padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
-  confirmSaveBtn: { flex: 2, padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
-  dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
-  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7 },
+  /* Dialogs */
+  dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
+  dialogTitle: { fontWeight: 800, fontSize: 18, textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogDesc: { fontSize: 14, color: '#A89E94', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: '#A89E94', border: 'none', borderRadius: 99, fontSize: 14, cursor: 'pointer' },
 }

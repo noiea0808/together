@@ -11,13 +11,13 @@
   --color-primary-light: #FF8C5A;
   --color-primary-dark: #E05520;
 
-  --color-bg: #FAFAFA;
+  --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
-  --color-surface-2: #F5F5F5;
+  --color-surface-2: #F5F0EB;
 
   --color-text: #1A1A1A;
-  --color-text-muted: #888888;
-  --color-border: #E8E8E8;
+  --color-text-muted: #A89E94;
+  --color-border: #EDE8E3;
 
   --color-status-lunch: #4CAF50;
   --color-status-dinner: #2196F3;
