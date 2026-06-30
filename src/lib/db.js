@@ -407,7 +407,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('group_share_settings')
       .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
-      .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
+      .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
       .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
@@ -501,7 +501,7 @@ export async function generatePotInviteCode(potId) {
 export async function getPotByInviteCode(code) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
     .eq('invite_code', code.toUpperCase().trim())
     .single()
   if (error) return null
@@ -511,7 +511,7 @@ export async function getPotByInviteCode(code) {
 export async function getGroupPots(groupId, date) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
     .eq('group_id', groupId)
     .eq('date', date)
   if (error) throw error
@@ -521,7 +521,7 @@ export async function getGroupPots(groupId, date) {
 export async function getPot(potId) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
     .eq('id', potId)
     .maybeSingle()
   if (error) throw error
@@ -560,7 +560,7 @@ export async function joinPotAsGuest(potId, nickname) {
 export async function getGuestHome(potId) {
   const { data: pot, error } = await supabase
     .from('meal_pots')
-    .select('*, groups(name), pot_members(user_id, users(nickname, is_guest))')
+    .select('*, groups(name), pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id)))')
     .eq('id', potId)
     .maybeSingle()
   if (error) throw error

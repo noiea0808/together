@@ -141,7 +141,7 @@ const styles = {
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    borderColor: 'var(--color-primary)', background: 'var(--color-primary)18',
+    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18',
     color: 'var(--color-primary)',
   },
   card: {

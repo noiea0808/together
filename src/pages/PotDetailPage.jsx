@@ -123,10 +123,11 @@ export default function PotDetailPage() {
   const [showShare, setShowShare] = useState(false)
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmKick, setConfirmKick] = useState(null) // { id, nickname }
   const [draft, setDraft] = useState(null) // 편집 중인 값
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(confirmDelete || conflict))
+  useScrollLock(!!(confirmDelete || conflict || confirmKick))
 
   // 내 행동을 오늘 화면에 즉시 반영하기 위해 board 캐시 무효화
   const invalidateBoard = () => {
@@ -151,11 +152,22 @@ export default function PotDetailPage() {
     return () => window.removeEventListener('popstate', onPop)
   }, [id])
 
-  const participants = pot?.pot_members?.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?', is_guest: pm.users?.is_guest })) ?? []
+  const participants = pot?.pot_members?.map(pm => {
+    const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
+    return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
+  }) ?? []
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
+  // 기본팟: 첫 번째 비게스트 멤버가 관리자 역할
+  const defaultPotAdmin = pot?.is_default
+    ? (pot?.pot_members ?? [])
+        .sort((a, b) => new Date(a.joined_at ?? 0) - new Date(b.joined_at ?? 0))
+        .find(pm => !pm.users?.is_guest)?.user_id ?? null
+    : null
+  const isDefaultPotAdmin = pot?.is_default && defaultPotAdmin === user?.id
   const canEdit = isMaster || pot?.is_default
+  const canKick = isMaster || isDefaultPotAdmin
 
   const isPotExpired = (() => {
     if (!pot?.end_time || !pot?.date) return false
@@ -225,6 +237,18 @@ export default function PotDetailPage() {
   const handleConflictJoinBoth = async () => {
     setActionLoading(true); setConflict(null)
     await doJoin()
+  }
+
+  const handleKickMember = async () => {
+    if (!confirmKick || actionLoading) return
+    setActionLoading(true)
+    try {
+      await leavePotWithCleanup(pot.id, confirmKick.id)
+      invalidateBoard()
+      setConfirmKick(null)
+      await loadPot()
+    } catch (e) { console.error(e) }
+    finally { setActionLoading(false) }
   }
 
   const handleDeletePot = async () => {
@@ -395,11 +419,20 @@ export default function PotDetailPage() {
             {Array.from({ length: pot.max_people }).map((_, i) => {
               const member = participants[i]
               const isMe = member?.id === user?.id
+              const kickable = canKick && member && !isMe
               return (
                 <div key={i} style={styles.dotWrapper}>
-                  <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
-                    {member ? member.nickname[0] : ''}
-                    {member?.is_guest && <span style={styles.guestBadge}>G</span>}
+                  <div style={{ position: 'relative', display: 'inline-flex', flexDirection: 'column', alignItems: 'center' }}>
+                    <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
+                      {member ? member.nickname[0] : ''}
+                      {member?.is_guest && <span style={styles.guestBadge}>G</span>}
+                    </div>
+                    {kickable && (
+                      <button
+                        style={styles.kickBtn}
+                        onClick={e => { e.stopPropagation(); setConfirmKick({ id: member.id, nickname: member.nickname }) }}
+                      >✕</button>
+                    )}
                   </div>
                   <div style={styles.dotName}>{member?.nickname ?? '　'}</div>
                 </div>
@@ -466,6 +499,23 @@ export default function PotDetailPage() {
         )}
       </div>
 
+
+      {/* 멤버 퇴장 확인 */}
+      {confirmKick && (
+        <div style={styles.overlay}>
+          <div style={styles.dialog}>
+            <div style={{ fontSize: 36 }}>👋</div>
+            <div style={styles.dialogTitle}>{confirmKick.nickname}님을{'\n'}퇴장시킬까요?</div>
+            <p style={styles.dialogDesc}>퇴장하면 밥팟에서 제외돼요.</p>
+            <div style={styles.dialogBtns}>
+              <button style={{ ...styles.dialogBtnPrimary, background: '#f44336' }} onClick={handleKickMember} disabled={actionLoading}>
+                {actionLoading ? '처리 중...' : '퇴장시키기'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConfirmKick(null)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 밥팟 삭제 확인 */}
       {confirmDelete && (
@@ -540,6 +590,7 @@ const styles = {
   dotWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
   dot: { position: 'relative', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-sm)' },
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)' },
+  kickBtn: { marginTop: 4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 10, fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   dotName: { fontSize: 10, color: 'var(--color-text-muted)' },
   btn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
   shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },
