@@ -7,61 +7,10 @@ import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
+import { useScrollLock } from '../lib/useScrollLock'
+import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
-
-const CAROUSEL_AMPM    = ['오전', '오후']
-const CAROUSEL_HOURS   = ['01','02','03','04','05','06','07','08','09','10','11','12']
-const CAROUSEL_MINUTES = ['00','05','10','15','20','25','30','35','40','45','50','55']
-
-// 현재 시각 기준 캐러셀 기본값 (또는 기존 time 파싱)
-function getCarouselTime(timeStr) {
-  if (timeStr) {
-    const [h, m] = timeStr.split(':').map(Number)
-    const ampm = h < 12 ? '오전' : '오후'
-    const hour12 = h % 12 === 0 ? 12 : h % 12
-    const nearestMin = CAROUSEL_MINUTES.reduce((a, b) =>
-      Math.abs(parseInt(b) - m) < Math.abs(parseInt(a) - m) ? b : a)
-    return { ampm, hour: String(hour12).padStart(2, '0'), minute: nearestMin }
-  }
-  const now = new Date()
-  const h = now.getHours(), m = now.getMinutes()
-  const ampm = h < 12 ? '오전' : '오후'
-  const hour12 = h % 12 === 0 ? 12 : h % 12
-  const nearestMin = CAROUSEL_MINUTES.reduce((a, b) =>
-    Math.abs(parseInt(b) - m) < Math.abs(parseInt(a) - m) ? b : a)
-  return { ampm, hour: String(hour12).padStart(2, '0'), minute: nearestMin }
-}
-
-function carouselTimeToStr({ ampm, hour, minute }) {
-  let h = Number(hour) % 12
-  if (ampm === '오후') h += 12
-  return `${String(h).padStart(2, '0')}:${minute}`
-}
-
-function CarouselPicker({ items, value, onChange, disabled, width = 56 }) {
-  const idx = Math.max(0, items.indexOf(value))
-  const get = (offset) => items[((idx + offset) % items.length + items.length) % items.length]
-  return (
-    <div style={{ width, display: 'flex', flexDirection: 'column', alignItems: 'center', userSelect: 'none' }}>
-      <div
-        style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, opacity: 0.3, cursor: disabled ? 'default' : 'pointer', color: 'var(--color-text-muted)', width: '100%' }}
-        onClick={() => !disabled && onChange(get(-1))}
-      >{get(-1)}</div>
-      <div style={{ height: 40, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        fontSize: 20, fontWeight: 800, color: 'var(--color-text)', width: '100%',
-        borderTop: '1.5px solid var(--color-primary)', borderBottom: '1.5px solid var(--color-primary)',
-        background: 'rgba(255,107,53,0.05)' }}
-      >{get(0)}</div>
-      <div
-        style={{ height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center',
-          fontSize: 13, opacity: 0.3, cursor: disabled ? 'default' : 'pointer', color: 'var(--color-text-muted)', width: '100%' }}
-        onClick={() => !disabled && onChange(get(1))}
-      >{get(1)}</div>
-    </div>
-  )
-}
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -140,6 +89,9 @@ export default function TodayPage() {
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
+
+  // 팝업 열려 있는 동안 배경 스크롤 잠금
+  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -560,11 +512,10 @@ export default function TodayPage() {
                   {slot}
                 </div>
 
-                {/* 바디: 탭하면 팝업 편집 */}
+                {/* 바디: 탭하면 팝업 편집 (지난 날짜는 열람 전용으로 열림) */}
                 <div
-                  style={{ ...styles.slotBody, cursor: isPastDate ? 'default' : 'pointer' }}
+                  style={{ ...styles.slotBody, cursor: 'pointer' }}
                   onClick={() => {
-                    if (isPastDate) return
                     setSelectedSlot(slot)
                     openSlotEditor(slot)
                   }}
@@ -790,6 +741,53 @@ export default function TodayPage() {
             const isInPot = Object.values(potsMap).flat()
               .some(p => p.slot === editingSlot && p.pot_members?.some(pm => pm.user_id === user.id))
             if (isInPot) return null
+
+            // 지난 날짜: 입력된 상태를 열람만 (편집 불가)
+            const isPastDate = currentDate < TODAY
+            if (isPastDate) {
+              const opt = SLOT_STATUS_OPTIONS.find(o => o.key === draftData.status)
+              return (
+                <>
+                  {opt ? (
+                    <>
+                      <div style={styles.potInfoBanner}>
+                        <span style={{ fontSize: 22 }}>{opt.emoji}</span>
+                        <div>
+                          <div style={{ fontWeight: 700, color: opt.color, fontSize: 14 }}>{opt.label}</div>
+                          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>지난 날짜는 열람만 가능해요</div>
+                        </div>
+                      </div>
+                      {(draftData.time || draftData.menu) && (
+                        <div style={styles.potInfoCard}>
+                          {draftData.time && (
+                            <div style={styles.potInfoRow}>
+                              <span style={styles.potInfoLabel}>시간</span>
+                              <span style={styles.potInfoValue}>{draftData.time.slice(0, 5)}</span>
+                            </div>
+                          )}
+                          {draftData.menu && (
+                            <div style={styles.potInfoRow}>
+                              <span style={styles.potInfoLabel}>메뉴</span>
+                              <span style={styles.potInfoValue}>{draftData.menu}</span>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div style={styles.potInfoBanner}>
+                      <span style={{ fontSize: 22 }}>○</span>
+                      <div>
+                        <div style={{ fontWeight: 700, fontSize: 14 }}>미설정</div>
+                        <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>이 슬롯에 입력된 상태가 없어요</div>
+                      </div>
+                    </div>
+                  )}
+                  <button style={styles.slotPopupCancel} onClick={() => setEditingSlot(null)}>닫기</button>
+                </>
+              )
+            }
+
             return <>
 
           {/* 상태 선택 */}
@@ -978,6 +976,9 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // 멤버 관리
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
+
+  // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
+  useScrollLock(!!(showSettings || confirmRemoveMember))
 
   const handleToggleSharing = () => onToggleShare(!isShared)
 

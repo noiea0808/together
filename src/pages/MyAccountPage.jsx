@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { updateNickname } from '../lib/db'
+import { updateNickname, deleteAccount } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import BottomNav from '../components/BottomNav'
 
@@ -9,12 +9,17 @@ export default function MyAccountPage() {
   const navigate = useNavigate()
   const { user, logout, login } = useUser()
   const [nickname, setNickname] = useState(user?.nickname ?? '')
-  const { installPrompt, triggerInstall, isInstalled, isIOS } = useInstallPrompt()
+  const { installPrompt, triggerInstall, isInstalled, isIOS, isAndroid, isPC } = useInstallPrompt()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [showAndroidGuide, setShowAndroidGuide] = useState(false)
+  const [showPCGuide, setShowPCGuide] = useState(false)
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [showWithdraw, setShowWithdraw] = useState(false)
+  const [withdrawConfirm, setWithdrawConfirm] = useState('')
+  const [withdrawing, setWithdrawing] = useState(false)
+  const [withdrawError, setWithdrawError] = useState(null)
 
   const handleSave = async () => {
     if (!nickname.trim() || saving) return
@@ -35,6 +40,28 @@ export default function MyAccountPage() {
   const handleLogout = async () => {
     await logout()
     navigate('/onboarding')
+  }
+
+  const closeWithdraw = () => {
+    if (withdrawing) return
+    setShowWithdraw(false)
+    setWithdrawConfirm('')
+    setWithdrawError(null)
+  }
+
+  const handleWithdraw = async () => {
+    if (withdrawConfirm !== '탈퇴' || withdrawing) return
+    setWithdrawing(true)
+    setWithdrawError(null)
+    try {
+      await deleteAccount()
+      await logout()
+      navigate('/onboarding')
+    } catch (e) {
+      console.error(e)
+      setWithdrawError('탈퇴 처리에 실패했어요. 잠시 후 다시 시도해주세요.')
+      setWithdrawing(false)
+    }
   }
 
   return (
@@ -96,15 +123,16 @@ export default function MyAccountPage() {
             <button
               style={styles.installBtn}
               onClick={() => {
-                if (isIOS) setShowIOSGuide(true)
+                if (isPC) setShowPCGuide(true)
+                else if (isIOS) setShowIOSGuide(true)
                 else if (installPrompt) triggerInstall()
                 else setShowAndroidGuide(true)
               }}
             >
-              <span>📲</span>
-              <span>홈 화면에 앱 추가</span>
+              <span>{isPC ? '🔖' : '📲'}</span>
+              <span>{isPC ? '즐겨찾기에 추가' : '홈 화면에 앱 추가'}</span>
             </button>
-            <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>
+            <p style={styles.installDesc}>{isPC ? '즐겨찾기에서 빠르게 접속할 수 있어요.' : '아이콘을 탭하면 앱처럼 바로 열려요.'}</p>
           </div>
         )}
         {isInstalled && (
@@ -116,7 +144,82 @@ export default function MyAccountPage() {
           <button style={styles.logoutBtn} onClick={handleLogout}>
             로그아웃
           </button>
+          {/* 회원 탈퇴 — 실수 방지를 위해 작고 눈에 띄지 않게 */}
+          <div style={styles.withdrawWrap}>
+            <button style={styles.withdrawLink} onClick={() => setShowWithdraw(true)}>
+              회원 탈퇴
+            </button>
+          </div>
         </div>
+
+        {/* 회원 탈퇴 경고 모달 */}
+        {showWithdraw && (
+          <div style={styles.modalOverlay} onClick={closeWithdraw}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div style={styles.withdrawIcon}>⚠️</div>
+              <div style={styles.withdrawTitle}>정말 탈퇴하시겠어요?</div>
+              <div style={styles.withdrawDesc}>
+                탈퇴하면 <strong>되돌릴 수 없습니다.</strong><br />
+                아래 데이터가 <strong style={{ color: '#f44336' }}>영구적으로 삭제</strong>돼요.
+              </div>
+              <ul style={styles.withdrawList}>
+                <li>프로필 · 닉네임 정보</li>
+                <li>참여 중인 모든 밥팟 기록</li>
+                <li>그룹 멤버십 및 상태 기록</li>
+              </ul>
+              <div style={styles.withdrawConfirmLabel}>
+                계속하려면 아래에 <strong>탈퇴</strong> 를 입력하세요.
+              </div>
+              <div style={styles.withdrawInputRow}>
+                <input
+                  style={styles.withdrawInput}
+                  value={withdrawConfirm}
+                  onChange={e => setWithdrawConfirm(e.target.value)}
+                  placeholder="탈퇴"
+                  disabled={withdrawing}
+                  autoFocus
+                />
+                <button
+                  style={{ ...styles.withdrawBtn, opacity: withdrawConfirm === '탈퇴' && !withdrawing ? 1 : 0.4 }}
+                  onClick={handleWithdraw}
+                  disabled={withdrawConfirm !== '탈퇴' || withdrawing}
+                >
+                  {withdrawing ? '처리 중...' : '탈퇴하기'}
+                </button>
+              </div>
+              {withdrawError && <p style={styles.withdrawErrorMsg}>{withdrawError}</p>}
+              <button style={styles.withdrawCancel} onClick={closeWithdraw} disabled={withdrawing}>
+                취소
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* PC 즐겨찾기 안내 모달 */}
+        {showPCGuide && (
+          <div style={styles.modalOverlay} onClick={() => setShowPCGuide(false)}>
+            <div style={styles.modal} onClick={e => e.stopPropagation()}>
+              <div style={styles.modalTitle}>즐겨찾기에 추가하기</div>
+              <div style={styles.guideSteps}>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>1</span>
+                  <span>주소창 오른쪽 <strong>별표(☆)</strong> 아이콘을 클릭하세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>또는</span>
+                  <span>키보드에서 <strong>Ctrl+D</strong> (Mac: ⌘+D) 를 누르세요.</span>
+                </div>
+                <div style={styles.guideStep}>
+                  <span style={styles.guideNum}>2</span>
+                  <span><strong>완료</strong>를 클릭하면 즐겨찾기에 저장돼요.</span>
+                </div>
+              </div>
+              <button style={styles.modalClose} onClick={() => setShowPCGuide(false)}>
+                확인
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Android 수동 안내 모달 */}
         {showAndroidGuide && (
@@ -212,4 +315,17 @@ const styles = {
   guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
   guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 13 },
   modalClose: { width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+
+  withdrawWrap: { textAlign: 'center', marginTop: 14 },
+  withdrawLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 11, textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.6 },
+  withdrawIcon: { fontSize: 40, textAlign: 'center', marginBottom: 8 },
+  withdrawTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
+  withdrawDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.6, marginBottom: 'var(--spacing-md)' },
+  withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: '#FFF0F0', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#c62828', lineHeight: 1.8 },
+  withdrawConfirmLabel: { fontSize: 'var(--font-size-sm)', textAlign: 'center', marginBottom: 8, color: 'var(--color-text)' },
+  withdrawInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 'var(--spacing-md)' },
+  withdrawInput: { flex: 1, padding: '12px var(--spacing-md)', border: '1.5px solid #f44336', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: '#f44336', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
+  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
+  withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 }
