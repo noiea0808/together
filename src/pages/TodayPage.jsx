@@ -8,6 +8,7 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
 import { useScrollLock } from '../lib/useScrollLock'
+import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
@@ -62,6 +63,7 @@ export default function TodayPage() {
   )
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
+  const [slotEndPickerOpen, setSlotEndPickerOpen] = useState(false)
   const [allCollapsed, setAllCollapsed] = useState(false)
   const [collapseKey, setCollapseKey] = useState(0) // 강제 리렌더용
 
@@ -94,6 +96,15 @@ export default function TodayPage() {
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
   useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot))
+  useEscKey(useCallback(() => {
+    if (slotEndPickerOpen) { setSlotEndPickerOpen(false); return }
+    if (editingSlot) { setEditingSlot(null); return }
+    if (showJoinPot) { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError(''); return }
+    if (editingOrder) { cancelEditingOrder(); return }
+    if (shareTogglePending) { setShareTogglePending(null); return }
+    if (createConflict) { setCreateConflict(null); return }
+    if (showResetConfirm) { setShowResetConfirm(false); return }
+  }, [slotEndPickerOpen, editingSlot, showJoinPot, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -154,7 +165,7 @@ export default function TodayPage() {
       // 내 상태 (사용자 의향 원본)
       const slots = {}
       myStatuses.forEach(s => {
-        slots[s.slot] = { status: s.status, time: s.meal_time, menu: s.menu }
+        slots[s.slot] = { status: s.status, time: s.meal_time, end_time: s.end_time, menu: s.menu }
       })
 
       // 그룹 공유 설정
@@ -238,7 +249,7 @@ export default function TodayPage() {
               setMySlots(prev => ({
                 ...prev,
                 [s.slot]: s.status
-                  ? { status: s.status, time: s.meal_time, menu: s.menu }
+                  ? { status: s.status, time: s.meal_time, end_time: s.end_time, menu: s.menu }
                   : undefined
               }))
             }
@@ -305,9 +316,20 @@ export default function TodayPage() {
     return () => document.removeEventListener('visibilitychange', handleVisibility)
   }, [loadData])
 
+  const addSlotMinutes = (timeStr, minutes) => {
+    if (!timeStr) return ''
+    const [h, m] = timeStr.split(':').map(Number)
+    const total = h * 60 + m + minutes
+    return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
+  }
+
   const openSlotEditor = (slot) => {
     setEditingSlot(slot)
-    setDraftData(mySlots[slot] ?? {})
+    const saved = mySlots[slot] ?? {}
+    const time = saved.time ?? null
+    const savedEnd = saved.end_time ? saved.end_time.slice(0, 5) : null
+    setDraftData({ ...saved, end_time: savedEnd ?? (time ? addSlotMinutes(time, 60) : null), duration_minutes: 60 })
+    setSlotEndPickerOpen(false)
   }
 
   const saveSlotEditor = async () => {
@@ -319,7 +341,7 @@ export default function TodayPage() {
       await deleteStatus({ userId: user.id, date: dateStr, slot })
     } else {
       setMySlots(prev => ({ ...prev, [slot]: draftData }))
-      await upsertStatus({ userId: user.id, date: dateStr, slot, status: draftData.status, meal_time: draftData.time, menu: draftData.menu })
+      await upsertStatus({ userId: user.id, date: dateStr, slot, status: draftData.status, meal_time: draftData.time, end_time: draftData.end_time || null, menu: draftData.menu })
     }
   }
 
@@ -529,7 +551,9 @@ export default function TodayPage() {
                         <span style={{ fontSize: 18, lineHeight: 1 }}>{lockedOpt.emoji}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: lockedOpt.color }}>{lockedOpt.label}</span>
                       </div>
-                      <div style={styles.slotMeta}>{earliestPot.meal_time?.slice(0, 5)}</div>
+                      <div style={styles.slotMeta}>
+                        {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
+                      </div>
                       <div style={{ ...styles.slotMeta, fontSize: 11 }}>{earliestPot.title}</div>
                     </>
                   ) : displayOpt ? (
@@ -538,7 +562,11 @@ export default function TodayPage() {
                         <span style={{ fontSize: 18, lineHeight: 1 }}>{displayOpt.emoji}</span>
                         <span style={{ fontSize: 12, fontWeight: 700, color: displayOpt.color }}>{displayOpt.label}</span>
                       </div>
-                      {data?.time && <div style={styles.slotMeta}>{data.time.slice(0, 5)}</div>}
+                      {data?.time && (
+                        <div style={styles.slotMeta}>
+                          {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
+                        </div>
+                      )}
                       {data?.menu && <div style={{ ...styles.slotMeta, fontSize: 11 }}>{data.menu}</div>}
                     </>
                   ) : (
@@ -765,7 +793,7 @@ export default function TodayPage() {
                           {draftData.time && (
                             <div style={styles.potInfoRow}>
                               <span style={styles.potInfoLabel}>시간</span>
-                              <span style={styles.potInfoValue}>{draftData.time.slice(0, 5)}</span>
+                              <span style={styles.potInfoValue}>{draftData.time.slice(0, 5)}{draftData.end_time ? `~${draftData.end_time.slice(0, 5)}` : ''}</span>
                             </div>
                           )}
                           {draftData.menu && (
@@ -819,10 +847,13 @@ export default function TodayPage() {
                 }}
                 onClick={() => setDraftData(prev => {
                   const needsTimeInit = o.key !== 'skip' && !prev.time
+                  const newTime = needsTimeInit ? carouselTimeToStr(getCarouselTime(null)) : prev.time
+                  const dur = prev.duration_minutes ?? 60
                   return {
                     ...prev,
                     status: o.key,
-                    time: needsTimeInit ? carouselTimeToStr(getCarouselTime(null)) : prev.time,
+                    time: newTime,
+                    end_time: (needsTimeInit && o.key !== 'skip') ? addSlotMinutes(newTime, dur) : prev.end_time,
                   }
                 })}
               >
@@ -834,13 +865,30 @@ export default function TodayPage() {
           {/* 시간 / 메뉴 */}
           {(() => {
             const fieldDisabled = !draftData.status || draftData.status === 'skip'
+            const showEndTime = !fieldDisabled && (draftData.status === 'open' || draftData.status === 'closed')
             const ct = getCarouselTime(draftData.time)
             const updateCarousel = (patch) => {
               const next = { ...ct, ...patch }
-              setDraftData(prev => ({ ...prev, time: carouselTimeToStr(next) }))
+              const newTime = carouselTimeToStr(next)
+              setDraftData(prev => ({
+                ...prev,
+                time: newTime,
+                end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(newTime, prev.duration_minutes) : prev.end_time,
+              }))
             }
             const timeOn = !!draftData.time
             const carouselDisabled = fieldDisabled || !timeOn
+            const dur = draftData.duration_minutes ?? 60
+            const setSlotDuration = (min) => setDraftData(prev => ({
+              ...prev,
+              duration_minutes: min,
+              end_time: min > 0 ? addSlotMinutes(prev.time, min) : prev.end_time,
+            }))
+            const endCt = getCarouselTime(draftData.end_time)
+            const updateEndCarousel = (patch) => {
+              const next = { ...endCt, ...patch }
+              setDraftData(prev => ({ ...prev, end_time: carouselTimeToStr(next), duration_minutes: 0 }))
+            }
             return (
               <div style={styles.slotPopupFields}>
                 {fieldDisabled && (
@@ -851,11 +899,11 @@ export default function TodayPage() {
                 {/* 시간 행 */}
                 <div style={{ ...styles.slotPopupFieldWrap }}>
                   <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <div style={styles.slotPopupFieldLabel}>시간</div>
+                    <div style={styles.slotPopupFieldLabel}>시작시간</div>
                     <button
                       style={{ fontSize: 10, fontWeight: 700, background: timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: timeOn && !fieldDisabled ? '#fff' : 'var(--color-text-muted)', border: `1px solid ${timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 99, padding: '1px 8px', cursor: fieldDisabled ? 'not-allowed' : 'pointer', lineHeight: 1.6, opacity: fieldDisabled ? 0.4 : 1 }}
                       disabled={fieldDisabled}
-                      onClick={() => setDraftData(prev => prev.time ? { ...prev, time: undefined } : { ...prev, time: carouselTimeToStr(getCarouselTime(null)) })}
+                      onClick={() => setDraftData(prev => prev.time ? { ...prev, time: undefined, end_time: null } : { ...prev, time: carouselTimeToStr(getCarouselTime(null)), end_time: addSlotMinutes(carouselTimeToStr(getCarouselTime(null)), prev.duration_minutes ?? 60) })}
                     >{timeOn ? 'ON' : 'OFF'}</button>
                   </div>
                   <div style={{ ...styles.timeCarouselRow, opacity: carouselDisabled ? 0.25 : 1, pointerEvents: carouselDisabled ? 'none' : 'auto' }}>
@@ -866,6 +914,35 @@ export default function TodayPage() {
                     <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => updateCarousel({ minute })} disabled={carouselDisabled} width={52} />
                   </div>
                 </div>
+                {/* 종료시간 행 — open/closed 이고 시간 ON일 때 */}
+                {showEndTime && timeOn && (
+                  <div style={{ ...styles.slotPopupFieldWrap, marginTop: 4 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                      <div style={styles.slotPopupFieldLabel}>종료시간</div>
+                      <button
+                        type="button"
+                        style={{ fontSize: 13, fontWeight: 600, background: 'var(--color-surface)', color: dur > 0 ? 'var(--color-primary)' : 'var(--color-text)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px', cursor: 'pointer' }}
+                        onClick={() => setSlotEndPickerOpen(v => !v)}
+                      >
+                        {draftData.end_time || '--:--'}
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
+                      {[{ min: 30, label: '30분' }, { min: 60, label: '1시간' }, { min: 90, label: '1.5시간' }, { min: 120, label: '2시간' }].map(o => (
+                        <button key={o.min}
+                          style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === o.min ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === o.min ? 'var(--color-primary)18' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === o.min ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: dur === o.min ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
+                          onClick={() => setSlotDuration(o.min)}>
+                          {o.label}
+                        </button>
+                      ))}
+                      <button
+                        style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === 0 ? 'var(--color-primary)18' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === 0 ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: dur === 0 ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
+                        onClick={() => { setSlotDuration(0); setSlotEndPickerOpen(true) }}>
+                        직접입력
+                      </button>
+                    </div>
+                  </div>
+                )}
                 {/* 메뉴 행 */}
                 <div style={{ ...styles.slotPopupFieldWrap, marginTop: 8, opacity: fieldDisabled ? 0.25 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -891,6 +968,34 @@ export default function TodayPage() {
           </div>
             </>
           })()}
+        </div>
+      </div>
+    )}
+
+    {/* 종료시간 캐러셀 팝업 (슬롯 팝업보다 위) */}
+    {slotEndPickerOpen && editingSlot && (
+      <div style={{ ...styles.overlay, zIndex: 400 }} onClick={() => setSlotEndPickerOpen(false)}>
+        <div style={styles.timeDialog} onClick={e => e.stopPropagation()}>
+          <div style={styles.timeDialogTitle}>종료 시간</div>
+          <div style={styles.timeCarouselRow}>
+            {(() => {
+              const endCt = getCarouselTime(draftData.end_time)
+              const update = (patch) => {
+                const next = { ...endCt, ...patch }
+                setDraftData(prev => ({ ...prev, end_time: carouselTimeToStr(next), duration_minutes: 0 }))
+              }
+              return (
+                <>
+                  <CarouselPicker items={CAROUSEL_AMPM} value={endCt.ampm} onChange={ampm => update({ ampm })} width={56} />
+                  <div style={{ width: 4 }} />
+                  <CarouselPicker items={CAROUSEL_HOURS} value={endCt.hour} onChange={hour => update({ hour })} width={56} />
+                  <span style={styles.timeColon}>:</span>
+                  <CarouselPicker items={CAROUSEL_MINUTES} value={endCt.minute} onChange={minute => update({ minute })} width={56} />
+                </>
+              )
+            })()}
+          </div>
+          <button style={styles.timeDoneBtn} onClick={() => setSlotEndPickerOpen(false)}>확인</button>
         </div>
       </div>
     )}
@@ -1370,6 +1475,9 @@ const styles = {
   slotPopupFieldLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
   slotPopupInput: { width: '100%', padding: '10px var(--spacing-sm)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none', color: 'var(--color-text)', boxSizing: 'border-box' },
   slotPopupDisabledBanner: { fontSize: 11, fontWeight: 600, color: '#9E9E9E', background: '#F5F5F5', border: '1px dashed #BDBDBD', borderRadius: 'var(--radius-sm)', padding: '6px 10px', textAlign: 'center' },
+  timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '4px 0' },
   timeCarouselSep: { width: 1, height: 40, background: 'var(--color-border)', flexShrink: 0, margin: '0 4px' },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)', lineHeight: 1, paddingBottom: 2 },

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, createPot, joinPot, setGroupShareSetting } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
+import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
@@ -59,9 +60,13 @@ export default function CreatePotPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [timeEnabled, setTimeEnabled] = useState(true)
   const [timePicker, setTimePicker] = useState(null) // null | 'start' | 'end'
   const [pickerSnapshot, setPickerSnapshot] = useState(null) // 팝업 열릴 때 원본 시간 저장
   useScrollLock(!!timePicker)
+  useEscKey(useCallback(() => {
+    if (timePicker) cancelTimePicker()
+  }, [timePicker]))
 
   const openTimePicker = (which) => {
     setPickerSnapshot({ meal_time: form.meal_time, end_time: form.end_time, duration_minutes: form.duration_minutes })
@@ -128,8 +133,8 @@ export default function CreatePotPage() {
         groupId: form.group_id,
         date: initialDate,
         slot: form.slot,
-        meal_time: form.meal_time,
-        end_time: form.end_time,
+        meal_time: timeEnabled ? form.meal_time : null,
+        end_time: timeEnabled ? form.end_time : null,
         title: form.title.trim() || `${form.slot} ${form.meal_time}`,
         menu: form.menu.trim(),
         memo: form.memo.trim(),
@@ -153,7 +158,8 @@ export default function CreatePotPage() {
   }
 
   const handleCreate = async () => {
-    if ((!form.title.trim() && !form.meal_time) || !form.group_id || loading) return
+    if (!form.title.trim() && !form.meal_time && timeEnabled) return
+    if (!form.group_id || loading) return
     await doCreate()
   }
 
@@ -203,8 +209,14 @@ export default function CreatePotPage() {
         </div>
 
         <div style={styles.field}>
-          <label style={styles.label}>시간</label>
-          <div style={styles.fieldContent}>
+          <div style={{ width: 68, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'flex-start', paddingTop: 12, gap: 4 }}>
+            <label style={{ ...styles.label, width: 'auto', paddingTop: 0 }}>시간</label>
+            <button
+              style={{ fontSize: 10, fontWeight: 700, background: timeEnabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: timeEnabled ? '#fff' : 'var(--color-text-muted)', border: `1px solid ${timeEnabled ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 99, padding: '2px 8px', cursor: 'pointer', lineHeight: 1.6 }}
+              onClick={() => setTimeEnabled(v => !v)}
+            >{timeEnabled ? 'ON' : 'OFF'}</button>
+          </div>
+          <div style={{ ...styles.fieldContent, opacity: timeEnabled ? 1 : 0.3, pointerEvents: timeEnabled ? 'auto' : 'none' }}>
             <div style={styles.timeRange}>
               <button type="button" style={styles.timeBtn} onClick={() => openTimePicker('start')}>{form.meal_time}</button>
               <span style={styles.timeSep}>~</span>
@@ -297,11 +309,14 @@ export default function CreatePotPage() {
 
       <div style={styles.footer}>
         <button
-          style={{ ...styles.createBtn, opacity: (form.title.trim() || form.meal_time) && !loading ? 1 : 0.4 }}
+          style={{ ...styles.createBtn, opacity: !loading ? 1 : 0.4 }}
           onClick={handleCreate}
           disabled={loading}
         >
           {loading ? '생성 중...' : '밥팟 열기 🍚'}
+        </button>
+        <button style={styles.cancelBtn} onClick={() => navigate(-1)} disabled={loading}>
+          취소
         </button>
       </div>
 
@@ -358,8 +373,8 @@ const styles = {
   timeCarouselSep: { width: 4 },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
   timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  durationRow: { display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 },
-  durationBtn: { padding: '5px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500 },
+  durationRow: { display: 'flex', gap: 4, flexWrap: 'nowrap', marginTop: 6 },
+  durationBtn: { flex: 1, padding: '5px 4px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 11, cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
   durationBtnActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)', fontWeight: 700 },
   slotRow: { display: 'flex', flexWrap: 'wrap', gap: 8 },
   slotBtn: { padding: '7px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)' },
@@ -371,8 +386,9 @@ const styles = {
   toggleBtn: { flex: 1, padding: 12, border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   toggleActive: { borderColor: 'var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
   publicNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginTop: 4 },
-  footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },
+  footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 8 },
   createBtn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', fontWeight: 500 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
