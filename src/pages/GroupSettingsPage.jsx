@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react'
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupDefaultPotConfigs, insertGroupDefaultPotConfig, updateGroupDefaultPotConfig, deleteGroupDefaultPotConfig } from '../lib/db'
+import { invalidateCache } from '../lib/cache'
+import { useScrollLock } from '../lib/useScrollLock'
 
 const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -42,6 +44,8 @@ export default function GroupSettingsPage() {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(null)
+
+  useScrollLock(!!confirmDelete)
 
   const editingConfigParam = searchParams.get('config')
   const editingSlotParam = searchParams.get('slot')
@@ -137,7 +141,8 @@ export default function GroupSettingsPage() {
       } else {
         await insertGroupDefaultPotConfig({ groupId, ...payload })
       }
-      // 추가/수정 완료 후 메인으로 복귀
+      // 추가/수정 완료 후 메인으로 복귀 (캐시 무효화로 즉시 반영)
+      invalidateCache(`board:${user.id}:`, { prefix: true })
       navigate('/today', { replace: true })
     } catch (e) {
       setError('저장에 실패했어요.')
@@ -151,6 +156,7 @@ export default function GroupSettingsPage() {
     setSaving(true)
     try {
       await deleteGroupDefaultPotConfig(id, toDateStr(new Date()))
+      invalidateCache(`board:${user.id}:`, { prefix: true })
       navigate('/today', { replace: true })
     } catch (e) { console.error(e) }
     finally { setSaving(false) }

@@ -74,6 +74,16 @@ body {
   flex-direction: column;
 }
 
+/* ===== 캐러셀 롤링 애니메이션 ===== */
+@keyframes carouselUp {
+  from { transform: translateY(60%); opacity: 0; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+@keyframes carouselDown {
+  from { transform: translateY(-60%); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
 /* ===== 공통 유틸 ===== */
 .page {
   flex: 1;

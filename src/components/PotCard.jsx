@@ -13,7 +13,7 @@ export default function PotCard({ pot }) {
   // DB 구조: pot_members: [{ user_id, users: { nickname } }]
   // mock 구조: members: ['user-id', ...]
   const participants = pot.pot_members
-    ? pot.pot_members.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?' }))
+    ? pot.pot_members.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?', is_guest: pm.users?.is_guest }))
     : (pot.members ?? []).map(id => ({ id, nickname: '?' }))
 
   const filled = participants.length
@@ -58,6 +58,7 @@ export default function PotCard({ pot }) {
             <div key={member.id} style={styles.memberChip}>
               <div style={{ ...styles.avatar, background: isCreator ? 'var(--color-primary)' : '#888' }}>
                 {member.nickname[0]}
+                {member.is_guest && <span style={styles.guestBadge}>G</span>}
               </div>
               <span style={styles.memberName}>
                 {member.nickname}{isCreator ? ' 👑' : ''}
@@ -95,7 +96,8 @@ const styles = {
   count: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
   members: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   memberChip: { display: 'flex', alignItems: 'center', gap: 4 },
-  avatar: { width: 22, height: 22, borderRadius: '50%', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 10, flexShrink: 0 },
+  avatar: { position: 'relative', width: 22, height: 22, borderRadius: '50%', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 10, flexShrink: 0 },
+  guestBadge: { position: 'absolute', top: -3, right: -3, width: 12, height: 12, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 7, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-surface)' },
   memberName: { fontSize: 11, color: 'var(--color-text-muted)' },
   emptySlot: { width: 22, height: 22, borderRadius: '50%', border: '1.5px dashed var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-border)' },
 }

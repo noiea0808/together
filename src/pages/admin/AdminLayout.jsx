@@ -13,6 +13,7 @@ const NAV_SECTIONS = [
   {
     title: '서비스 관리',
     items: [
+      { to: '/admin/terms',    label: '약관',     icon: '📜' },
       { to: '/admin/users',    label: '사용자',   icon: '👤', disabled: true },
       { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
       { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },

@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest } from '../lib/db'
+import { invalidateCache } from '../lib/cache'
+import { useScrollLock } from '../lib/useScrollLock'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -40,10 +42,79 @@ const iStyles = {
   editBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', flexShrink: 0 },
 }
 
+// 비로그인 방문자용 게이트: 계정 로그인 또는 임시 닉네임 게스트 참여
+function GuestGate({ potId, onJoined, navigate }) {
+  const [nickname, setNickname] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+
+  const handleGuestJoin = async () => {
+    if (!nickname.trim() || loading) return
+    setLoading(true); setError(null)
+    try {
+      const profile = await joinPotAsGuest(potId, nickname.trim())
+      onJoined(profile) // UserContext.login → 게스트로 재렌더
+    } catch (e) {
+      console.error(e)
+      setError('참여에 실패했어요. 잠시 후 다시 시도해주세요.')
+      setLoading(false)
+    }
+  }
+
+  const handleLogin = () => {
+    sessionStorage.setItem('returnTo', `/pot/${potId}`)
+    navigate('/onboarding')
+  }
+
+  return (
+    <div style={gateStyles.page}>
+      <div style={gateStyles.logo}>🍚</div>
+      <h1 style={gateStyles.title}>밥팟에 초대받으셨어요!</h1>
+      <p style={gateStyles.sub}>닉네임만 입력하면 바로 참여할 수 있어요.</p>
+
+      <div style={gateStyles.card}>
+        <input
+          style={gateStyles.input}
+          placeholder="사용할 닉네임 (예: 김철수)"
+          value={nickname}
+          onChange={e => setNickname(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && handleGuestJoin()}
+          maxLength={8}
+          autoFocus
+          disabled={loading}
+        />
+        {error && <p style={gateStyles.error}>{error}</p>}
+        <button
+          style={{ ...gateStyles.guestBtn, opacity: nickname.trim() && !loading ? 1 : 0.4 }}
+          onClick={handleGuestJoin}
+          disabled={!nickname.trim() || loading}
+        >
+          {loading ? '참여 중...' : '게스트로 참여하기 🙋'}
+        </button>
+        <button style={gateStyles.loginLink} onClick={handleLogin} disabled={loading}>
+          이미 계정이 있어요 · 로그인
+        </button>
+      </div>
+    </div>
+  )
+}
+
+const gateStyles = {
+  page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 'var(--spacing-lg)', gap: 8, textAlign: 'center' },
+  logo: { fontSize: 52, marginBottom: 8 },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
+  sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', margin: '4px 0 16px' },
+  card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)' },
+  input: { width: '100%', padding: '13px var(--spacing-md)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', margin: 0 },
+  guestBtn: { width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  loginLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
+}
+
 export default function PotDetailPage() {
   const navigate = useNavigate()
   const { id } = useParams()
-  const { user } = useUser()
+  const { user, login } = useUser()
 
   const [pot, setPot] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -53,6 +124,14 @@ export default function PotDetailPage() {
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [draft, setDraft] = useState(null) // 편집 중인 값
+
+  // 팝업 열려 있는 동안 배경 스크롤 잠금
+  useScrollLock(!!(confirmDelete || conflict))
+
+  // 내 행동을 오늘 화면에 즉시 반영하기 위해 board 캐시 무효화
+  const invalidateBoard = () => {
+    if (user) invalidateCache(`board:${user.id}:`, { prefix: true })
+  }
 
   const loadPot = async () => {
     try {
@@ -72,7 +151,7 @@ export default function PotDetailPage() {
     return () => window.removeEventListener('popstate', onPop)
   }, [id])
 
-  const participants = pot?.pot_members?.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?' })) ?? []
+  const participants = pot?.pot_members?.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?', is_guest: pm.users?.is_guest })) ?? []
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
   const isMaster = !pot?.is_default && pot?.created_by === user?.id
@@ -114,6 +193,7 @@ export default function PotDetailPage() {
         max_people: draft.max_people,
         is_public: draft.is_public,
       }, pot.is_default ? user.id : null)
+      invalidateBoard()
       await loadPot()
     } catch (e) { console.error(e) }
     finally { setActionLoading(false) }
@@ -130,6 +210,7 @@ export default function PotDetailPage() {
     await joinPot(pot.id, user.id)
     // 비공유 상태였다면 해당 일자/슬롯만 공유로 전환
     await setGroupShareSetting(user.id, pot.group_id, pot.date, pot.slot, true).catch(e => console.warn('share setting:', e))
+    invalidateBoard()
     await loadPot()
     setActionLoading(false)
   }
@@ -150,6 +231,7 @@ export default function PotDetailPage() {
     setActionLoading(true)
     try {
       await deletePot(pot.id)
+      invalidateBoard()
       navigate(-1)
     } catch (e) { console.error(e) }
     finally { setActionLoading(false) }
@@ -165,6 +247,7 @@ export default function PotDetailPage() {
           const others = participants.filter(m => m.id !== user.id)
           if (others.length === 0) {
             await deletePot(pot.id)
+            invalidateBoard()
             navigate(-1); return
           } else {
             const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
@@ -172,6 +255,7 @@ export default function PotDetailPage() {
           }
         }
         await leavePotWithCleanup(pot.id, user.id)
+        invalidateBoard()
         // 비기본팟이고 내가 마지막 멤버였으면 팟이 삭제됨 → 뒤로 이동
         if (!pot.is_default && participants.length <= 1) {
           navigate(-1); return
@@ -189,6 +273,9 @@ export default function PotDetailPage() {
 
   const potLink = `${window.location.origin}/pot/${pot?.id}`
   const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
+
+  // 비로그인 방문자: 게스트 게이트 표시 (계정 로그인 / 게스트 참여 선택)
+  if (!user) return <GuestGate potId={id} onJoined={login} navigate={navigate} />
 
   if (loading) return <div style={styles.loadingPage}>🍚</div>
   if (!pot) return <div style={styles.loadingPage}>밥팟을 찾을 수 없어요.</div>
@@ -312,6 +399,7 @@ export default function PotDetailPage() {
                 <div key={i} style={styles.dotWrapper}>
                   <div style={{ ...styles.dot, background: member ? (isMe ? 'var(--color-primary)' : '#555') : 'var(--color-border)' }}>
                     {member ? member.nickname[0] : ''}
+                    {member?.is_guest && <span style={styles.guestBadge}>G</span>}
                   </div>
                   <div style={styles.dotName}>{member?.nickname ?? '　'}</div>
                 </div>
@@ -334,7 +422,7 @@ export default function PotDetailPage() {
           </button>
         )}
 
-        {!isPotExpired && (
+        {!isPotExpired && !user?.is_guest && (
           <button style={styles.shareBtn} onClick={() => setShowShare(v => !v)}>
             📣 {showShare ? '닫기' : '모집하기'}
           </button>
@@ -450,7 +538,8 @@ const styles = {
   dotsLabel: { fontWeight: 700, marginBottom: 'var(--spacing-sm)' },
   dots: { display: 'flex', gap: 'var(--spacing-md)', flexWrap: 'wrap' },
   dotWrapper: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
-  dot: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-sm)' },
+  dot: { position: 'relative', width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-sm)' },
+  guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)' },
   dotName: { fontSize: 10, color: 'var(--color-text-muted)' },
   btn: { width: '100%', padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
   shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer' },

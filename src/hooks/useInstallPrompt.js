@@ -4,18 +4,19 @@ export function useInstallPrompt() {
   const [installPrompt, setInstallPrompt] = useState(null)
   const [isInstalled, setIsInstalled] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
+  const [isAndroid, setIsAndroid] = useState(false)
 
   useEffect(() => {
-    // iOS 감지
-    const ios = /iphone|ipad|ipod/i.test(navigator.userAgent)
+    const ua = navigator.userAgent
+    const ios = /iphone|ipad|ipod/i.test(ua)
+    const android = /android/i.test(ua)
     setIsIOS(ios)
+    setIsAndroid(android)
 
-    // 이미 설치됐는지 확인
     const installed = window.matchMedia('(display-mode: standalone)').matches
       || window.navigator.standalone === true
     setIsInstalled(installed)
 
-    // Android/Chrome 설치 프롬프트 캐치
     const handler = (e) => {
       e.preventDefault()
       setInstallPrompt(e)
@@ -32,8 +33,8 @@ export function useInstallPrompt() {
     return outcome === 'accepted'
   }
 
-  // 설치 가능 여부 (Android Chrome: installPrompt 있어야 함)
-  const canInstall = !isInstalled && (isIOS || !!installPrompt)
+  const isPC = !isIOS && !isAndroid
+  const canInstall = !isInstalled && (isIOS || isAndroid || isPC)
 
-  return { installPrompt, triggerInstall, isInstalled, isIOS, canInstall }
+  return { installPrompt, triggerInstall, isInstalled, isIOS, isAndroid, isPC, canInstall }
 }

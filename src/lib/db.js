@@ -1,14 +1,16 @@
 import { supabase } from './supabase'
 
 // ── Auth ──────────────────────────────────────────
-export async function signUp(email, password, nickname) {
+export async function signUp(email, password) {
   const { data, error } = await supabase.auth.signUp({ email, password })
   if (error) throw error
 
   const authUser = data.user
+  // 최소 프로필만 생성하고, 닉네임·생년월일·약관동의는 /welcome 단계에서 채운다.
+  const placeholder = email.split('@')[0]
   const { data: profile, error: profileError } = await supabase
     .from('users')
-    .insert({ auth_id: authUser.id, email, nickname })
+    .upsert({ auth_id: authUser.id, email, nickname: placeholder, onboarded: false }, { onConflict: 'auth_id' })
     .select()
     .single()
   if (profileError) throw profileError
@@ -32,6 +34,27 @@ export async function signOut() {
   await supabase.auth.signOut()
 }
 
+// 회원 탈퇴: delete-account Edge Function 을 호출해
+// 앱 데이터 + auth.users 레코드를 완전히 삭제한 뒤 세션을 종료한다.
+// (auth 계정 삭제는 service_role 권한이 필요하므로 서버에서 처리)
+export async function deleteAccount() {
+  const { data, error } = await supabase.functions.invoke('delete-account', { method: 'POST' })
+  if (error) throw error
+  if (data?.error) throw new Error(data.error)
+  await supabase.auth.signOut()
+}
+
+export async function signInWithGoogle() {
+  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
+  const returnTo = sessionStorage.getItem('returnTo') || '/today'
+  sessionStorage.removeItem('returnTo')
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo: window.location.origin + returnTo },
+  })
+  if (error) throw error
+}
+
 export async function getSessionUser() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return null
@@ -41,8 +64,109 @@ export async function getSessionUser() {
     .select('*')
     .eq('auth_id', session.user.id)
     .single()
+
+  // 첫 로그인(구글/이메일): users 테이블에 프로필이 없으면 최소 프로필 자동 생성.
+  // 닉네임·생년월일·약관동의는 onboarded=false 상태로 두고 /welcome 단계에서 채운다.
+  if (error && error.code === 'PGRST116') {
+    const authUser = session.user
+    // 익명(게스트) 세션이면 온보딩 게이트를 우회하도록 is_guest=true, onboarded=true 로 생성.
+    // 닉네임·guest_pot_id 는 joinPotAsGuest 에서 다시 채운다.
+    if (authUser.is_anonymous) {
+      const { data: guestProfile, error: gErr } = await supabase
+        .from('users')
+        .upsert({ auth_id: authUser.id, nickname: '게스트', is_guest: true, onboarded: true }, { onConflict: 'auth_id' })
+        .select()
+        .single()
+      if (gErr) return null
+      return guestProfile
+    }
+    const nickname = authUser.user_metadata?.full_name?.split(' ')[0]
+      ?? authUser.email?.split('@')[0]
+      ?? '사용자'
+    const { data: newProfile, error: insertError } = await supabase
+      .from('users')
+      .upsert({ auth_id: authUser.id, email: authUser.email, nickname, onboarded: false }, { onConflict: 'auth_id' })
+      .select()
+      .single()
+    if (insertError) return null
+    return newProfile
+  }
+
   if (error) return null
   return data
+}
+
+// 온보딩 완료: 닉네임·생년월일·라이프스타일 저장 + 약관 동의 기록 + onboarded 처리
+export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTermIds = []) {
+  const { data: profile, error } = await supabase
+    .from('users')
+    .update({
+      nickname: nickname.trim(),
+      birthdate: birthdate || null,
+      lifestyle: lifestyle || null,
+      onboarded: true,
+    })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+
+  if (agreedTermIds.length > 0) {
+    const rows = agreedTermIds.map(term_id => ({ user_id: userId, term_id }))
+    const { error: agreeError } = await supabase
+      .from('user_term_agreements')
+      .upsert(rows, { onConflict: 'user_id,term_id' })
+    if (agreeError) throw agreeError
+  }
+  return profile
+}
+
+// ── 약관 ──────────────────────────────────────────
+// 온보딩에 노출할 활성 약관 (정렬 순)
+export async function getActiveTerms() {
+  const { data, error } = await supabase
+    .from('terms')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+// 어드민: 전체 약관 조회
+export async function getAllTerms() {
+  const { data, error } = await supabase
+    .from('terms')
+    .select('*')
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function createTerm(term) {
+  const { data, error } = await supabase
+    .from('terms')
+    .insert(term)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateTerm(id, patch) {
+  const { data, error } = await supabase
+    .from('terms')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteTerm(id) {
+  const { error } = await supabase.from('terms').delete().eq('id', id)
+  if (error) throw error
 }
 
 // ── 유저 ──────────────────────────────────────────
@@ -283,7 +407,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('group_share_settings')
       .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
-      .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
+      .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
       .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
@@ -377,7 +501,7 @@ export async function generatePotInviteCode(potId) {
 export async function getPotByInviteCode(code) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
     .eq('invite_code', code.toUpperCase().trim())
     .single()
   if (error) return null
@@ -387,7 +511,7 @@ export async function getPotByInviteCode(code) {
 export async function getGroupPots(groupId, date) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
     .eq('group_id', groupId)
     .eq('date', date)
   if (error) throw error
@@ -397,11 +521,11 @@ export async function getGroupPots(groupId, date) {
 export async function getPot(potId) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname)), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest)), modifier:users!last_modified_by(nickname)')
     .eq('id', potId)
-    .single()
+    .maybeSingle()
   if (error) throw error
-  return data
+  return data // 삭제됐으면 null
 }
 
 export async function joinPot(potId, userId) {
@@ -409,6 +533,58 @@ export async function joinPot(potId, userId) {
     .from('pot_members')
     .upsert({ pot_id: potId, user_id: userId })
   if (error) throw error
+}
+
+// 게스트로 밥팟 참여: 익명 세션 발급 → 게스트 프로필 생성 → 참여. 게스트 프로필 반환.
+export async function joinPotAsGuest(potId, nickname) {
+  const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
+  if (authError) throw authError
+  const authId = authData.user.id
+
+  const { data: profile, error: profileError } = await supabase
+    .from('users')
+    .upsert(
+      { auth_id: authId, nickname: nickname.trim() || '게스트', is_guest: true, guest_pot_id: potId, onboarded: true },
+      { onConflict: 'auth_id' },
+    )
+    .select()
+    .single()
+  if (profileError) throw profileError
+
+  await joinPot(potId, profile.id)
+  return profile
+}
+
+// 게스트 홈: 참여한 밥팟 + 그룹명 + 같은 그룹·날짜의 본인 참여 팟 목록.
+// 구성원/타인 상태는 노출하지 않는다.
+export async function getGuestHome(potId) {
+  const { data: pot, error } = await supabase
+    .from('meal_pots')
+    .select('*, groups(name), pot_members(user_id, users(nickname, is_guest))')
+    .eq('id', potId)
+    .maybeSingle()
+  if (error) throw error
+  if (!pot) return null
+
+  // 같은 그룹·날짜에서 내가 참여한 모든 팟
+  const { data: { session } } = await supabase.auth.getSession()
+  const { data: me } = await supabase
+    .from('users').select('id').eq('auth_id', session.user.id).single()
+
+  const { data: myParts } = await supabase
+    .from('pot_members')
+    .select('meal_pots!inner(*, pot_members(user_id, users(nickname, is_guest)))')
+    .eq('user_id', me.id)
+    .eq('meal_pots.group_id', pot.group_id)
+    .eq('meal_pots.date', pot.date)
+
+  const myPots = (myParts ?? []).map(r => r.meal_pots)
+  return {
+    groupName: pot.groups?.name ?? '',
+    date: pot.date,
+    slot: pot.slot,
+    pots: myPots.length > 0 ? myPots : [pot],
+  }
 }
 
 export async function leavePot(potId, userId) {
