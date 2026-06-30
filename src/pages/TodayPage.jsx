@@ -57,7 +57,9 @@ export default function TodayPage() {
     return TODAY
   })()
   const [currentDate, setCurrentDate] = useState(initialDate)
-  const [selectedSlot, setSelectedSlot] = useState('점심')
+  const [selectedSlot, setSelectedSlot] = useState(
+    () => localStorage.getItem('lastSelectedSlot') || '점심'
+  )
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
   const [allCollapsed, setAllCollapsed] = useState(false)
@@ -507,7 +509,7 @@ export default function TodayPage() {
                 {/* 헤더: 탭하면 그룹현황만 전환 */}
                 <div
                   style={styles.slotName}
-                  onClick={() => { if (!isPastDate) setSelectedSlot(slot) }}
+                  onClick={() => { if (!isPastDate) { setSelectedSlot(slot); localStorage.setItem('lastSelectedSlot', slot) } }}
                 >
                   {slot}
                 </div>
@@ -517,6 +519,7 @@ export default function TodayPage() {
                   style={{ ...styles.slotBody, cursor: 'pointer' }}
                   onClick={() => {
                     setSelectedSlot(slot)
+                    localStorage.setItem('lastSelectedSlot', slot)
                     openSlotEditor(slot)
                   }}
                 >
@@ -836,6 +839,8 @@ export default function TodayPage() {
               const next = { ...ct, ...patch }
               setDraftData(prev => ({ ...prev, time: carouselTimeToStr(next) }))
             }
+            const timeOn = !!draftData.time
+            const carouselDisabled = fieldDisabled || !timeOn
             return (
               <div style={styles.slotPopupFields}>
                 {fieldDisabled && (
@@ -843,27 +848,38 @@ export default function TodayPage() {
                     {!draftData.status ? '상태를 먼저 선택하세요' : '패스는 시간/메뉴를 입력할 수 없어요'}
                   </div>
                 )}
-                <div style={{ ...styles.slotPopupFieldWrap, opacity: fieldDisabled ? 0.25 : 1, pointerEvents: fieldDisabled ? 'none' : 'auto' }}>
-                  <div style={styles.slotPopupFieldLabel}>시간</div>
-                  <div style={styles.timeCarouselRow}>
-                    <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => updateCarousel({ ampm })} disabled={fieldDisabled} width={52} />
+                {/* 시간 행 */}
+                <div style={{ ...styles.slotPopupFieldWrap }}>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={styles.slotPopupFieldLabel}>시간</div>
+                    <button
+                      style={{ fontSize: 10, fontWeight: 700, background: timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: timeOn && !fieldDisabled ? '#fff' : 'var(--color-text-muted)', border: `1px solid ${timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 99, padding: '1px 8px', cursor: fieldDisabled ? 'not-allowed' : 'pointer', lineHeight: 1.6, opacity: fieldDisabled ? 0.4 : 1 }}
+                      disabled={fieldDisabled}
+                      onClick={() => setDraftData(prev => prev.time ? { ...prev, time: undefined } : { ...prev, time: carouselTimeToStr(getCarouselTime(null)) })}
+                    >{timeOn ? 'ON' : 'OFF'}</button>
+                  </div>
+                  <div style={{ ...styles.timeCarouselRow, opacity: carouselDisabled ? 0.25 : 1, pointerEvents: carouselDisabled ? 'none' : 'auto' }}>
+                    <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => updateCarousel({ ampm })} disabled={carouselDisabled} width={52} />
                     <div style={styles.timeCarouselSep} />
-                    <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => updateCarousel({ hour })} disabled={fieldDisabled} width={52} />
+                    <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => updateCarousel({ hour })} disabled={carouselDisabled} width={52} />
                     <span style={styles.timeColon}>:</span>
-                    <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => updateCarousel({ minute })} disabled={fieldDisabled} width={52} />
+                    <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => updateCarousel({ minute })} disabled={carouselDisabled} width={52} />
                   </div>
                 </div>
+                {/* 메뉴 행 */}
                 <div style={{ ...styles.slotPopupFieldWrap, marginTop: 8, opacity: fieldDisabled ? 0.25 : 1 }}>
-                  <div style={styles.slotPopupFieldLabel}>메뉴</div>
-                  <input
-                    style={{ ...styles.slotPopupInput, background: fieldDisabled ? '#F0F0F0' : 'var(--color-surface)', cursor: fieldDisabled ? 'not-allowed' : 'auto' }}
-                    placeholder="메뉴를 입력하세요"
-                    value={draftData.menu ?? ''}
-                    onChange={e => setDraftData(prev => ({ ...prev, menu: e.target.value }))}
-                    onKeyDown={e => { if (e.key === 'Enter') saveSlotEditor() }}
-                    maxLength={20}
-                    disabled={fieldDisabled}
-                  />
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ ...styles.slotPopupFieldLabel, flexShrink: 0 }}>메뉴</div>
+                    <input
+                      style={{ ...styles.slotPopupInput, flex: 1, background: fieldDisabled ? '#F0F0F0' : 'var(--color-surface)', cursor: fieldDisabled ? 'not-allowed' : 'auto' }}
+                      placeholder="메뉴를 입력하세요"
+                      value={draftData.menu ?? ''}
+                      onChange={e => setDraftData(prev => ({ ...prev, menu: e.target.value }))}
+                      onKeyDown={e => { if (e.key === 'Enter') saveSlotEditor() }}
+                      maxLength={20}
+                      disabled={fieldDisabled}
+                    />
+                  </div>
                 </div>
               </div>
             )

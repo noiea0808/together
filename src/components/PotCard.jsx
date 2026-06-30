@@ -10,65 +10,63 @@ function isPotExpired(pot) {
 export default function PotCard({ pot }) {
   const navigate = useNavigate()
 
-  // DB 구조: pot_members: [{ user_id, users: { nickname } }]
-  // mock 구조: members: ['user-id', ...]
   const participants = pot.pot_members
-    ? pot.pot_members.map(pm => ({ id: pm.user_id, nickname: pm.users?.nickname ?? '?', is_guest: pm.users?.is_guest }))
+    ? pot.pot_members.map(pm => {
+        const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
+        return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
+      })
     : (pot.members ?? []).map(id => ({ id, nickname: '?' }))
 
   const filled = participants.length
   const isFull = filled >= pot.max_people
-  const creatorNickname = pot.is_default ? null : (pot.users?.nickname ?? null)
   const expired = isPotExpired(pot)
+  const timeStr = typeof pot.meal_time === 'string' ? pot.meal_time.slice(0, 5) : pot.meal_time
+  const endStr = pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''
 
   return (
     <div
       style={{
+        position: 'relative',
         ...styles.card,
         ...(pot.is_default ? styles.defaultCard : {}),
         ...(expired ? (pot.is_default ? styles.expiredDefaultCard : styles.expiredNormalCard) : {}),
       }}
       onClick={() => navigate(`/pot/${pot.id}`)}
     >
-      <div style={styles.top}>
+      {/* 기본팟 배지 — 우상단 고정 */}
+      {pot.is_default && <span style={styles.defaultBadge}>기본팟</span>}
+
+      {/* 1줄: 시간, 공개 여부 */}
+      <div style={styles.row1}>
         <span style={{ ...styles.time, color: expired
           ? (pot.is_default ? '#A5C8A5' : '#E0A98F')
           : (pot.is_default ? '#4CAF50' : 'var(--color-primary)') }}>
-          {typeof pot.meal_time === 'string' ? pot.meal_time.slice(0, 5) : pot.meal_time}
-          {pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''}
+          {timeStr}{endStr}
         </span>
-        <span style={styles.title}>{pot.title}</span>
-        {pot.is_default && <span style={styles.defaultTag}>기본팟</span>}
-        {pot.is_default && pot.modifier?.nickname && (
-          <span style={styles.modifierTag}>✎ {pot.modifier.nickname}</span>
-        )}
         {pot.is_public && <span style={styles.publicTag}>공개</span>}
-        <span style={{ ...styles.menu, color: pot.menu ? 'var(--color-text)' : 'var(--color-text-muted)' }}>
-          {pot.menu || '미정'}
-        </span>
-        <span style={{ ...styles.count, color: isFull ? '#4CAF50' : 'var(--color-text-muted)', marginLeft: 'auto' }}>
-          {filled}/{pot.max_people}명
-        </span>
       </div>
 
-      <div style={styles.members}>
-        {participants.map((member, i) => {
-          const isCreator = !pot.is_default && i === 0
-          return (
-            <div key={member.id} style={styles.memberChip}>
-              <div style={{ ...styles.avatar, background: isCreator ? 'var(--color-primary)' : '#888' }}>
-                {member.nickname[0]}
-                {member.is_guest && <span style={styles.guestBadge}>G</span>}
-              </div>
-              <span style={styles.memberName}>
-                {member.nickname}{isCreator ? ' 👑' : ''}
-              </span>
-            </div>
-          )
-        })}
-        {Array.from({ length: pot.max_people - filled }).map((_, i) => (
-          <div key={`empty-${i}`} style={styles.emptySlot}>+</div>
-        ))}
+      {/* 2줄: 밥팟 제목, 메뉴 */}
+      <div style={styles.row2}>
+        <span style={styles.title}>{pot.title}</span>
+        {pot.menu && <span style={styles.menu}>{pot.menu}</span>}
+      </div>
+
+      {/* 3줄: 참여자 태그, 참여자수/인원제한 */}
+      <div style={styles.row3}>
+        <div style={styles.tags}>
+          {participants.map(m => (
+            <span key={m.id} style={styles.tag}>
+              {m.nickname}{m.is_guest ? <span style={styles.guestMark}>G</span> : null}
+            </span>
+          ))}
+          {Array.from({ length: pot.max_people - filled }).map((_, i) => (
+            <span key={`empty-${i}`} style={styles.emptyTag}>+</span>
+          ))}
+        </div>
+        <span style={{ ...styles.count, color: isFull ? '#4CAF50' : 'var(--color-text-muted)', flexShrink: 0 }}>
+          {filled}/{pot.max_people}명
+        </span>
       </div>
     </div>
   )
@@ -79,25 +77,22 @@ const styles = {
     background: 'var(--color-surface)', border: '1px solid var(--color-border)',
     borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)',
     cursor: 'pointer', boxShadow: 'var(--shadow-sm)',
-    display: 'flex', flexDirection: 'column', gap: 8,
+    display: 'flex', flexDirection: 'column', gap: 5,
   },
   defaultCard: { background: '#F1F8F1', border: '1px solid #C8E6C9', boxShadow: 'none' },
-  // 경과 일반팟 — 주황 톤 유지하며 흐리게
   expiredNormalCard: { background: '#FBF6F3', border: '1px solid #ECDDD4', boxShadow: 'none', opacity: 0.6 },
-  // 경과 기본팟 — 초록 톤 유지하며 흐리게
   expiredDefaultCard: { background: '#EDF4ED', border: '1px solid #D5E5D5', boxShadow: 'none', opacity: 0.6 },
-  top: { display: 'flex', alignItems: 'center', gap: 6 },
+  row1: { display: 'flex', alignItems: 'center', gap: 6 },
+  row2: { display: 'flex', alignItems: 'center', gap: 6 },
+  row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   time: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  title: { fontSize: 13, fontWeight: 700, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  defaultTag: { fontSize: 10, background: '#E8F5E9', borderRadius: 4, padding: '1px 6px', color: '#4CAF50', flexShrink: 0, fontWeight: 600 },
-  modifierTag: { fontSize: 10, background: '#F5F5F5', borderRadius: 4, padding: '1px 6px', color: '#9E9E9E', flexShrink: 0 },
+  defaultBadge: { position: 'absolute', top: 8, right: 10, fontSize: 10, background: '#E8F5E9', borderRadius: 4, padding: '2px 7px', color: '#4CAF50', fontWeight: 700 },
   publicTag: { fontSize: 10, background: '#eee', borderRadius: 4, padding: '1px 6px', color: 'var(--color-text-muted)', flexShrink: 0 },
-  menu: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
+  title: { fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  menu: { fontSize: 12, color: 'var(--color-text-muted)', flexShrink: 0 },
+  tags: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, flex: 1, minWidth: 0 },
+  tag: { fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 99, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
+  emptyTag: { fontSize: 11, color: 'var(--color-border)', background: 'transparent', border: '1px dashed var(--color-border)', borderRadius: 99, padding: '2px 8px' },
+  guestMark: { fontSize: 9, color: '#FF9800', fontWeight: 800, marginLeft: 1 },
   count: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
-  members: { display: 'flex', gap: 6, flexWrap: 'wrap' },
-  memberChip: { display: 'flex', alignItems: 'center', gap: 4 },
-  avatar: { position: 'relative', width: 22, height: 22, borderRadius: '50%', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 10, flexShrink: 0 },
-  guestBadge: { position: 'absolute', top: -3, right: -3, width: 12, height: 12, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 7, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1.5px solid var(--color-surface)' },
-  memberName: { fontSize: 11, color: 'var(--color-text-muted)' },
-  emptySlot: { width: 22, height: 22, borderRadius: '50%', border: '1.5px dashed var(--color-border)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, color: 'var(--color-border)' },
 }
