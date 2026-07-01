@@ -308,10 +308,10 @@ export default function CreatePotPage() {
               <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
               <button style={{ ...S.groupBtn, ...(form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
             </div>
-            {form.is_public && <p style={{ fontSize: 11, color: '#A89E94', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
           </div>
 
-          {error && <p style={{ color: '#f44336', fontSize: 13, margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: '#f44336', fontSize: 'var(--font-size-sm)', margin: 0 }}>{error}</p>}
 
           <button
             style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1, marginTop: 6 }}
@@ -360,22 +360,22 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
     lineHeight: 1,
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 15, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
+  headerTitle: { flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
 
   body: { flex: 1, overflowY: 'auto', paddingBottom: 32 },
   hero: { padding: '22px 16px 16px' },
-  heroTitle: { fontSize: 22, fontWeight: 900, color: '#1A1A1A', lineHeight: 1.35, letterSpacing: '-0.6px', marginBottom: 5, whiteSpace: 'pre-line' },
-  heroSub: { fontSize: 12, color: '#A89E94' },
+  heroTitle: { fontSize: 'var(--font-size-xl)', fontWeight: 900, color: '#1A1A1A', lineHeight: 1.35, letterSpacing: '-0.6px', marginBottom: 5, whiteSpace: 'pre-line' },
+  heroSub: { fontSize: 'var(--font-size-sm)', color: '#A89E94' },
 
   sections: { padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 },
   section: { background: 'white', border: '1.5px solid #EDE8E3', borderRadius: 16, padding: 14 },
-  sectionLabel: { fontSize: 10, fontWeight: 800, color: '#FF6B35', marginBottom: 9, letterSpacing: '0.4px', textTransform: 'uppercase' },
+  sectionLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FF6B35', marginBottom: 9, letterSpacing: '0.4px', textTransform: 'uppercase' },
   optLabel: { color: '#C8BEB4', fontWeight: 500, textTransform: 'none', letterSpacing: 0 },
 
   groupRow: { display: 'flex', gap: 7 },
   groupBtn: {
     flex: 1, padding: '9px 6px', background: '#FAF8F5', border: '1.5px solid #EDE8E3',
-    borderRadius: 11, fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
+    borderRadius: 11, fontSize: 'var(--font-size-sm)', color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
     letterSpacing: '-0.2px',
   },
   groupBtnActive: { background: '#FFF4EF', border: '2px solid #FF6B35', fontWeight: 800, color: '#FF6B35' },
@@ -383,26 +383,26 @@ const S = {
   chipRow: { display: 'flex', gap: 6, flexWrap: 'wrap' },
   chip: {
     padding: '7px 13px', background: '#FAF8F5', border: '1.5px solid #EDE8E3',
-    borderRadius: 99, fontSize: 12, color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
+    borderRadius: 99, fontSize: 'var(--font-size-sm)', color: '#6B7280', cursor: 'pointer', fontFamily: 'inherit',
   },
   chipActive: { background: '#FFF4EF', border: '2px solid #FF6B35', fontWeight: 800, color: '#FF6B35' },
 
   sectionInput: {
     width: '100%', padding: '10px 12px', border: '1.5px solid #EDE8E3', borderRadius: 11,
-    fontSize: 13, outline: 'none', fontFamily: 'inherit', background: '#FAF8F5',
+    fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: '#FAF8F5',
     color: '#1A1A1A', boxSizing: 'border-box',
   },
 
   submitBtn: {
     width: '100%', padding: 15, background: '#FF6B35', color: 'white', border: 'none',
-    borderRadius: 16, fontSize: 15, fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
+    borderRadius: 16, fontSize: 'var(--font-size-base)', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
     letterSpacing: '-0.3px',
   },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '24px' },
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
-  timeDialogTitle: { fontWeight: 800, fontSize: 16 },
+  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
   timeColon: { fontSize: 20, fontWeight: 800, color: '#A89E94' },
-  timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
+  timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
 }

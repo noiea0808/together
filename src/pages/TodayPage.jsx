@@ -491,7 +491,9 @@ export default function TodayPage() {
     <div style={styles.page}>
       {/* 날짜 네비 — sticky 고정 */}
       <div style={styles.dateNav}>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>←</button>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>
+          <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
@@ -499,7 +501,9 @@ export default function TodayPage() {
             <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>→</button>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>
+          <svg width="9" height="15" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7.5 7.5L1.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+        </button>
       </div>
 
       {/* 나의 상태 슬롯 그리드 */}
@@ -523,6 +527,8 @@ export default function TodayPage() {
             const potCount = myPotsInSlot.length
             const earliestPot = myPotsInSlot[0]
             const isInPot = potCount > 0
+            const hasDefaultPot = Object.values(potsMap).flat()
+              .some(p => p.slot === slot && p.is_default)
             const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
             const displayOpt = lockedOpt ?? opt
 
@@ -537,48 +543,84 @@ export default function TodayPage() {
                   background: cardBg,
                   border: `${isSelected && !isPastDate ? 2 : 1.5}px solid ${cardBorder}`,
                   borderRadius: 14,
-                  padding: '11px 9px',
-                  minHeight: 80,
-                  cursor: 'pointer',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: 3,
+                  overflow: 'hidden',
                   opacity: isPastDate ? 0.65 : 1,
                   WebkitTapHighlightColor: 'transparent',
                   transition: 'border-color 0.15s',
-                }}
-                onClick={() => {
-                  setSelectedSlot(slot)
-                  localStorage.setItem('lastSelectedSlot', slot)
-                  openSlotEditor(slot)
+                  display: 'flex',
+                  flexDirection: 'column',
                 }}
               >
-                <span style={{ fontSize: 10, color: '#A89E94', fontWeight: 600, letterSpacing: '-0.1px' }}>{slot}</span>
-                {isInPot ? (
-                  <>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: '#FF6B35', marginTop: 1 }}>{lockedOpt.label}</span>
-                    <span style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
-                      {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
-                    </span>
-                    {earliestPot.title && (
-                      <span style={{ fontSize: 10, color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
-                    )}
-                  </>
-                ) : displayOpt ? (
-                  <>
-                    <span style={{ fontSize: 11, fontWeight: 800, color: displayOpt.color, marginTop: 1 }}>{displayOpt.label}</span>
-                    {data?.time && (
-                      <span style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
-                        {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
+                {/* 제목부: 탭하면 현황만 보기 (편집 없음) */}
+                <div
+                  style={{
+                    padding: '8px 9px 7px',
+                    borderBottom: `1px solid ${cardStatusOpt ? (cardStatusOpt.border ?? 'var(--color-border)') : 'var(--color-border)'}`,
+                    background: 'rgba(0,0,0,0.03)',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                  }}
+                  onClick={() => {
+                    setSelectedSlot(slot)
+                    localStorage.setItem('lastSelectedSlot', slot)
+                  }}
+                >
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', fontWeight: 700, letterSpacing: '-0.1px' }}>
+                    {({ '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' })[slot]} {slot}
+                  </span>
+                  {hasDefaultPot && (
+                    <span style={{ fontSize: 9, fontWeight: 800, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 4, padding: '1px 4px', lineHeight: 1.4 }}>기본</span>
+                  )}
+                </div>
+
+                {/* 설정부: 탭하면 현황 보기 + 편집 가능 */}
+                <div
+                  style={{
+                    flex: 1,
+                    minHeight: 62,
+                    padding: '8px 9px 9px',
+                    cursor: isPastDate ? 'default' : 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: 3,
+                  }}
+                  onClick={() => {
+                    if (isPastDate) return
+                    setSelectedSlot(slot)
+                    localStorage.setItem('lastSelectedSlot', slot)
+                    openSlotEditor(slot)
+                  }}
+                >
+                  {isInPot ? (
+                    <>
+                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FF6B35' }}>{lockedOpt.label}</span>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94' }}>
+                        {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
                       </span>
-                    )}
-                    {data?.menu && (
-                      <span style={{ fontSize: 10, color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
-                    )}
-                  </>
-                ) : (
-                  <span style={{ fontSize: 10, color: '#C8BEB4', marginTop: 'auto', letterSpacing: '-0.1px' }}>탭해서 설정</span>
-                )}
+                      {earliestPot.title && (
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
+                      )}
+                    </>
+                  ) : displayOpt ? (
+                    <>
+                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: displayOpt.color }}>{displayOpt.label}</span>
+                      {data?.time && (
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94' }}>
+                          {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
+                        </span>
+                      )}
+                      {data?.menu && (
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
+                      )}
+                    </>
+                  ) : (
+                    <span style={{ fontSize: 'var(--font-size-xs)', color: '#C8BEB4', letterSpacing: '-0.1px' }}>
+                      {isPastDate ? '' : '탭해서 설정'}
+                    </span>
+                  )}
+                </div>
               </div>
             )
           })}
@@ -994,7 +1036,7 @@ export default function TodayPage() {
                       <div style={styles.slotPopupFieldLabel}>종료시간</div>
                       <button
                         type="button"
-                        style={{ fontSize: 13, fontWeight: 600, background: 'var(--color-surface)', color: dur > 0 ? 'var(--color-primary)' : 'var(--color-text)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px', cursor: 'pointer' }}
+                        style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, background: 'var(--color-surface)', color: dur > 0 ? 'var(--color-primary)' : 'var(--color-text)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px', cursor: 'pointer' }}
                         onClick={() => setSlotEndPickerOpen(v => !v)}
                       >
                         {draftData.end_time || '--:--'}
@@ -1293,7 +1335,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
           ) : (
             <button
               style={{
-                fontSize: 10, fontWeight: 700,
+                fontSize: 'var(--font-size-2xs)', fontWeight: 700,
                 color: isShared ? '#FF6B35' : '#B0A89E',
                 background: isShared ? '#FFF4EF' : '#F5F0EB',
                 border: `1px solid ${isShared ? '#FFD6C0' : '#E8E3DE'}`,
@@ -1403,7 +1445,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 {showMemberManage && (
                   <div style={styles.sheetInlineExpand}>
                     {members.filter(m => m.id !== myUserId).length === 0 && (
-                      <div style={{ fontSize: 12, color: 'var(--color-text-muted)', padding: '4px 0' }}>다른 멤버가 없어요</div>
+                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', padding: '4px 0' }}>다른 멤버가 없어요</div>
                     )}
                     {members.filter(m => m.id !== myUserId).map(member => (
                       <div key={member.id} style={styles.sheetMemberRow}>
@@ -1508,7 +1550,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   key={tab.key}
                   onClick={() => setStatusFilter(isActive ? null : tab.key)}
                   style={{
-                    fontSize: 11, fontWeight: 700,
+                    fontSize: 'var(--font-size-2xs)', fontWeight: 700,
                     color: isActive ? tab.color : '#A89E94',
                     background: isActive ? (tab.bg ?? tab.color + '18') : '#F5F0EB',
                     border: `1px solid ${isActive ? (tab.border ?? tab.color + '44') : '#E8E3DE'}`,
@@ -1538,21 +1580,21 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   width: 30, height: 30, borderRadius: '50%',
                   background: isMe ? 'var(--color-primary)' : '#A89E94',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'white', fontSize: 12, fontWeight: 800, flexShrink: 0,
+                  color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                 }}>{member.nickname[0]}</div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px' }}>
+                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px' }}>
                     {member.nickname}{isMe ? ' (나)' : ''}
                   </span>
                   {(data?.meal_time || data?.menu) && (
-                    <div style={{ fontSize: 10, color: '#A89E94', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {data.meal_time?.slice(0, 5)}{data.meal_time && data.menu ? ' · ' : ''}{data.menu}
                     </div>
                   )}
                 </div>
                 {opt && !statusFilter && (
                   <span style={{
-                    fontSize: 11, fontWeight: 700,
+                    fontSize: 'var(--font-size-2xs)', fontWeight: 700,
                     color: opt.color,
                     background: opt.bg ?? opt.color + '18',
                     border: `1px solid ${opt.border ?? opt.color + '44'}`,
@@ -1572,11 +1614,11 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   style={{
                     width: '100%', padding: '7px 0', background: 'none', border: 'none',
                     cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    color: '#B0A89E', fontSize: 11, fontFamily: 'inherit',
+                    color: '#B0A89E', fontSize: 'var(--font-size-xs)', fontFamily: 'inherit',
                   }}
                 >
                   <span>미설정 {unsetMembers.length}명</span>
-                  <span style={{ fontSize: 10 }}>{showUnset ? '▴' : '▾'}</span>
+                  <span style={{ fontSize: 'var(--font-size-xs)' }}>{showUnset ? '▴' : '▾'}</span>
                 </button>
               ) : null}
               {(statusFilter === 'unset' || showUnset) && unsetMembers.map(member => (
@@ -1589,9 +1631,9 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     width: 28, height: 28, borderRadius: '50%',
                     background: member.id === myUserId ? 'var(--color-primary)' : '#C0B8B0',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontSize: 11, fontWeight: 800, flexShrink: 0,
+                    color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                   }}>{member.nickname[0]}</div>
-                  <span style={{ flex: 1, fontSize: 12, color: '#6B7280', letterSpacing: '-0.2px' }}>
+                  <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', color: '#6B7280', letterSpacing: '-0.2px' }}>
                     {member.nickname}{member.id === myUserId ? ' (나)' : ''}
                   </span>
                 </div>
@@ -1614,8 +1656,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             >
               <span style={{ fontSize: 16 }}>🍚</span>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 12, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</div>
-                <div style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
+                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</div>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', marginTop: 1 }}>
                   {pot.meal_time?.slice(0, 5)} · {pot.pot_members?.length ?? 0}/{pot.max_people}명
                 </div>
               </div>
@@ -1631,7 +1673,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             width: '100%', padding: 9, marginTop: 9,
             background: 'transparent', border: '1.5px dashed #FFB899',
             borderRadius: 11, color: '#FF6B35',
-            fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
+            fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}
           onClick={() => onCreatePot(group.id, slot)}
         >+ 밥팟 만들기</button>
@@ -1646,31 +1688,31 @@ const styles = {
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
   emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid #EDE8E3', background: 'rgba(250,248,245,0.95)', backdropFilter: 'blur(8px)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
-  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#EDE8E3', color: '#6B7280', fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' },
+  dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'rgba(250,248,245,0.96)', backdropFilter: 'blur(8px)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
+  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: '#A89E94', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.10)', flexShrink: 0 },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
-  todayBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
-  myCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
-  myCardTitle: { fontWeight: 900, fontSize: 15, letterSpacing: '-0.4px' },
-  resetAllBtn: { fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' },
-  slotResetBtn: { marginLeft: 3, fontSize: 9, color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
+  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+  myCard: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
+  myCardTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
+  resetAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' },
+  slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  slotMeta: { fontSize: 13, color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' },
-  slotEmpty: { fontSize: 12, color: 'var(--color-text-muted)', fontWeight: 600 },
+  slotMeta: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' },
+  slotEmpty: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
   slotPopup: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   slotPopupTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   slotPopupStatusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  slotPopupStatusBtn: { padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 13, cursor: 'pointer', transition: 'all 0.12s', textAlign: 'center' },
+  slotPopupStatusBtn: { padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s', textAlign: 'center' },
   slotPopupFields: { display: 'flex', flexDirection: 'column', gap: 4 },
   slotPopupFieldWrap: { display: 'flex', flexDirection: 'column', gap: 4, transition: 'opacity 0.15s' },
-  slotPopupFieldLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
-  slotPopupInput: { width: '100%', padding: '10px var(--spacing-sm)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none', color: 'var(--color-text)', boxSizing: 'border-box' },
-  slotPopupDisabledBanner: { fontSize: 11, fontWeight: 600, color: '#9E9E9E', background: '#F5F5F5', border: '1px dashed #BDBDBD', borderRadius: 'var(--radius-sm)', padding: '6px 10px', textAlign: 'center' },
+  slotPopupFieldLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  slotPopupInput: { width: '100%', padding: '10px var(--spacing-sm)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', color: 'var(--color-text)', boxSizing: 'border-box' },
+  slotPopupDisabledBanner: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#9E9E9E', background: '#F5F5F5', border: '1px dashed #BDBDBD', borderRadius: 'var(--radius-sm)', padding: '6px 10px', textAlign: 'center' },
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
@@ -1680,11 +1722,11 @@ const styles = {
   potInfoBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#E8F5E9', borderRadius: 'var(--radius-md)', border: '1.5px solid #A5D6A7' },
   potInfoCard: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
   potInfoRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  potInfoLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
-  potInfoValue: { fontSize: 13, fontWeight: 600, color: 'var(--color-text)' },
+  potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
+  potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
   slotPopupBtns: { display: 'flex', gap: 8 },
-  slotPopupSave: { flex: 1, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 14, fontWeight: 700, cursor: 'pointer' },
-  slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
+  slotPopupSave: { flex: 1, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
@@ -1694,30 +1736,30 @@ const styles = {
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: 'var(--radius-md)', transition: 'border-color 0.15s', overflow: 'hidden' },
-  slotName: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer' },
-  sectionTitle: { fontWeight: 900, fontSize: 15, letterSpacing: '-0.4px' },
+  slotName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer' },
+  sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
   groupCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 14, marginBottom: 10, transition: 'opacity 0.2s' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
-  groupName: { fontWeight: 800, fontSize: 13, letterSpacing: '-0.3px' },
-  inviteBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  groupName: { fontWeight: 800, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.3px' },
+  inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
   groupSettingsBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '0 2px' },
   groupCollapseBtn: { background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px', color: 'var(--color-text-muted)' },
-  collapseAllBtn: { fontSize: 12, fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
+  collapseAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
   orderRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
   orderHandle: { fontSize: 16, color: 'var(--color-text-muted)', flexShrink: 0 },
   orderName: { flex: 1, fontWeight: 700, fontSize: 'var(--font-size-base)' },
   orderBtns: { display: 'flex', gap: 4, flexShrink: 0 },
   orderBtn: { width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   toggleWrap: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
-  toggleLocked: { fontSize: 11, fontWeight: 700, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
+  toggleLocked: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
   toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
-  toggleLabel: { fontSize: 10, fontWeight: 700, whiteSpace: 'nowrap' },
+  toggleLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap' },
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4 },
   sheetTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
-  sheetMaster: { fontSize: 12, color: 'var(--color-text-muted)', textAlign: 'center' },
+  sheetMaster: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' },
   sheetLeaveIcon: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 2px', opacity: 0.5, flexShrink: 0 },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '4px 0 8px' },
   sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
@@ -1725,38 +1767,38 @@ const styles = {
   sheetRowChevron: { fontSize: 10, color: 'var(--color-text-muted)' },
   sheetInlineExpand: { padding: '0 var(--spacing-sm) 10px 36px', display: 'flex', flexDirection: 'column', gap: 6 },
   sheetInlineInputRow: { display: 'flex', gap: 6, alignItems: 'center' },
-  sheetInlineInput: { flex: 1, padding: '9px 12px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 14, outline: 'none', minWidth: 0 },
-  sheetInlineSave: { flexShrink: 0, padding: '9px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 13, cursor: 'pointer' },
-  sheetInlineCancel: { flexShrink: 0, padding: '9px 12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 13, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  sheetClose: { width: '100%', padding: 12, marginTop: 8, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 14, fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  sheetNicknameBadge: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
+  sheetInlineInput: { flex: 1, padding: '9px 12px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', minWidth: 0 },
+  sheetInlineSave: { flexShrink: 0, padding: '9px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  sheetInlineCancel: { flexShrink: 0, padding: '9px 12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--color-text-muted)' },
+  sheetClose: { width: '100%', padding: 12, marginTop: 8, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
+  sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
   sheetMemberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' },
-  sheetMemberName: { flex: 1, fontSize: 14, fontWeight: 600 },
-  sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid #FFCDD2', borderRadius: 'var(--radius-full)', fontSize: 12, fontWeight: 600, color: '#f44336', cursor: 'pointer' },
-  sheetResetNicknameBtn: { padding: '6px 0', background: 'none', border: 'none', fontSize: 12, color: '#9E9E9E', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' },
-  sheetInviteLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
+  sheetMemberName: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
+  sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid #FFCDD2', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: '#f44336', cursor: 'pointer' },
+  sheetResetNicknameBtn: { padding: '6px 0', background: 'none', border: 'none', fontSize: 'var(--font-size-sm)', color: '#9E9E9E', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' },
+  sheetInviteLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   sheetInviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' },
-  sheetInviteCode: { flex: 1, fontSize: 14, fontWeight: 700, letterSpacing: 1, wordBreak: 'break-all' },
-  sheetInviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  sheetInviteCode: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 700, letterSpacing: 1, wordBreak: 'break-all' },
+  sheetInviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
   invitePanel: { margin: '0 var(--spacing-md) var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 },
-  inviteLabel: { fontSize: 11, fontWeight: 700, color: 'var(--color-text-muted)' },
+  inviteLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   inviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', border: '1px solid var(--color-border)' },
-  inviteCode: { flex: 1, fontSize: 16, fontWeight: 800, letterSpacing: 2, color: 'var(--color-text)', wordBreak: 'break-all' },
-  inviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 11, fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
+  inviteCode: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 800, letterSpacing: 2, color: 'var(--color-text)', wordBreak: 'break-all' },
+  inviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
   activityDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' },
   memberList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   memberRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  avatar: { width: 28, height: 28, borderRadius: '50%', color: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 11 },
-  memberName: { fontSize: 13, fontWeight: 600, flexShrink: 0 },
+  avatar: { width: 28, height: 28, borderRadius: '50%', color: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
+  memberName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, flexShrink: 0 },
   memberInfo: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 4, overflow: 'hidden' },
-  memberMeta: { fontSize: 11, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-  metaDot: { fontSize: 11, color: 'var(--color-border)' },
-  memberStatus: { fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap' },
-  memberStatusEmpty: { fontSize: 11, color: 'var(--color-text-muted)' },
+  memberMeta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  metaDot: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-border)' },
+  memberStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap' },
+  memberStatusEmpty: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   potsArea: { padding: '10px var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 8 },
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
-  createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   bottomBtnRow: { display: 'flex', gap: 8 },
-  addGroupBtn: { flex: 1, padding: 14, background: 'var(--color-surface-2)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
-  joinPotBtn: { flex: 1, padding: 14, background: 'rgba(255,107,53,0.07)', border: '1.5px dashed var(--color-primary)', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  addGroupBtn: { flex: 1, padding: 14, background: 'var(--color-surface-2)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
+  joinPotBtn: { flex: 1, padding: 14, background: 'rgba(255,107,53,0.07)', border: '1.5px dashed var(--color-primary)', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }

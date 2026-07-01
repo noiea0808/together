@@ -94,7 +94,7 @@ const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
   header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-xl)' },
+  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
 
   summary: { display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)' },
@@ -111,5 +111,5 @@ const styles = {
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4 },
   friendName: { fontSize: 'var(--font-size-base)', fontWeight: 700 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
-  groupTag: { fontSize: 11, background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
+  groupTag: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
 }
