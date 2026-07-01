@@ -11,15 +11,16 @@ import GroupSetupModal from '../components/GroupSetupModal'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
 
 const SLOT_TIME_PRESETS = {
   '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
   '오전간식': ['09:30', '10:00', '10:30', '11:00'],
-  '점심':    ['11:30', '12:00', '12:30', '13:00'],
+  '점심':    ['11:00', '11:30', '12:00', '12:30', '13:00'],
   '오후간식': ['14:00', '14:30', '15:00', '15:30'],
-  '저녁':    ['17:30', '18:00', '18:30', '19:00', '19:30'],
+  '저녁':    ['17:00', '17:30', '18:00', '18:30', '19:00'],
   '야식':    ['21:00', '21:30', '22:00', '23:00'],
 }
 
@@ -74,6 +75,7 @@ export default function TodayPage() {
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
   const [slotEndPickerOpen, setSlotEndPickerOpen] = useState(false)
+  const [slotStartPickerOpen, setSlotStartPickerOpen] = useState(false)
   const [allCollapsed, setAllCollapsed] = useState(false)
   const [collapseKey, setCollapseKey] = useState(0) // 강제 리렌더용
 
@@ -110,6 +112,7 @@ export default function TodayPage() {
   useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot || showGroupSetup))
   useEscKey(useCallback(() => {
     if (slotEndPickerOpen) { setSlotEndPickerOpen(false); return }
+    if (slotStartPickerOpen) { setSlotStartPickerOpen(false); return }
     if (editingSlot) { setEditingSlot(null); return }
     if (showJoinPot) { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError(''); return }
     if (showGroupSetup) { setShowGroupSetup(false); return }
@@ -117,7 +120,7 @@ export default function TodayPage() {
     if (shareTogglePending) { setShareTogglePending(null); return }
     if (createConflict) { setCreateConflict(null); return }
     if (showResetConfirm) { setShowResetConfirm(false); return }
-  }, [slotEndPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
+  }, [slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -531,8 +534,6 @@ export default function TodayPage() {
             const potCount = myPotsInSlot.length
             const earliestPot = myPotsInSlot[0]
             const isInPot = potCount > 0
-            const hasDefaultPot = Object.values(potsMap).flat()
-              .some(p => p.slot === slot && p.is_default)
             const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
             const displayOpt = lockedOpt ?? opt
 
@@ -574,9 +575,6 @@ export default function TodayPage() {
                   <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', fontWeight: 700, letterSpacing: '-0.1px' }}>
                     {({ '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' })[slot]} {slot}
                   </span>
-                  {hasDefaultPot && (
-                    <span style={{ fontSize: 9, fontWeight: 800, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 4, padding: '1px 4px', lineHeight: 1.4 }}>기본</span>
-                  )}
                 </div>
 
                 {/* 설정부: 탭하면 현황 보기 + 편집 가능 */}
@@ -897,24 +895,14 @@ export default function TodayPage() {
                   color: draftData.status === o.key ? o.color : 'var(--color-text)',
                   fontWeight: draftData.status === o.key ? 700 : 400,
                 }}
-                onClick={() => setDraftData(prev => {
-                  const needsTimeInit = o.key !== 'skip' && !prev.time
-                  const newTime = needsTimeInit ? carouselTimeToStr(getCarouselTime(null)) : prev.time
-                  const dur = prev.duration_minutes ?? 60
-                  return {
-                    ...prev,
-                    status: o.key,
-                    time: newTime,
-                    end_time: (needsTimeInit && o.key !== 'skip') ? addSlotMinutes(newTime, dur) : prev.end_time,
-                  }
-                })}
+                onClick={() => setDraftData(prev => ({ ...prev, status: o.key }))}
               >
                 {o.emoji} {o.label}
               </button>
             ))}
           </div>
 
-          {/* 시간 / 메뉴 */}
+          {/* 시간 / 메모 */}
           {(() => {
             const fieldDisabled = !draftData.status || draftData.status === 'skip'
             const showEndTime = !fieldDisabled && (draftData.status === 'open' || draftData.status === 'closed')
@@ -945,7 +933,7 @@ export default function TodayPage() {
               <div style={styles.slotPopupFields}>
                 {fieldDisabled && (
                   <div style={styles.slotPopupDisabledBanner}>
-                    {!draftData.status ? '상태를 먼저 선택하세요' : '패스는 시간/메뉴를 입력할 수 없어요'}
+                    {!draftData.status ? '상태를 먼저 선택하세요' : '패스는 시간/메모를 입력할 수 없어요'}
                   </div>
                 )}
                 {/* 시간 행 — 프리셋 버튼 */}
@@ -977,42 +965,28 @@ export default function TodayPage() {
                         >{t}</button>
                       )
                     })}
-                    {/* 직접 입력 */}
+                    {/* 직접 설정 */}
                     {(() => {
                       const isCustom = timeOn && !fieldDisabled && !(SLOT_TIME_PRESETS[editingSlot] ?? []).some(t => draftData.time?.startsWith(t))
                       return (
-                        <label style={{
-                          padding: '6px 11px',
-                          border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                          borderRadius: 99,
-                          background: isCustom ? 'rgba(255,107,53,0.09)' : 'transparent',
-                          color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                          fontSize: 12,
-                          fontWeight: isCustom ? 700 : 500,
-                          cursor: fieldDisabled ? 'not-allowed' : 'pointer',
-                          opacity: fieldDisabled ? 0.3 : 1,
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: 4,
-                          position: 'relative',
-                        }}>
-                          {isCustom && draftData.time ? draftData.time.slice(0, 5) : '직접 입력'}
-                          <input
-                            type="time"
-                            disabled={fieldDisabled}
-                            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: fieldDisabled ? 'not-allowed' : 'pointer', width: '100%' }}
-                            value={draftData.time?.slice(0, 5) ?? ''}
-                            onChange={e => {
-                              const val = e.target.value
-                              if (!val) return
-                              setDraftData(prev => ({
-                                ...prev,
-                                time: val + ':00',
-                                end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(val + ':00', prev.duration_minutes) : prev.end_time,
-                              }))
-                            }}
-                          />
-                        </label>
+                        <button
+                          type="button"
+                          disabled={fieldDisabled}
+                          style={{
+                            padding: '6px 11px',
+                            border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            borderRadius: 99,
+                            background: isCustom ? 'rgba(255,107,53,0.09)' : 'transparent',
+                            color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                            fontSize: 12,
+                            fontWeight: isCustom ? 700 : 500,
+                            cursor: fieldDisabled ? 'not-allowed' : 'pointer',
+                            opacity: fieldDisabled ? 0.3 : 1,
+                          }}
+                          onClick={() => !fieldDisabled && setSlotStartPickerOpen(true)}
+                        >
+                          {isCustom && draftData.time ? draftData.time.slice(0, 5) : '직접 설정'}
+                        </button>
                       )
                     })()}
                     {/* 시간 없음 버튼 */}
@@ -1062,13 +1036,13 @@ export default function TodayPage() {
                     </div>
                   </div>
                 )}
-                {/* 메뉴 행 */}
+                {/* 메모 행 */}
                 <div style={{ ...styles.slotPopupFieldWrap, marginTop: 8, opacity: fieldDisabled ? 0.25 : 1 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <div style={{ ...styles.slotPopupFieldLabel, flexShrink: 0 }}>메뉴</div>
+                    <div style={{ ...styles.slotPopupFieldLabel, flexShrink: 0 }}>메모</div>
                     <input
                       style={{ ...styles.slotPopupInput, flex: 1, background: fieldDisabled ? '#F0F0F0' : 'var(--color-surface)', cursor: fieldDisabled ? 'not-allowed' : 'auto' }}
-                      placeholder="메뉴를 입력하세요"
+                      placeholder="메모를 입력하세요"
                       value={draftData.menu ?? ''}
                       onChange={e => setDraftData(prev => ({ ...prev, menu: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') saveSlotEditor() }}
@@ -1087,6 +1061,39 @@ export default function TodayPage() {
           </div>
             </>
           })()}
+        </div>
+      </div>
+    )}
+
+    {/* 시작시간 캐러셀 팝업 (슬롯 팝업보다 위) */}
+    {slotStartPickerOpen && editingSlot && (
+      <div style={{ ...styles.overlay, zIndex: 400 }} onClick={() => setSlotStartPickerOpen(false)}>
+        <div style={styles.timeDialog} onClick={e => e.stopPropagation()}>
+          <div style={styles.timeDialogTitle}>시작 시간</div>
+          <div style={styles.timeCarouselRow}>
+            {(() => {
+              const ct = getCarouselTime(draftData.time)
+              const update = (patch) => {
+                const next = { ...ct, ...patch }
+                const newTime = carouselTimeToStr(next)
+                setDraftData(prev => ({
+                  ...prev,
+                  time: newTime,
+                  end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(newTime, prev.duration_minutes) : prev.end_time,
+                }))
+              }
+              return (
+                <>
+                  <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => update({ ampm })} width={56} />
+                  <div style={{ width: 4 }} />
+                  <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => update({ hour })} width={56} />
+                  <span style={styles.timeColon}>:</span>
+                  <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => update({ minute })} width={56} />
+                </>
+              )
+            })()}
+          </div>
+          <button style={styles.timeDoneBtn} onClick={() => setSlotStartPickerOpen(false)}>확인</button>
         </div>
       </div>
     )}
@@ -1604,7 +1611,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                 }}>{member.nickname[0]}</div>
-                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
+                <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
                   {member.nickname}{isMe ? ' (나)' : ''}
                 </span>
                 <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -1659,7 +1666,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 {/* 2행: 시간, 메뉴 */}
                 <div style={potListStyles.row2}>
                   {timeStr && (
-                    <span style={{ ...potListStyles.time, color: pot.is_default ? '#2E9E4F' : 'var(--color-primary)' }}>
+                    <span style={{ ...potListStyles.time, color: pot.is_default ? '#2E9E4F' : '#1E88E5' }}>
                       🕒 {timeStr}{endStr}
                     </span>
                   )}
@@ -1692,8 +1699,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         <button
           style={{
             width: '100%', padding: 10, marginTop: 9,
-            background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', border: 'none',
-            borderRadius: 11, color: '#fff', boxShadow: '0 2px 8px rgba(255,107,53,0.28)',
+            background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)',
+            borderRadius: 'var(--radius-full)', color: 'var(--color-primary)',
             fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}
           onClick={() => onCreatePot(group.id, slot)}
@@ -1705,11 +1712,11 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
 const potListStyles = {
   normalCard: {
-    background: 'linear-gradient(135deg, #FFF6F1, #FFEFE6)',
-    border: '1.5px solid #FFD6C0', borderRadius: 13,
+    background: 'linear-gradient(135deg, #F2F8FF, #E8F2FE)',
+    border: '1.5px solid #BBDEFB', borderRadius: 13,
     padding: '10px 12px', cursor: 'pointer',
     display: 'flex', flexDirection: 'column', gap: 4,
-    boxShadow: '0 2px 8px rgba(255,107,53,0.10)',
+    boxShadow: '0 2px 8px rgba(30,136,229,0.10)',
   },
   defaultCard: {
     background: 'linear-gradient(135deg, #F2FAF3, #E9F6EA)',
@@ -1729,7 +1736,7 @@ const potListStyles = {
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 1 },
   tags: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, flex: 1, minWidth: 0 },
   tag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
-  tagNormal: { color: '#E05520', background: '#fff', border: '1px solid #FFD6C0' },
+  tagNormal: { color: '#1565C0', background: '#fff', border: '1px solid #BBDEFB' },
   tagDefault: { color: '#2E9E4F', background: '#fff', border: '1px solid #A5D6A7' },
   emptyTag: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6', background: 'transparent', border: '1px dashed #D8D0C8', borderRadius: 99, padding: '2px 8px' },
   guestMark: { fontSize: 9, color: '#FF9800', fontWeight: 800, marginLeft: 1 },
@@ -1779,7 +1786,7 @@ const styles = {
   potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
   potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
   slotPopupBtns: { display: 'flex', gap: 8 },
-  slotPopupSave: { flex: 1, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
