@@ -308,7 +308,7 @@ export default function CreatePotPage() {
               <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
               <button style={{ ...S.groupBtn, ...(form.is_public ? S.groupBtnActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
             </div>
-            {form.is_public && <p style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
           </div>
 
           {error && <p style={{ color: '#f44336', fontSize: 'var(--font-size-sm)', margin: 0 }}>{error}</p>}
@@ -365,12 +365,12 @@ const S = {
   body: { flex: 1, overflowY: 'auto', paddingBottom: 32 },
   hero: { padding: '22px 16px 16px' },
   heroTitle: { fontSize: 'var(--font-size-xl)', fontWeight: 900, color: '#1A1A1A', lineHeight: 1.35, letterSpacing: '-0.6px', marginBottom: 5, whiteSpace: 'pre-line' },
-  heroSub: { fontSize: 'var(--font-size-sm)', color: '#A89E94' },
+  heroSub: { fontSize: 'var(--font-size-sm)', color: '#857B72' },
 
   sections: { padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 10, paddingBottom: 16 },
   section: { background: 'white', border: '1.5px solid #EDE8E3', borderRadius: 16, padding: 14 },
   sectionLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FF6B35', marginBottom: 9, letterSpacing: '0.4px', textTransform: 'uppercase' },
-  optLabel: { color: '#C8BEB4', fontWeight: 500, textTransform: 'none', letterSpacing: 0 },
+  optLabel: { color: '#ADA59B', fontWeight: 500, textTransform: 'none', letterSpacing: 0 },
 
   groupRow: { display: 'flex', gap: 7 },
   groupBtn: {
@@ -394,15 +394,15 @@ const S = {
   },
 
   submitBtn: {
-    width: '100%', padding: 15, background: '#FF6B35', color: 'white', border: 'none',
+    width: '100%', padding: 15, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: 'white', border: 'none',
     borderRadius: 16, fontSize: 'var(--font-size-base)', fontWeight: 900, cursor: 'pointer', fontFamily: 'inherit',
-    letterSpacing: '-0.3px',
+    letterSpacing: '-0.3px', boxShadow: '0 4px 14px rgba(255,107,53,0.32)',
   },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: '24px' },
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: '#A89E94' },
+  timeColon: { fontSize: 20, fontWeight: 800, color: '#857B72' },
   timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
 }

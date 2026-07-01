@@ -16,13 +16,13 @@
   --color-surface-2: #F5F0EB;
 
   --color-text: #1A1A1A;
-  --color-text-muted: #A89E94;
+  --color-text-muted: #857B72;
   --color-border: #EDE8E3;
 
-  --color-status-lunch: #4CAF50;
-  --color-status-dinner: #2196F3;
-  --color-status-coffee: #FF9800;
-  --color-status-pass: #BDBDBD;
+  --color-status-lunch: #3DBB5C;
+  --color-status-dinner: #1E88E5;
+  --color-status-coffee: #FB8C00;
+  --color-status-pass: #A8A29B;
 
   --radius-sm: 8px;
   --radius-md: 12px;

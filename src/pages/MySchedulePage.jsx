@@ -90,7 +90,7 @@ export default function MySchedulePage() {
           const isWeekend = dow === 0 || dow === 6
           const showMonth = idx === 0 || date.getDate() === 1
 
-          const dayColor = isToday ? '#FF6B35' : isWeekend ? '#E53935' : isPast ? '#A89E94' : '#1A1A1A'
+          const dayColor = isToday ? '#FF6B35' : isWeekend ? '#E53935' : isPast ? '#857B72' : '#1A1A1A'
           const cardBg = isToday ? '#FFF4EF' : '#FFFFFF'
           const cardBorder = isToday ? '#FFD6C0' : '#EDE8E3'
 
@@ -181,7 +181,7 @@ const S = {
   list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 
-  monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#A89E94', padding: '12px 4px 6px', letterSpacing: '0.3px' },
+  monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#857B72', padding: '12px 4px 6px', letterSpacing: '0.3px' },
   card: { borderRadius: 15, padding: '12px 14px', marginBottom: 7, cursor: 'pointer' },
   row: { display: 'flex', alignItems: 'center', gap: 10 },
 
@@ -191,16 +191,16 @@ const S = {
 
   chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', minWidth: 0 },
   chip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap' },
-  noStatus: { fontSize: 'var(--font-size-2xs)', color: '#D1C8C0' },
+  noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
   todayBadge: { background: '#FF6B35', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', flexShrink: 0 },
-  expIcon: { color: '#C8BEB4', fontSize: 'var(--font-size-2xs)', flexShrink: 0 },
+  expIcon: { color: '#ADA59B', fontSize: 'var(--font-size-2xs)', flexShrink: 0 },
 
   expanded: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #EDE8E3' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 5 },
   slotCell: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px' },
-  slotName: { fontSize: 'var(--font-size-2xs)', color: '#A89E94', minWidth: 44 },
+  slotName: { fontSize: 'var(--font-size-2xs)', color: '#857B72', minWidth: 44 },
   slotBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 7px' },
-  slotDash: { fontSize: 'var(--font-size-2xs)', color: '#DDD5CC' },
+  slotDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
   goRow: { display: 'flex', justifyContent: 'flex-end', paddingTop: 8 },
   goBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#FF6B35', background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
 }

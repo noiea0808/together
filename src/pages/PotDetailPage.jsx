@@ -44,7 +44,7 @@ function durationOf(start, end) {
 
 const iStyles = {
   row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid #EDE8E3' },
-  label: { fontSize: 12, fontWeight: 700, color: '#A89E94', width: 52, flexShrink: 0 },
+  label: { fontSize: 12, fontWeight: 700, color: '#857B72', width: 52, flexShrink: 0 },
   valueWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   value: { fontSize: 16, fontWeight: 600 },
 }
@@ -108,12 +108,12 @@ const gateStyles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, textAlign: 'center' },
   logo: { fontSize: 52, marginBottom: 8 },
   title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
-  sub: { color: '#A89E94', fontSize: 'var(--font-size-base)', margin: '4px 0 16px' },
+  sub: { color: '#857B72', fontSize: 'var(--font-size-base)', margin: '4px 0 16px' },
   card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: '#fff', border: '1.5px solid #EDE8E3', borderRadius: 20, padding: 24 },
   input: { width: '100%', padding: '13px 16px', border: '1.5px solid #EDE8E3', borderRadius: 12, fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
   error: { fontSize: 'var(--font-size-sm)', color: '#f44336', margin: 0 },
-  guestBtn: { width: '100%', padding: 14, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
-  loginLink: { background: 'none', border: 'none', color: '#A89E94', fontSize: 'var(--font-size-base)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
+  guestBtn: { width: '100%', padding: 14, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 99, fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.32)' },
+  loginLink: { background: 'none', border: 'none', color: '#857B72', fontSize: 'var(--font-size-base)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
 }
 
 export default function PotDetailPage() {
@@ -379,7 +379,7 @@ export default function PotDetailPage() {
               <span style={S.slotTag}>{pot.slot}</span>
               {isMaster ? (
                 <button
-                  style={{ ...S.publicToggle, background: pot.is_public ? '#E3F2FD' : '#F5F0EB', color: pot.is_public ? '#2563EB' : '#A89E94', borderColor: pot.is_public ? '#2563EB' : '#EDE8E3' }}
+                  style={{ ...S.publicToggle, background: pot.is_public ? '#E3F2FD' : '#F5F0EB', color: pot.is_public ? '#2563EB' : '#857B72', borderColor: pot.is_public ? '#2563EB' : '#EDE8E3' }}
                   onClick={togglePublic}
                 >
                   {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
@@ -427,7 +427,7 @@ export default function PotDetailPage() {
                         <button type="button" style={S.inlineTimeBtn} onClick={() => openDetailTimePicker('start')}>
                           {draft.meal_time || '--:--'}
                         </button>
-                        <span style={{ fontSize: 13, color: '#A89E94', flexShrink: 0 }}>~</span>
+                        <span style={{ fontSize: 13, color: '#857B72', flexShrink: 0 }}>~</span>
                         <button type="button" style={{ ...S.inlineTimeBtn, color: draft.duration_minutes > 0 ? '#FF6B35' : '#1A1A1A' }} onClick={() => openDetailTimePicker('end')}>
                           {draft.end_time || '--:--'}
                         </button>
@@ -520,7 +520,7 @@ export default function PotDetailPage() {
                     <div style={{
                       ...S.memberCircle,
                       background: member ? (isMe ? '#FF6B35' : avBg(member.nickname)) : '#F5F0EB',
-                      border: member ? 'none' : '2px dashed #DDD5CC',
+                      border: member ? 'none' : '2px dashed #C7BFB6',
                     }}>
                       {member ? member.nickname[0] : ''}
                       {member?.is_guest && <span style={S.guestBadge}>G</span>}
@@ -693,8 +693,8 @@ const S = {
     lineHeight: 1,
   },
   headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
-  headerSub: { fontSize: 'var(--font-size-xs)', color: '#A89E94' },
-  headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: '#A89E94', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
+  headerSub: { fontSize: 'var(--font-size-xs)', color: '#857B72' },
+  headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: '#857B72', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
   headerEditPill: { fontSize: 'var(--font-size-xs)', color: '#FF6B35', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 99, padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' },
 
   body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingBottom: 80 },
@@ -703,8 +703,8 @@ const S = {
   heroCard: { background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
   defaultTag: { fontSize: 'var(--font-size-xs)', background: '#E8F5E9', borderRadius: 6, padding: '2px 8px', color: '#4CAF50', fontWeight: 700 },
-  slotTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#A89E94' },
-  publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#A89E94' },
+  slotTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#857B72' },
+  publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#857B72' },
   publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 99, padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: { width: 48, height: 48, background: '#FF6B35', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 },
@@ -712,7 +712,7 @@ const S = {
   heroSlot: { fontSize: 'var(--font-size-xs)', color: '#FF6B35', fontWeight: 700, marginTop: 2 },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
   infoPanel: { background: 'rgba(255,255,255,0.7)', borderRadius: 12, padding: '10px 12px' },
-  infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: '#A89E94', marginBottom: 3, fontWeight: 600 },
+  infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: '#857B72', marginBottom: 3, fontWeight: 600 },
   infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
 
   /* Edit card */
@@ -721,36 +721,36 @@ const S = {
   fields: { display: 'flex', flexDirection: 'column' },
   inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid #FF6B35', borderRadius: 10, fontSize: 'var(--font-size-base)', outline: 'none' },
   inlineTimeBtn: { flex: 1, padding: '6px 10px', border: '1.5px solid #FF6B35', borderRadius: 10, fontSize: 'var(--font-size-base)', fontWeight: 600, background: '#fff', color: '#1A1A1A', cursor: 'pointer', textAlign: 'center' },
-  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid #EDE8E3', borderRadius: 99, background: 'transparent', fontSize: 'var(--font-size-xs)', cursor: 'pointer', color: '#A89E94', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
+  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid #EDE8E3', borderRadius: 99, background: 'transparent', fontSize: 'var(--font-size-xs)', cursor: 'pointer', color: '#857B72', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
   durBtnActive: { borderColor: '#FF6B35', background: '#FFF4EF', color: '#FF6B35', fontWeight: 700 },
   stepperBtn: { width: 32, height: 32, border: '1.5px solid #EDE8E3', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  pubBtn: { flex: 1, padding: '8px 10px', border: '1.5px solid #EDE8E3', borderRadius: 10, background: '#F5F0EB', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: '#A89E94' },
+  pubBtn: { flex: 1, padding: '8px 10px', border: '1.5px solid #EDE8E3', borderRadius: 10, background: '#F5F0EB', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: '#857B72' },
   pubBtnActive: { borderColor: '#FF6B35', background: '#FFF4EF', color: '#FF6B35' },
 
-  creatorLine: { fontSize: 'var(--font-size-sm)', color: '#A89E94', margin: '-6px 0 0' },
+  creatorLine: { fontSize: 'var(--font-size-sm)', color: '#857B72', margin: '-6px 0 0' },
 
   /* Members card */
   membersCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 16 },
   membersHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   membersTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.3px' },
-  membersCount: { fontSize: 'var(--font-size-sm)', color: '#A89E94', fontWeight: 600 },
+  membersCount: { fontSize: 'var(--font-size-sm)', color: '#857B72', fontWeight: 600 },
   membersList: { display: 'flex', gap: 10, flexWrap: 'wrap' },
   memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
   memberCircle: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-base)', position: 'relative' },
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
   kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
-  memberName: { fontSize: 'var(--font-size-xs)', color: '#A89E94' },
+  memberName: { fontSize: 'var(--font-size-xs)', color: '#857B72' },
 
   /* Action buttons */
-  joinBtn: { width: '100%', padding: 16, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 16, fontWeight: 700, cursor: 'pointer' },
+  joinBtn: { width: '100%', padding: 16, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 99, fontSize: 16, fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.32)' },
   leaveBtn: { width: '100%', padding: 16, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
-  expiredCard: { background: '#F5F0EB', borderRadius: 14, padding: 15, textAlign: 'center', color: '#A89E94', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
+  expiredCard: { background: '#F5F0EB', borderRadius: 14, padding: 15, textAlign: 'center', color: '#857B72', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
   shareBtn: { width: '100%', padding: 14, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 99, fontSize: 16, fontWeight: 600, cursor: 'pointer' },
 
   /* Share panel */
   sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: '#F5F0EB', borderRadius: 14, border: '1px solid #EDE8E3' },
-  shareLabel: { fontSize: 11, fontWeight: 700, color: '#A89E94' },
+  shareLabel: { fontSize: 11, fontWeight: 700, color: '#857B72' },
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 10, padding: '8px 10px', border: '1px solid #EDE8E3' },
   shareText: { flex: 1, fontSize: 13, color: '#1A1A1A', wordBreak: 'break-all', lineHeight: 1.4 },
   shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 99, fontSize: 11, fontWeight: 700, cursor: 'pointer' },
@@ -760,15 +760,15 @@ const S = {
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
   timeDialogTitle: { fontWeight: 800, fontSize: 16 },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: '#A89E94' },
+  timeColon: { fontSize: 20, fontWeight: 800, color: '#857B72' },
   timeDoneBtn: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
 
   /* Dialogs */
   dialog: { width: '100%', maxWidth: 360, background: '#fff', borderRadius: 20, padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16 },
   dialogTitle: { fontWeight: 800, fontSize: 18, textAlign: 'center', whiteSpace: 'pre-line' },
-  dialogDesc: { fontSize: 14, color: '#A89E94', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
+  dialogDesc: { fontSize: 14, color: '#857B72', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { width: '100%', padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 99, fontSize: 14, fontWeight: 700, cursor: 'pointer' },
   dialogBtnSecondary: { width: '100%', padding: 13, background: '#F5F0EB', color: '#1A1A1A', border: '1px solid #EDE8E3', borderRadius: 99, fontSize: 14, fontWeight: 600, cursor: 'pointer' },
-  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: '#A89E94', border: 'none', borderRadius: 99, fontSize: 14, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: '#857B72', border: 'none', borderRadius: 99, fontSize: 14, cursor: 'pointer' },
 }

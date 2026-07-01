@@ -377,7 +377,7 @@ const styles = {
   deleteBtn: { padding: '14px 18px', background: 'none', color: '#f44336', border: '1px solid #f4433660', borderRadius: 'var(--radius-full)', fontSize: 18, cursor: 'pointer', flexShrink: 0 },
 
   footer: { padding: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)', display: 'flex', gap: 8 },
-  createBtn: { flex: 1, padding: 16, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  createBtn: { flex: 1, padding: 16, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.32)' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 340, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },

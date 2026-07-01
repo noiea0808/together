@@ -567,7 +567,7 @@ export default function TodayPage() {
                     localStorage.setItem('lastSelectedSlot', slot)
                   }}
                 >
-                  <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', fontWeight: 700, letterSpacing: '-0.1px' }}>
+                  <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', fontWeight: 700, letterSpacing: '-0.1px' }}>
                     {({ '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' })[slot]} {slot}
                   </span>
                   {hasDefaultPot && (
@@ -596,27 +596,27 @@ export default function TodayPage() {
                   {isInPot ? (
                     <>
                       <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FF6B35' }}>{lockedOpt.label}</span>
-                      <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94' }}>
+                      <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72' }}>
                         {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
                       </span>
                       {earliestPot.title && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
                       )}
                     </>
                   ) : displayOpt ? (
                     <>
                       <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: displayOpt.color }}>{displayOpt.label}</span>
                       {data?.time && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94' }}>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72' }}>
                           {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
                         </span>
                       )}
                       {data?.menu && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
                       )}
                     </>
                   ) : (
-                    <span style={{ fontSize: 'var(--font-size-xs)', color: '#C8BEB4', letterSpacing: '-0.1px' }}>
+                    <span style={{ fontSize: 'var(--font-size-xs)', color: '#ADA59B', letterSpacing: '-0.1px' }}>
                       {isPastDate ? '' : '탭해서 설정'}
                     </span>
                   )}
@@ -1313,7 +1313,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // Filter tabs: always show all 4 options
   const filterTabs = [
     ...SLOT_STATUS_OPTIONS.map(o => ({ ...o, count: statusCounts[o.key] ?? 0 })),
-    { key: 'unset', label: '미설정', color: '#A89E94', bg: '#F5F0EB', border: '#DDD5CC', count: unsetMembers.length },
+    { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6', count: unsetMembers.length },
   ]
 
   // Filtered member lists based on active filter
@@ -1327,7 +1327,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {/* 그룹 헤더 */}
       <div style={styles.groupHeader}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#B0A89E' }}>{group.name}</span>
+          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#8F877D' }}>{group.name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
@@ -1336,7 +1336,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             <button
               style={{
                 fontSize: 'var(--font-size-2xs)', fontWeight: 700,
-                color: isShared ? '#FF6B35' : '#B0A89E',
+                color: isShared ? '#FF6B35' : '#8F877D',
                 background: isShared ? '#FFF4EF' : '#F5F0EB',
                 border: `1px solid ${isShared ? '#FFD6C0' : '#E8E3DE'}`,
                 borderRadius: 99, padding: '3px 9px', cursor: 'pointer',
@@ -1551,7 +1551,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   onClick={() => setStatusFilter(isActive ? null : tab.key)}
                   style={{
                     fontSize: 'var(--font-size-2xs)', fontWeight: 700,
-                    color: isActive ? tab.color : '#A89E94',
+                    color: isActive ? tab.color : '#857B72',
                     background: isActive ? (tab.bg ?? tab.color + '18') : '#F5F0EB',
                     border: `1px solid ${isActive ? (tab.border ?? tab.color + '44') : '#E8E3DE'}`,
                     borderRadius: 99, padding: '3px 10px',
@@ -1578,7 +1578,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               }}>
                 <div style={{
                   width: 30, height: 30, borderRadius: '50%',
-                  background: isMe ? 'var(--color-primary)' : '#A89E94',
+                  background: isMe ? 'var(--color-primary)' : '#857B72',
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                 }}>{member.nickname[0]}</div>
@@ -1587,7 +1587,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     {member.nickname}{isMe ? ' (나)' : ''}
                   </span>
                   {(data?.meal_time || data?.menu) && (
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    <div style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {data.meal_time?.slice(0, 5)}{data.meal_time && data.menu ? ' · ' : ''}{data.menu}
                     </div>
                   )}
@@ -1614,7 +1614,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   style={{
                     width: '100%', padding: '7px 0', background: 'none', border: 'none',
                     cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    color: '#B0A89E', fontSize: 'var(--font-size-xs)', fontFamily: 'inherit',
+                    color: '#8F877D', fontSize: 'var(--font-size-xs)', fontFamily: 'inherit',
                   }}
                 >
                   <span>미설정 {unsetMembers.length}명</span>
@@ -1657,11 +1657,11 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               <span style={{ fontSize: 16 }}>🍚</span>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: '#A89E94', marginTop: 1 }}>
+                <div style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', marginTop: 1 }}>
                   {pot.meal_time?.slice(0, 5)} · {pot.pot_members?.length ?? 0}/{pot.max_people}명
                 </div>
               </div>
-              <span style={{ color: '#C8BEB4', fontSize: 14 }}>›</span>
+              <span style={{ color: '#ADA59B', fontSize: 14 }}>›</span>
             </div>
           ))}
         </div>
@@ -1670,9 +1670,9 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {!collapsed && (
         <button
           style={{
-            width: '100%', padding: 9, marginTop: 9,
-            background: 'transparent', border: '1.5px dashed #FFB899',
-            borderRadius: 11, color: '#FF6B35',
+            width: '100%', padding: 10, marginTop: 9,
+            background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', border: 'none',
+            borderRadius: 11, color: '#fff', boxShadow: '0 2px 8px rgba(255,107,53,0.28)',
             fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
           }}
           onClick={() => onCreatePot(group.id, slot)}
@@ -1687,9 +1687,9 @@ const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80 },
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
-  emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.32)' },
   dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'rgba(250,248,245,0.96)', backdropFilter: 'blur(8px)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
-  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: '#A89E94', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.10)', flexShrink: 0 },
+  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: '#857B72', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.10)', flexShrink: 0 },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
@@ -1800,5 +1800,5 @@ const styles = {
   createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   bottomBtnRow: { display: 'flex', gap: 8 },
   addGroupBtn: { flex: 1, padding: 14, background: 'var(--color-surface-2)', border: '1.5px dashed var(--color-border)', borderRadius: 'var(--radius-lg)', color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
-  joinPotBtn: { flex: 1, padding: 14, background: 'rgba(255,107,53,0.07)', border: '1.5px dashed var(--color-primary)', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
+  joinPotBtn: { flex: 1, padding: 14, background: 'rgba(255,107,53,0.10)', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-lg)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }
