@@ -11,18 +11,18 @@
   --color-primary-light: #FF8C5A;
   --color-primary-dark: #E05520;
 
-  --color-bg: #FAFAFA;
+  --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
-  --color-surface-2: #F5F5F5;
+  --color-surface-2: #F5F0EB;
 
   --color-text: #1A1A1A;
-  --color-text-muted: #888888;
-  --color-border: #E8E8E8;
+  --color-text-muted: #857B72;
+  --color-border: #EDE8E3;
 
-  --color-status-lunch: #4CAF50;
-  --color-status-dinner: #2196F3;
-  --color-status-coffee: #FF9800;
-  --color-status-pass: #BDBDBD;
+  --color-status-lunch: #3DBB5C;
+  --color-status-dinner: #1E88E5;
+  --color-status-coffee: #FB8C00;
+  --color-status-pass: #A8A29B;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -32,12 +32,13 @@
   --shadow-sm: 0 1px 4px rgba(0,0,0,0.08);
   --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
 
-  --font-size-xs: 12px;
-  --font-size-sm: 14px;
-  --font-size-base: 16px;
-  --font-size-lg: 18px;
-  --font-size-xl: 22px;
-  --font-size-2xl: 28px;
+  --font-size-2xs: 12px;
+  --font-size-xs: 14px;
+  --font-size-sm: 16px;
+  --font-size-base: 18px;
+  --font-size-lg: 20px;
+  --font-size-xl: 24px;
+  --font-size-2xl: 32px;
 
   --spacing-xs: 4px;
   --spacing-sm: 8px;
@@ -56,7 +57,7 @@ html {
 
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
-  background-color: var(--color-bg);
+  background-color: #D4B896;
   color: var(--color-text);
   line-height: 1.5;
   min-height: 100dvh;
@@ -68,7 +69,7 @@ body {
   width: 100%;
   max-width: var(--max-width);
   min-height: 100dvh;
-  background: var(--color-surface);
+  background: var(--color-bg);
   position: relative;
   display: flex;
   flex-direction: column;
@@ -155,6 +156,9 @@ body {
 
 .text-muted { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .text-center { text-align: center; }
+
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
 
 .mt-sm { margin-top: var(--spacing-sm); }
 .mt-md { margin-top: var(--spacing-md); }

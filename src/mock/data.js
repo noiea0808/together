@@ -3,10 +3,10 @@ export const ME = { id: 'user-1', nickname: '나' }
 export const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
 export const SLOT_STATUS_OPTIONS = [
-  { key: 'open',   label: '열려있음', emoji: '🟢', color: '#BDBDBD', selectable: true },
-  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#BDBDBD', selectable: true },
-  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2196F3', selectable: true },
-  { key: '참여중', label: '참여중',    emoji: '✅', color: '#4CAF50', selectable: false },
+  { key: 'open',   label: '같이 가능', emoji: '✋', color: '#2E9E4F', bg: '#E8F5E9', border: '#A5D6A7', selectable: true },
+  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', selectable: true },
+  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', selectable: true },
+  { key: '참여중', label: '참여중',    emoji: '🍚', color: '#FF6B35', bg: '#FFF4EF', border: '#FFD6C0', selectable: false },
 ]
 
 export const GROUPS = [

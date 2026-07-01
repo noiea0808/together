@@ -7,7 +7,6 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
-const SLOT_SHORT = ['아침', '오전', '점심', '오후', '저녁', '야식']
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -16,10 +15,8 @@ function toDateStr(d) {
   return `${year}-${month}-${day}`
 }
 
-// 이번 주 일요일부터 다음 주 토요일까지 14일
 function getTwoWeekDates() {
   const today = new Date(); today.setHours(0, 0, 0, 0)
-  // 이번 주 일요일 (day=0)
   const sunday = new Date(today)
   sunday.setDate(today.getDate() - today.getDay())
   return Array.from({ length: 14 }, (_, i) => {
@@ -45,25 +42,20 @@ export default function MySchedulePage() {
   useEffect(() => {
     if (!user) return
     const key = `schedule:${user.id}:${fromDate}:${toDate}`
-
-    // 캐시 우선 — 탭 재방문 시 즉시 표시(스피너 생략) 후 백그라운드 재검증
     const cached = getCache(key)
     if (cached) {
       setStatuses(cached.data)
       setLoading(false)
       if (!cached.stale) return
     }
-
     getMySchedule(user.id, fromDate, toDate)
       .then(data => {
         setStatuses(data)
         setCache(key, data)
-        // 날짜 상세는 기본 닫힘
       })
       .finally(() => setLoading(false))
   }, [user, fromDate, toDate])
 
-  // date별 grouping
   const byDate = {}
   statuses.forEach(s => {
     if (!byDate[s.date]) byDate[s.date] = {}
@@ -79,14 +71,14 @@ export default function MySchedulePage() {
   }
 
   return (
-    <div style={styles.page}>
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>나의 일정</span>
+    <div style={S.page}>
+      <div style={S.header}>
+        <span style={S.headerTitle}>나의 일정</span>
       </div>
 
-      <div style={styles.list}>
+      <div style={S.list}>
         {loading ? (
-          <div style={styles.empty}>🍚</div>
+          <div style={S.empty}>🍚</div>
         ) : dates.map((date, idx) => {
           const dateStr = toDateStr(date)
           const dayStatuses = byDate[dateStr] ?? {}
@@ -94,100 +86,81 @@ export default function MySchedulePage() {
           const isToday = date.getTime() === TODAY.getTime()
           const isPast = date < TODAY
           const isExpanded = expandedDates.has(dateStr)
-          const dow = date.getDay() // 0=일, 6=토
+          const dow = date.getDay()
           const isWeekend = dow === 0 || dow === 6
-          // 첫 번째 날짜이거나 해당 월의 1일인 경우에만 월 표시
           const showMonth = idx === 0 || date.getDate() === 1
 
+          const dayColor = isToday ? '#FF6B35' : isWeekend ? '#E53935' : isPast ? '#857B72' : '#1A1A1A'
+          const cardBg = isToday ? '#FFF4EF' : '#FFFFFF'
+          const cardBorder = isToday ? '#FFD6C0' : '#EDE8E3'
+
+          const chips = SLOT_ORDER
+            .filter(slot => dayStatuses[slot])
+            .map(slot => ({
+              slot,
+              opt: SLOT_STATUS_OPTIONS.find(o => o.key === dayStatuses[slot].status),
+            }))
+
           return (
-            <div key={dateStr} style={{ ...styles.dayBlock, opacity: isPast && !hasStatus ? 0.4 : 1 }}>
-              {/* 날짜 행 */}
-              <div style={{ ...styles.dayRow, background: isToday ? 'rgba(255,107,53,0.1)' : 'transparent' }} onClick={() => toggleDate(dateStr)}>
-                {/* 날짜 */}
-                <div style={styles.dateCol}>
-                  <div style={{ ...styles.dateMonth, visibility: showMonth ? 'visible' : 'hidden' }}>
-                    {date.getMonth() + 1}월
+            <div key={dateStr} style={{ padding: '0 16px' }}>
+              {showMonth && (
+                <div style={S.monthLabel}>{date.getMonth() + 1}월</div>
+              )}
+              <div
+                style={{ ...S.card, background: cardBg, border: `1.5px solid ${cardBorder}`, opacity: isPast && !hasStatus ? 0.4 : 1 }}
+                onClick={() => toggleDate(dateStr)}
+              >
+                <div style={S.row}>
+                  <div style={S.dateCol}>
+                    <div style={{ ...S.dayNum, color: dayColor }}>{date.getDate()}</div>
+                    <div style={{ ...S.dayName, color: dayColor }}>
+                      {date.toLocaleDateString('ko-KR', { weekday: 'short' })}
+                    </div>
                   </div>
-                  <div style={{
-                    ...styles.dateNum,
-                    color: isToday
-                      ? 'var(--color-primary)'
-                      : isWeekend
-                      ? '#E53935'
-                      : isPast ? 'var(--color-text-muted)' : 'var(--color-text)'
-                  }}>
-                    {date.getDate()}
+                  <div style={S.chipsArea}>
+                    {hasStatus ? chips.map(({ slot, opt }) => opt && (
+                      <span key={slot} style={{ ...S.chip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
+                        {slot} · {opt.label}
+                      </span>
+                    )) : (
+                      <span style={S.noStatus}>미설정</span>
+                    )}
                   </div>
-                  <div style={{
-                    ...styles.dateDay,
-                    color: isWeekend ? '#E53935' : 'var(--color-text-muted)'
-                  }}>
-                    {date.toLocaleDateString('ko-KR', { weekday: 'short' })}
-                  </div>
-                  {isToday && <div style={styles.todayDot} />}
+                  {isToday && <span style={S.todayBadge}>오늘</span>}
+                  <span style={S.expIcon}>{isExpanded ? '▲' : '▼'}</span>
                 </div>
 
-                {/* 미니 슬롯 6개 */}
-                <div style={styles.miniSlots}>
-                  {SLOT_ORDER.map((slot, i) => {
-                    const s = dayStatuses[slot]
-                    const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
-                    return (
-                      <div
-                        key={slot}
-                        style={{
-                          ...styles.miniSlot,
-                          background: opt ? opt.color + '20' : 'var(--color-surface-2)',
-                          border: `1px solid ${opt ? opt.color + '55' : 'var(--color-border)'}`,
-                        }}
-                        title={slot}
-                      >
-                        <div style={styles.miniSlotLabel}>{SLOT_SHORT[i]}</div>
-                        <div style={styles.miniSlotEmoji}>{opt ? opt.emoji : '·'}</div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-              </div>
-
-              {/* 상세 펼침 */}
-              {isExpanded && (
-                <div style={styles.detail}>
-                  {hasStatus ? (
-                    <>
-                      {SLOT_ORDER.filter(slot => dayStatuses[slot]).map(slot => {
+                {isExpanded && (
+                  <div style={S.expanded}>
+                    <div style={S.slotGrid}>
+                      {SLOT_ORDER.map(slot => {
                         const s = dayStatuses[slot]
-                        const opt = SLOT_STATUS_OPTIONS.find(o => o.key === s.status)
+                        const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
                         return (
-                          <div key={slot} style={styles.detailRow}>
-                            <span style={styles.detailSlot}>{slot}</span>
-                            <span style={styles.detailTime}>{s.meal_time?.slice(0, 5) || '—'}</span>
-                            <span style={styles.detailMenu}>{s.menu || '—'}</span>
-                            {opt && (
-                              <span style={{ ...styles.detailStatus, color: opt.color, background: opt.color + '15' }}>
-                                {opt.emoji} {opt.label}
+                          <div key={slot} style={S.slotCell}>
+                            <span style={S.slotName}>{slot}</span>
+                            {opt ? (
+                              <span style={{ ...S.slotBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.color}40` }}>
+                                {opt.label}
                               </span>
+                            ) : (
+                              <span style={S.slotDash}>—</span>
                             )}
                           </div>
                         )
                       })}
-                      <div style={styles.detailGoRow}>
-                        <button style={styles.detailGoBtn} onClick={() => navigate(`/today?date=${dateStr}`)}>
-                          해당 일자로 이동하기 →
-                        </button>
-                      </div>
-                    </>
-                  ) : (
-                    <div style={styles.detailEmpty}>
-                      <span>설정된 상태가 없어요</span>
-                      <button style={styles.detailSetBtn} onClick={() => navigate(`/today?date=${dateStr}`)}>
+                    </div>
+                    <div style={S.goRow}>
+                      <button
+                        style={S.goBtn}
+                        onClick={e => { e.stopPropagation(); navigate(`/today?date=${dateStr}`) }}
+                      >
                         해당 일자로 이동하기 →
                       </button>
                     </div>
-                  )}
-                </div>
-              )}
+                  </div>
+                )}
+              </div>
             </div>
           )
         })}
@@ -198,73 +171,36 @@ export default function MySchedulePage() {
   )
 }
 
-const styles = {
+const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0,
+    padding: '18px 20px 12px', position: 'sticky', top: 0,
+    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
   },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-xl)' },
-  list: { flex: 1, overflowY: 'auto', paddingBottom: 80 },
+  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
+  list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 
-  dayBlock: { borderBottom: '1px solid var(--color-border)' },
+  monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#857B72', padding: '12px 4px 6px', letterSpacing: '0.3px' },
+  card: { borderRadius: 15, padding: '12px 14px', marginBottom: 7, cursor: 'pointer' },
+  row: { display: 'flex', alignItems: 'center', gap: 10 },
 
-  dayRow: {
-    display: 'flex', alignItems: 'center', gap: 10,
-    padding: '10px var(--spacing-md)',
-    cursor: 'pointer',
-  },
-  dateCol: {
-    width: 32, flexShrink: 0,
-    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 1,
-  },
-  dateMonth: { fontSize: 9, fontWeight: 600, color: 'var(--color-text-muted)', lineHeight: 1 },
-  dateNum: { fontSize: 17, fontWeight: 800, lineHeight: 1 },
-  dateDay: { fontSize: 10, color: 'var(--color-text-muted)' },
-  todayDot: { width: 4, height: 4, borderRadius: '50%', background: 'var(--color-primary)', marginTop: 2 },
+  dateCol: { minWidth: 38, textAlign: 'center', flexShrink: 0 },
+  dayNum: { fontSize: 'var(--font-size-lg)', fontWeight: 900, lineHeight: 1.1 },
+  dayName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, marginTop: 1 },
 
-  miniSlots: { flex: 1, display: 'flex', gap: 4 },
-  miniSlot: {
-    flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '3px 2px', borderRadius: 6, minWidth: 0,
-  },
-  miniSlotLabel: { fontSize: 9, color: 'var(--color-text-muted)', fontWeight: 600, lineHeight: 1 },
-  miniSlotEmoji: { fontSize: 14, lineHeight: 1.3 },
+  chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', minWidth: 0 },
+  chip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', whiteSpace: 'nowrap' },
+  noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
+  todayBadge: { background: '#FF6B35', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', flexShrink: 0 },
+  expIcon: { color: '#ADA59B', fontSize: 'var(--font-size-2xs)', flexShrink: 0 },
 
-
-  detail: {
-    marginLeft: 58, marginRight: 'var(--spacing-md)', marginBottom: 8,
-    background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)',
-    overflow: 'hidden',
-  },
-  detailRow: {
-    display: 'flex', alignItems: 'center', gap: 8,
-    padding: '8px var(--spacing-md)',
-    borderBottom: '1px solid var(--color-border)',
-  },
-  detailSlot: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', width: 48, flexShrink: 0 },
-  detailTime: { fontSize: 12, fontWeight: 600, width: 40, flexShrink: 0 },
-  detailMenu: { flex: 1, fontSize: 12, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  detailStatus: {
-    fontSize: 11, fontWeight: 700, borderRadius: 'var(--radius-full)',
-    padding: '2px 8px', flexShrink: 0,
-  },
-  detailEmpty: {
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    padding: '10px var(--spacing-md)',
-    fontSize: 12, color: 'var(--color-text-muted)',
-  },
-  detailSetBtn: {
-    fontSize: 12, fontWeight: 700, color: 'var(--color-primary)',
-    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-  },
-  detailGoRow: {
-    display: 'flex', justifyContent: 'flex-end',
-    padding: '8px var(--spacing-md)',
-  },
-  detailGoBtn: {
-    fontSize: 12, fontWeight: 700, color: 'var(--color-primary)',
-    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
-  },
+  expanded: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #EDE8E3' },
+  slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 5 },
+  slotCell: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px' },
+  slotName: { fontSize: 'var(--font-size-2xs)', color: '#857B72', minWidth: 44 },
+  slotBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 7px' },
+  slotDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
+  goRow: { display: 'flex', justifyContent: 'flex-end', paddingTop: 8 },
+  goBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#FF6B35', background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
 }

@@ -39,8 +39,8 @@ export default function PotCard({ pot }) {
       {/* 1줄: 시간, 공개 여부 */}
       <div style={styles.row1}>
         <span style={{ ...styles.time, color: expired
-          ? (pot.is_default ? '#A5C8A5' : '#E0A98F')
-          : (pot.is_default ? '#4CAF50' : 'var(--color-primary)') }}>
+          ? (pot.is_default ? '#A5C8A5' : '#9DBEDC')
+          : (pot.is_default ? '#4CAF50' : '#1E88E5') }}>
           {timeStr}{endStr}
         </span>
         {pot.is_public && <span style={styles.publicTag}>공개</span>}
