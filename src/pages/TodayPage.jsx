@@ -1270,12 +1270,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       const mine = mySlotData ? { ...mySlotData, meal_time: mySlotData.time } : null
       if (isInThisGroupPot) {
         const myPot = pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId))
-        return { ...mine, status: '참여중', meal_time: myPot?.meal_time ?? mine?.meal_time }
+        return { ...mine, status: '참여중', meal_time: myPot?.meal_time ?? mine?.meal_time, end_time: myPot?.end_time ?? mine?.end_time }
       }
       if (amIInAnyPot) {
         // 다른 그룹 팟 참여 → 약속있음. 팟 시간은 파생된 statuses 행에서 가져옴
         const derived = statuses.find(s => s.user_id === myUserId && s.slot === slot)
-        return { status: 'closed', meal_time: derived?.meal_time ?? null }
+        return { status: 'closed', meal_time: derived?.meal_time ?? null, end_time: derived?.end_time ?? null }
       }
       return mine
     }
@@ -1307,20 +1307,23 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // Separate active and unset members
   const activeMembers = members.filter(m => getMemberData(m.id)?.status)
   const unsetMembers = members.filter(m => !getMemberData(m.id)?.status)
-  const [showUnset, setShowUnset] = useState(false)
-  const [statusFilter, setStatusFilter] = useState(null)
+  const [statusFilter, setStatusFilter] = useState('open')
+  // 날짜/슬롯을 바꿔가며 볼 때는 '같이 가능' 필터가 선택된 상태로 리셋
+  useEffect(() => { setStatusFilter('open') }, [dateStr, slot])
 
-  // Filter tabs: always show all 4 options
+  // Filter tabs: 같이 가능 / 참여중 / 약속있음 / 패스 / 미설정 순서 고정
+  const FILTER_TAB_ORDER = ['open', '참여중', 'closed', 'skip']
   const filterTabs = [
-    ...SLOT_STATUS_OPTIONS.map(o => ({ ...o, count: statusCounts[o.key] ?? 0 })),
+    ...FILTER_TAB_ORDER.map(key => ({ ...SLOT_STATUS_OPTIONS.find(o => o.key === key), count: statusCounts[key] ?? 0 })),
     { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6', count: unsetMembers.length },
   ]
 
-  // Filtered member lists based on active filter
-  const filteredActive = statusFilter && statusFilter !== 'unset'
-    ? activeMembers.filter(m => getMemberData(m.id)?.status === statusFilter)
-    : statusFilter === 'unset' ? [] : activeMembers
-  const showUnsetSection = statusFilter === 'unset' ? true : statusFilter === null
+  // 태그 미선택 시 전체 멤버(미설정 포함)를 한 목록으로, 태그 선택 시 해당 상태만 표시
+  const displayedMembers = !statusFilter
+    ? members
+    : statusFilter === 'unset'
+      ? unsetMembers
+      : activeMembers.filter(m => getMemberData(m.id)?.status === statusFilter)
 
   return (
     <div style={styles.groupCard}>
@@ -1542,8 +1545,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {!collapsed && (
         <div style={{ padding: '0 0 2px' }}>
           {/* 상태 필터 탭 */}
-          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
-            {filterTabs.map(tab => {
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 5, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 10 }}>
+            {filterTabs.filter(tab => tab.key === 'open' || tab.count > 0).map(tab => {
               const isActive = statusFilter === tab.key
               return (
                 <button
@@ -1554,22 +1557,29 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     color: isActive ? tab.color : '#857B72',
                     background: isActive ? (tab.bg ?? tab.color + '18') : '#F5F0EB',
                     border: `1px solid ${isActive ? (tab.border ?? tab.color + '44') : '#E8E3DE'}`,
-                    borderRadius: 99, padding: '3px 10px',
+                    borderRadius: 99, padding: '3px 9px',
                     cursor: 'pointer', fontFamily: 'inherit',
-                    opacity: tab.count === 0 ? 0.4 : 1,
+                    opacity: (tab.count === 0 && tab.key !== 'open') ? 0.4 : 1,
+                    whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
-                  {tab.label} {tab.count}
+                  {tab.key === 'open' ? `${tab.emoji} ` : ''}{tab.label} {tab.count}
                 </button>
               )
             })}
           </div>
 
-          {/* 활동 멤버 */}
-          {filteredActive.map((member) => {
+          {/* 멤버 목록 (태그 미선택 시 미설정 포함 전체) */}
+          {displayedMembers.map((member) => {
             const data = getMemberData(member.id)
-            const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+            const opt = data?.status
+              ? SLOT_STATUS_OPTIONS.find(o => o.key === data.status)
+              : { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6' }
             const isMe = member.id === myUserId
+            const timeStr = data?.meal_time
+              ? `${data.meal_time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
+              : ''
+            const isOpen = opt?.key === 'open'
             return (
               <div key={member.id} style={{
                 display: 'flex', alignItems: 'center', gap: 9,
@@ -1582,88 +1592,87 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                 }}>{member.nickname[0]}</div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px' }}>
-                    {member.nickname}{isMe ? ' (나)' : ''}
-                  </span>
-                  {(data?.meal_time || data?.menu) && (
-                    <div style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {data.meal_time?.slice(0, 5)}{data.meal_time && data.menu ? ' · ' : ''}{data.menu}
-                    </div>
-                  )}
-                </div>
-                {opt && !statusFilter && (
-                  <span style={{
+                <span style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
+                  {member.nickname}{isMe ? ' (나)' : ''}
+                </span>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {timeStr}
+                </span>
+                {opt && (isOpen || !statusFilter) && (
+                  <span style={isOpen ? {
+                    fontSize: 'var(--font-size-2xs)', fontWeight: 800,
+                    color: '#fff', background: opt.color,
+                    border: `1px solid ${opt.color}`,
+                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
+                  } : {
                     fontSize: 'var(--font-size-2xs)', fontWeight: 700,
                     color: opt.color,
                     background: opt.bg ?? opt.color + '18',
                     border: `1px solid ${opt.border ?? opt.color + '44'}`,
-                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap',
+                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>{opt.label}</span>
                 )}
               </div>
             )
           })}
-
-          {/* 미설정 멤버 */}
-          {unsetMembers.length > 0 && showUnsetSection && (
-            <>
-              {statusFilter !== 'unset' ? (
-                <button
-                  onClick={() => setShowUnset(v => !v)}
-                  style={{
-                    width: '100%', padding: '7px 0', background: 'none', border: 'none',
-                    cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                    color: '#8F877D', fontSize: 'var(--font-size-xs)', fontFamily: 'inherit',
-                  }}
-                >
-                  <span>미설정 {unsetMembers.length}명</span>
-                  <span style={{ fontSize: 'var(--font-size-xs)' }}>{showUnset ? '▴' : '▾'}</span>
-                </button>
-              ) : null}
-              {(statusFilter === 'unset' || showUnset) && unsetMembers.map(member => (
-                <div key={member.id} style={{
-                  display: 'flex', alignItems: 'center', gap: 9,
-                  padding: '5px 0', opacity: 0.45,
-                  borderBottom: '1px solid #F5F0EB',
-                }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%',
-                    background: member.id === myUserId ? 'var(--color-primary)' : '#C0B8B0',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
-                  }}>{member.nickname[0]}</div>
-                  <span style={{ flex: 1, fontSize: 'var(--font-size-sm)', color: '#6B7280', letterSpacing: '-0.2px' }}>
-                    {member.nickname}{member.id === myUserId ? ' (나)' : ''}
-                  </span>
-                </div>
-              ))}
-            </>
-          )}
         </div>
       )}
 
       {!collapsed && pots.length > 0 && (
-        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
-          {pots.map(pot => (
-            <div
-              key={pot.id}
-              style={{
-                background: '#FAF8F5', border: '1.5px solid #EDE8E3', borderRadius: 11,
-                padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
-              }}
-              onClick={() => onNavigate(`/pot/${pot.id}`)}
-            >
-              <span style={{ fontSize: 16 }}>🍚</span>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</div>
-                <div style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', marginTop: 1 }}>
-                  {pot.meal_time?.slice(0, 5)} · {pot.pot_members?.length ?? 0}/{pot.max_people}명
+        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 7 }}>
+          {pots.map(pot => {
+            const potParticipants = (pot.pot_members ?? []).map(pm => {
+              const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === group.id)?.nickname
+              return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
+            })
+            const filled = potParticipants.length
+            const isFull = filled >= pot.max_people
+            const timeStr = pot.meal_time?.slice(0, 5)
+            const endStr = pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''
+
+            return (
+              <div
+                key={pot.id}
+                style={pot.is_default ? potListStyles.defaultCard : potListStyles.normalCard}
+                onClick={() => onNavigate(`/pot/${pot.id}`)}
+              >
+                {/* 1행: 제목 + 기본팟 태그 */}
+                <div style={potListStyles.row1}>
+                  <span style={potListStyles.icon}>{pot.is_default ? '🍚' : '🎉'}</span>
+                  <span style={potListStyles.title}>{pot.title}</span>
+                  {pot.is_default && <span style={potListStyles.defaultTag}>기본팟</span>}
+                  <span style={potListStyles.chevron}>›</span>
+                </div>
+
+                {/* 2행: 시간, 메뉴 */}
+                <div style={potListStyles.row2}>
+                  {timeStr && (
+                    <span style={{ ...potListStyles.time, color: pot.is_default ? '#2E9E4F' : 'var(--color-primary)' }}>
+                      🕒 {timeStr}{endStr}
+                    </span>
+                  )}
+                  {pot.menu && <span style={potListStyles.menu}>🍽 {pot.menu}</span>}
+                </div>
+
+                {/* 3행: 참여자 태그 */}
+                <div style={potListStyles.row3}>
+                  <div style={potListStyles.tags}>
+                    {potParticipants.map(m => (
+                      <span key={m.id} style={{ ...potListStyles.tag, ...(pot.is_default ? potListStyles.tagDefault : potListStyles.tagNormal) }}>
+                        {m.nickname}{m.is_guest ? <span style={potListStyles.guestMark}>G</span> : null}
+                      </span>
+                    ))}
+                    {Array.from({ length: Math.max(pot.max_people - filled, 0) }).map((_, i) => (
+                      <span key={`empty-${i}`} style={potListStyles.emptyTag}>+</span>
+                    ))}
+                  </div>
+                  <span style={{ ...potListStyles.count, color: isFull ? '#2E9E4F' : 'var(--color-text-muted)' }}>
+                    {filled}/{pot.max_people}명
+                  </span>
                 </div>
               </div>
-              <span style={{ color: '#ADA59B', fontSize: 14 }}>›</span>
-            </div>
-          ))}
+            )
+          })}
         </div>
       )}
 
@@ -1680,6 +1689,39 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       )}
     </div>
   )
+}
+
+const potListStyles = {
+  normalCard: {
+    background: 'linear-gradient(135deg, #FFF6F1, #FFEFE6)',
+    border: '1.5px solid #FFD6C0', borderRadius: 13,
+    padding: '10px 12px', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', gap: 4,
+    boxShadow: '0 2px 8px rgba(255,107,53,0.10)',
+  },
+  defaultCard: {
+    background: 'linear-gradient(135deg, #F2FAF3, #E9F6EA)',
+    border: '1.5px solid #BEE3C0', borderRadius: 13,
+    padding: '10px 12px', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', gap: 4,
+    boxShadow: '0 2px 8px rgba(46,158,79,0.08)',
+  },
+  row1: { display: 'flex', alignItems: 'center', gap: 6 },
+  icon: { fontSize: 15, flexShrink: 0 },
+  title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  defaultTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 800, color: '#2E9E4F', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 99, padding: '1px 8px', flexShrink: 0 },
+  chevron: { color: '#B0A89E', fontSize: 14, flexShrink: 0 },
+  row2: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+  time: { fontSize: 'var(--font-size-xs)', fontWeight: 700 },
+  menu: { fontSize: 'var(--font-size-xs)', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 1 },
+  tags: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, flex: 1, minWidth: 0 },
+  tag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
+  tagNormal: { color: '#E05520', background: '#fff', border: '1px solid #FFD6C0' },
+  tagDefault: { color: '#2E9E4F', background: '#fff', border: '1px solid #A5D6A7' },
+  emptyTag: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6', background: 'transparent', border: '1px dashed #D8D0C8', borderRadius: 99, padding: '2px 8px' },
+  guestMark: { fontSize: 9, color: '#FF9800', fontWeight: 800, marginLeft: 1 },
+  count: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, flexShrink: 0 },
 }
 
 const styles = {

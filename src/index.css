@@ -157,6 +157,9 @@ body {
 .text-muted { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .text-center { text-align: center; }
 
+.no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
 .mt-sm { margin-top: var(--spacing-sm); }
 .mt-md { margin-top: var(--spacing-md); }
 .mt-lg { margin-top: var(--spacing-lg); }
