@@ -7,6 +7,7 @@ import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
+import GroupSetupModal from '../components/GroupSetupModal'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
@@ -96,6 +97,8 @@ export default function TodayPage() {
   const [showJoinPot, setShowJoinPot] = useState(false)
   const [joinPotInput, setJoinPotInput] = useState('')
   const [joinPotError, setJoinPotError] = useState('')
+  // 그룹 만들기 / 참여하기 다이얼로그
+  const [showGroupSetup, setShowGroupSetup] = useState(false)
   // 그룹 순서 편집
   const [editingOrder, setEditingOrder] = useState(false)
   const [localGroups, setLocalGroups] = useState([])
@@ -104,16 +107,17 @@ export default function TodayPage() {
   const isToday = currentDate.getTime() === TODAY.getTime()
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot))
+  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot || showGroupSetup))
   useEscKey(useCallback(() => {
     if (slotEndPickerOpen) { setSlotEndPickerOpen(false); return }
     if (editingSlot) { setEditingSlot(null); return }
     if (showJoinPot) { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError(''); return }
+    if (showGroupSetup) { setShowGroupSetup(false); return }
     if (editingOrder) { cancelEditingOrder(); return }
     if (shareTogglePending) { setShareTogglePending(null); return }
     if (createConflict) { setCreateConflict(null); return }
     if (showResetConfirm) { setShowResetConfirm(false); return }
-  }, [slotEndPickerOpen, editingSlot, showJoinPot, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
+  }, [slotEndPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -649,7 +653,7 @@ export default function TodayPage() {
           <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
             그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
           </p>
-          <button style={styles.emptyBtn} onClick={() => navigate('/group-setup')}>
+          <button style={styles.emptyBtn} onClick={() => setShowGroupSetup(true)}>
             그룹 만들기 / 참여하기
           </button>
         </div>
@@ -688,7 +692,7 @@ export default function TodayPage() {
       })()}
 
       <div style={styles.bottomBtnRow}>
-        <button style={styles.addGroupBtn} onClick={() => navigate('/group-setup')}>
+        <button style={styles.addGroupBtn} onClick={() => setShowGroupSetup(true)}>
           + 그룹 만들기 / 참여하기
         </button>
         <button style={styles.joinPotBtn} onClick={() => setShowJoinPot(true)}>
@@ -1139,6 +1143,14 @@ export default function TodayPage() {
           </div>
         </div>
       </div>
+    )}
+
+    {showGroupSetup && (
+      <GroupSetupModal
+        userId={user.id}
+        onClose={() => setShowGroupSetup(false)}
+        onDone={() => { setShowGroupSetup(false); invalidateCache(`board:${user.id}:`, { prefix: true }); loadData({ force: true }) }}
+      />
     )}
 
     {editingOrder && (
