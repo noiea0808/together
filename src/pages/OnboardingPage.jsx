@@ -50,7 +50,7 @@ function EmailForm({ hasPendingInvite, onBack }) {
   const navigate = useNavigate()
   const { login } = useUser()
   const [tab, setTab] = useState('login')
-  const [form, setForm] = useState({ email: '', password: '', passwordConfirm: '' })
+  const [form, setForm] = useState({ email: localStorage.getItem('rememberedEmail') || '', password: '', passwordConfirm: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -78,6 +78,7 @@ function EmailForm({ hasPendingInvite, onBack }) {
     setLoading(true); setError(null)
     try {
       const user = await signIn(form.email.trim(), form.password)
+      localStorage.setItem('rememberedEmail', form.email.trim())
       login(user)
       // 밥팟 링크 등에서 넘어온 경우 원래 위치로 복귀
       const returnTo = sessionStorage.getItem('returnTo')

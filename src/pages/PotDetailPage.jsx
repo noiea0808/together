@@ -7,6 +7,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -29,25 +30,11 @@ function avBg(name) {
   return colors[h % colors.length]
 }
 
-const DURATION_OPTIONS = [
-  { min: 30, label: '30분' },
-  { min: 60, label: '1시간' },
-  { min: 90, label: '1.5시간' },
-  { min: 120, label: '2시간' },
-]
-
 function durationOf(start, end) {
   if (!start || !end) return 0
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)
   return (eh * 60 + em) - (sh * 60 + sm)
-}
-
-const iStyles = {
-  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '10px 0', borderBottom: '1px solid var(--color-border)' },
-  label: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 52, flexShrink: 0 },
-  valueWrap: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  value: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
 }
 
 function GuestGate({ potId, onJoined, navigate }) {
@@ -187,20 +174,27 @@ export default function PotDetailPage() {
     return new Date() > expiry
   })()
 
-  const initDraft = () => {
-    if (draft) return
+  const buildDraft = (overrides = {}) => {
     const mt = pot.meal_time?.slice(0, 5) ?? ''
     const et = pot.end_time?.slice(0, 5) ?? ''
-    setDraft({
-      meal_time: mt,
-      end_time: et,
+    const fallbackStart = mt || SLOT_TIME_PRESETS[pot.slot]?.[0] || '12:00'
+    return {
+      time_enabled: !!mt,
+      meal_time: fallbackStart,
+      end_time: et || addMinutes(fallbackStart, 60),
       duration_minutes: durationOf(mt, et) || 60,
       title: pot.title ?? '',
       menu: pot.menu ?? '',
       memo: pot.memo ?? '',
       max_people: pot.max_people ?? 4,
       is_public: pot.is_public ?? false,
-    })
+      ...overrides,
+    }
+  }
+
+  const initDraft = () => {
+    if (draft) return
+    setDraft(buildDraft())
   }
 
   const openDetailTimePicker = (which) => {
@@ -240,8 +234,8 @@ export default function PotDetailPage() {
     setActionLoading(true)
     try {
       await updatePot(pot.id, {
-        meal_time: draft.meal_time,
-        end_time: draft.end_time || null,
+        meal_time: draft.time_enabled ? draft.meal_time : null,
+        end_time: draft.time_enabled ? (draft.end_time || null) : null,
         title: draft.title || pot.title,
         menu: draft.menu.trim() || null,
         memo: draft.memo.trim() || null,
@@ -256,8 +250,8 @@ export default function PotDetailPage() {
 
   const togglePublic = () => {
     if (!canEdit) return
-    const base = draft ?? { meal_time: pot.meal_time?.slice(0,5) ?? '', end_time: pot.end_time?.slice(0,5) ?? '', title: pot.title ?? '', menu: pot.menu ?? '', memo: pot.memo ?? '', max_people: pot.max_people ?? 4, is_public: pot.is_public ?? false }
-    setDraft({ ...base, is_public: !(draft?.is_public ?? pot.is_public) })
+    if (draft) { setDraft(d => ({ ...d, is_public: !d.is_public })); return }
+    setDraft(buildDraft({ is_public: !pot.is_public }))
   }
 
   const doJoin = async () => {
@@ -414,87 +408,114 @@ export default function PotDetailPage() {
           </div>
         )}
 
-        {/* EDIT MODE: fields card */}
-        {draft && (
-          <div style={S.editCard}>
-            <div style={S.editCardTitle}>정보 수정</div>
-            <div style={S.fields}>
-              {[
-                {
-                  label: '시간',
-                  content: (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, flex: 1 }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button type="button" style={S.inlineTimeBtn} onClick={() => openDetailTimePicker('start')}>
-                          {draft.meal_time || '--:--'}
-                        </button>
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', flexShrink: 0 }}>~</span>
-                        <button type="button" style={{ ...S.inlineTimeBtn, color: draft.duration_minutes > 0 ? '#FF6B35' : '#1A1A1A' }} onClick={() => openDetailTimePicker('end')}>
-                          {draft.end_time || '--:--'}
-                        </button>
-                      </div>
-                      <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
-                        {DURATION_OPTIONS.map(o => {
-                          const active = draft.duration_minutes === o.min
-                          return (
-                            <button key={o.min} style={{ ...S.durBtn, ...(active ? S.durBtnActive : {}) }} onClick={() => setDetailDuration(o.min)}>
-                              {o.label}
-                            </button>
-                          )
-                        })}
-                        <button style={{ ...S.durBtn, ...(draft.duration_minutes === 0 ? S.durBtnActive : {}) }} onClick={() => setDetailDuration(0)}>
-                          직접입력
-                        </button>
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  label: '이름',
-                  content: <input style={S.inlineInput} value={draft.title} onChange={e => setD('title', e.target.value)} maxLength={20} />,
-                },
-                {
-                  label: '메뉴',
-                  content: <input style={S.inlineInput} value={draft.menu} onChange={e => setD('menu', e.target.value)} maxLength={20} placeholder="미입력 시 미정" />,
-                },
-                {
-                  label: '최대',
-                  content: (
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                      <button style={S.stepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
-                      <span style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 32, textAlign: 'center' }}>{draft.max_people}명</span>
-                      <button style={S.stepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
-                    </div>
-                  ),
-                },
-                {
-                  label: '메모',
-                  content: <input style={S.inlineInput} value={draft.memo} onChange={e => setD('memo', e.target.value)} maxLength={50} placeholder="메모 입력" />,
-                },
-                {
-                  label: '공개',
-                  content: (
-                    <div style={{ display: 'flex', gap: 6 }}>
+        {/* EDIT MODE: section cards, matching '밥팟 열기' style */}
+        {draft && (() => {
+          const presets = SLOT_TIME_PRESETS[pot.slot] ?? []
+          const isCustomTime = draft.time_enabled && !presets.includes(draft.meal_time)
+          return (
+            <div style={S.editSections}>
+              {/* 시간 */}
+              <div style={S.editSection}>
+                <div style={S.editSectionLabel}>🕒 언제 먹을까요?</div>
+                <div style={S.editChipRow}>
+                  {presets.map(t => {
+                    const active = draft.time_enabled && draft.meal_time === t
+                    return (
                       <button
-                        style={{ ...S.pubBtn, ...(!draft.is_public ? S.pubBtnActive : {}) }}
-                        onClick={() => setD('is_public', false)}
-                      >그룹만</button>
-                      <button
-                        style={{ ...S.pubBtn, ...(draft.is_public ? S.pubBtnActive : {}) }}
-                        onClick={() => setD('is_public', true)}
-                      >전체 공개</button>
-                    </div>
-                  ),
-                },
-              ].map(({ label, content }) => (
-                <div key={label} style={iStyles.row}>
-                  <span style={iStyles.label}>{label}</span>
-                  <div style={iStyles.valueWrap}>{content}</div>
+                        key={t}
+                        style={{ ...S.editChip, ...(active ? S.editChipActive : {}) }}
+                        onClick={() => { setD('time_enabled', true); applyDetailPickerTime('start', t) }}
+                      >
+                        {t}
+                      </button>
+                    )
+                  })}
+                  <button
+                    style={{ ...S.editChip, ...(isCustomTime ? S.editChipActive : {}) }}
+                    onClick={() => { setD('time_enabled', true); openDetailTimePicker('start') }}
+                  >
+                    {isCustomTime ? draft.meal_time : '직접 설정'}
+                  </button>
+                  <button
+                    style={{ ...S.editChip, ...(!draft.time_enabled ? S.editChipActive : {}) }}
+                    onClick={() => setD('time_enabled', false)}
+                  >
+                    미정
+                  </button>
                 </div>
-              ))}
+                {draft.time_enabled && (
+                  <div style={{ marginTop: 8 }}>
+                    <div style={S.editSectionLabel}>~ 종료 {draft.end_time || ''}</div>
+                    <div style={S.editChipRow}>
+                      {DURATION_OPTIONS.map(o => (
+                        <button
+                          key={o.min}
+                          style={{ ...S.editChip, ...(draft.duration_minutes === o.min ? S.editChipActive : {}) }}
+                          onClick={() => setDetailDuration(o.min)}
+                        >
+                          {o.label}
+                        </button>
+                      ))}
+                      <button
+                        style={{ ...S.editChip, ...(draft.duration_minutes === 0 ? S.editChipActive : {}) }}
+                        onClick={() => { setDetailDuration(0); openDetailTimePicker('end') }}
+                      >
+                        {draft.duration_minutes === 0 && draft.end_time ? draft.end_time : '직접 설정'}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* 최대 인원 */}
+              <div style={{ ...S.editSection, ...S.editSectionRow }}>
+                <div style={S.editSectionLabel}>👥 몇 명까지?</div>
+                <div style={S.editStepper}>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                  <span style={S.editStepperNum}>{draft.max_people}명</span>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
+                </div>
+              </div>
+
+              {/* 세부 정보 */}
+              <div style={S.editSection}>
+                <div style={S.editDetailsRow}>
+                  <input
+                    style={S.editSectionInput}
+                    placeholder="밥팟 이름"
+                    value={draft.title}
+                    onChange={e => setD('title', e.target.value)}
+                    maxLength={20}
+                  />
+                  <input
+                    style={S.editSectionInput}
+                    placeholder="메뉴 (선택)"
+                    value={draft.menu}
+                    onChange={e => setD('menu', e.target.value)}
+                    maxLength={20}
+                  />
+                </div>
+                <input
+                  style={{ ...S.editSectionInput, marginTop: 6 }}
+                  placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
+                  value={draft.memo}
+                  onChange={e => setD('memo', e.target.value)}
+                  maxLength={50}
+                />
+              </div>
+
+              {/* 공개 범위 */}
+              <div style={S.editSection}>
+                <div style={S.editSectionLabel}>🔓 공개 범위</div>
+                <div style={S.editGroupRow}>
+                  <button style={{ ...S.editGroupBtn, ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
+                  <button style={{ ...S.editGroupBtn, ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+                </div>
+                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: '#2563EB', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+              </div>
             </div>
-          </div>
-        )}
+          )
+        })()}
 
         {/* Creator / modifier line */}
         {!pot.is_default && pot.users && (
@@ -716,17 +737,38 @@ const S = {
   infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 3, fontWeight: 600 },
   infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
-  /* Edit card */
-  editCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 18, padding: 16 },
-  editCardTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', marginBottom: 4, letterSpacing: '-0.3px' },
-  fields: { display: 'flex', flexDirection: 'column' },
-  inlineInput: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none' },
-  inlineTimeBtn: { flex: 1, padding: '6px 10px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', fontWeight: 600, background: 'var(--color-surface)', color: 'var(--color-text)', cursor: 'pointer', textAlign: 'center' },
-  durBtn: { flex: 1, padding: '4px 4px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', cursor: 'pointer', color: 'var(--color-text-muted)', fontWeight: 500, textAlign: 'center', whiteSpace: 'nowrap' },
-  durBtnActive: { borderColor: 'var(--color-primary)', background: '#FFF4EF', color: 'var(--color-primary)', fontWeight: 700 },
-  stepperBtn: { width: 32, height: 32, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'none', fontSize: 18, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  pubBtn: { flex: 1, padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-surface-2)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  pubBtnActive: { borderColor: 'var(--color-primary)', background: '#FFF4EF', color: 'var(--color-primary)' },
+  /* Edit sections (matches '밥팟 열기' style) */
+  editSections: { display: 'flex', flexDirection: 'column', gap: 6 },
+  editSection: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 10 },
+  editSectionRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 7 },
+
+  editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
+  editChip: {
+    padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  editChipActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+
+  editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
+  editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
+  editStepperNum: { fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 30, textAlign: 'center' },
+
+  editDetailsRow: { display: 'flex', gap: 6 },
+  editSectionInput: {
+    width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)',
+    color: 'var(--color-text)', boxSizing: 'border-box',
+  },
+
+  editGroupRow: { display: 'flex', gap: 6 },
+  editGroupBtn: {
+    flex: 1, padding: '6px 6px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
+    letterSpacing: '-0.2px',
+  },
+  editGroupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
+  editPublicActive: { background: '#E3F2FD', border: '1.5px solid #2563EB', fontWeight: 700, color: '#2563EB' },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', margin: '-6px 0 0' },
 
