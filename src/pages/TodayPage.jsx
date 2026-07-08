@@ -1665,6 +1665,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             const isFull = filled >= pot.max_people
             const timeStr = pot.meal_time?.slice(0, 5)
             const endStr = pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''
+            const commentCount = pot.pot_comments?.[0]?.count ?? 0
 
             return (
               <div
@@ -1672,10 +1673,19 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 style={pot.is_default ? potListStyles.defaultCard : potListStyles.normalCard}
                 onClick={() => onNavigate(`/pot/${pot.id}`)}
               >
-                {/* 1행: 제목 + 기본팟 태그 */}
+                {/* 1행: 제목 + 코멘트 개수 + 기본팟 태그 */}
                 <div style={potListStyles.row1}>
                   <span style={potListStyles.icon}>{pot.is_default ? '🍚' : '🎉'}</span>
                   <span style={potListStyles.title}>{pot.title}</span>
+                  {commentCount > 0 && (
+                    <span style={{
+                      ...potListStyles.commentBadge,
+                      color: pot.is_default ? '#2E9E4F' : '#1565C0',
+                      borderColor: pot.is_default ? '#A5D6A7' : '#BBDEFB',
+                    }}>
+                      💬 {commentCount}
+                    </span>
+                  )}
                   {pot.is_default && <span style={potListStyles.defaultTag}>기본팟</span>}
                   <span style={potListStyles.chevron}>›</span>
                 </div>
@@ -1689,6 +1699,9 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   )}
                   {pot.menu && <span style={potListStyles.menu}>🍽 {pot.menu}</span>}
                 </div>
+
+                {/* 메모 */}
+                {pot.memo && <div style={potListStyles.memo}>📝 {pot.memo}</div>}
 
                 {/* 3행: 참여자 태그 */}
                 <div style={potListStyles.row3}>
@@ -1750,6 +1763,7 @@ const potListStyles = {
   row2: { display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
   time: { fontSize: 'var(--font-size-xs)', fontWeight: 700 },
   menu: { fontSize: 'var(--font-size-xs)', color: '#6B7280', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  memo: { fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6, marginTop: 1 },
   tags: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, flex: 1, minWidth: 0 },
   tag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
@@ -1758,6 +1772,11 @@ const potListStyles = {
   emptyTag: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6', background: 'transparent', border: '1px dashed #D8D0C8', borderRadius: 99, padding: '2px 8px' },
   guestMark: { fontSize: 9, color: '#FF9800', fontWeight: 800, marginLeft: 1 },
   count: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, flexShrink: 0 },
+  commentBadge: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700,
+    background: '#fff', border: '1px solid', borderRadius: 99, padding: '2px 8px',
+    flexShrink: 0, whiteSpace: 'nowrap',
+  },
 }
 
 const styles = {

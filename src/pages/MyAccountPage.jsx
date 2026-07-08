@@ -1,8 +1,9 @@
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { updateNickname, uploadAvatar, deleteAccount } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
@@ -25,6 +26,34 @@ export default function MyAccountPage() {
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
   const avatarInputRef = useRef(null)
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushLoading, setPushLoading] = useState(false)
+  const [pushError, setPushError] = useState(null)
+
+  useEffect(() => {
+    if (!isPushSupported()) return
+    getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
+  }, [])
+
+  const handleTogglePush = async () => {
+    if (pushLoading) return
+    setPushLoading(true)
+    setPushError(null)
+    try {
+      if (pushEnabled) {
+        await unsubscribeFromPush()
+        setPushEnabled(false)
+      } else {
+        await subscribeToPush(user.id)
+        setPushEnabled(true)
+      }
+    } catch (e) {
+      console.error(e)
+      setPushError(e.message || '알림 설정에 실패했어요.')
+    } finally {
+      setPushLoading(false)
+    }
+  }
 
   const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0]
@@ -195,6 +224,28 @@ export default function MyAccountPage() {
         )}
         {isInstalled && (
           <div style={styles.installedBadge}>✓ 홈 화면에 설치됨</div>
+        )}
+
+        {/* 알림 받기 */}
+        {isPushSupported() && (
+          <div style={styles.section}>
+            <div style={styles.sectionTitle}>알림</div>
+            {isIOS && !isInstalled ? (
+              <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
+            ) : (
+              <div style={styles.infoRow}>
+                <span style={styles.infoValue}>푸시 알림</span>
+                <button
+                  style={{ ...styles.editBtn, opacity: pushLoading ? 0.5 : 1 }}
+                  onClick={handleTogglePush}
+                  disabled={pushLoading}
+                >
+                  {pushLoading ? '처리 중...' : pushEnabled ? '알림 끄기' : '알림 받기'}
+                </button>
+              </div>
+            )}
+            {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
+          </div>
         )}
 
         {/* 로그아웃 */}

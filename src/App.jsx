@@ -13,6 +13,7 @@ import GroupPage from './pages/GroupPage'
 import GroupSetupPage from './pages/GroupSetupPage'
 import GroupSettingsPage from './pages/GroupSettingsPage'
 import JoinPage from './pages/JoinPage'
+import NotificationsPage from './pages/NotificationsPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import StatusGuidePage from './pages/admin/guide/StatusGuidePage'
 import TermsPage from './pages/admin/TermsPage'
@@ -50,6 +51,7 @@ function AppRoutes() {
       <Route path="/group-setup" element={guestSafe(<GroupSetupPage />)} />
       <Route path="/group/:id/settings" element={guestSafe(<GroupSettingsPage />)} />
       <Route path="/join/:code"  element={<JoinPage />} />
+      <Route path="/notifications" element={guestSafe(<NotificationsPage />)} />
       <Route path="/admin" element={<AdminLayout />}>
         <Route index element={<Navigate to="/admin/guide/status" replace />} />
         <Route path="guide/status" element={<StatusGuidePage />} />

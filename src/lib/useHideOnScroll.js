@@ -11,7 +11,11 @@ export function useHideOnScroll({ threshold = 48, delta = 6 } = {}) {
     lastY.current = window.scrollY
 
     const update = () => {
-      const y = window.scrollY
+      // 모바일 오버스크롤(고무줄 바운스) 구간에서는 scrollY가 범위를 벗어나며 미세하게
+      // 진동하는데, 이걸 그대로 diff에 반영하면 헤더가 보였다 숨었다를 반복해 떨려 보인다.
+      // 유효 범위로 클램프해서 바운스 중엔 diff가 0에 가깝게 유지되도록 한다.
+      const maxScroll = Math.max(0, document.documentElement.scrollHeight - window.innerHeight)
+      const y = Math.min(Math.max(window.scrollY, 0), maxScroll)
       const diff = y - lastY.current
       if (y < threshold) setHidden(false)
       else if (diff > delta) setHidden(true)
