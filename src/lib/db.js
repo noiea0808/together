@@ -55,6 +55,17 @@ export async function signInWithGoogle() {
   if (error) throw error
 }
 
+export async function signInWithKakao() {
+  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
+  const returnTo = sessionStorage.getItem('returnTo') || '/today'
+  sessionStorage.removeItem('returnTo')
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: { redirectTo: window.location.origin + returnTo },
+  })
+  if (error) throw error
+}
+
 export async function getSessionUser() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return null
@@ -799,6 +810,15 @@ export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_tim
     })
     .eq('id', id)
   if (error) throw error
+
+  // 적용 시작일 이후로 이미 예전 설정으로 자동 생성돼 있던 기본팟은 지운다.
+  // (ensureDefaultPots가 다음 로드 때 새 설정으로 다시 만들어주므로, 적용 시작일부터 즉시 반영된다.)
+  await supabase
+    .from('meal_pots')
+    .delete()
+    .eq('config_id', id)
+    .eq('is_default', true)
+    .gte('date', effective_from)
 }
 
 export async function deleteGroupDefaultPotConfig(id, fromDate) {
