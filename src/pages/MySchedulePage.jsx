@@ -15,10 +15,10 @@ function toDateStr(d) {
   return `${year}-${month}-${day}`
 }
 
-function getTwoWeekDates() {
+function getTwoWeekDates(offset = 0) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const sunday = new Date(today)
-  sunday.setDate(today.getDate() - today.getDay())
+  sunday.setDate(today.getDate() - today.getDay() + offset * 14)
   return Array.from({ length: 14 }, (_, i) => {
     const d = new Date(sunday)
     d.setDate(sunday.getDate() + i)
@@ -34,10 +34,12 @@ export default function MySchedulePage() {
   const [statuses, setStatuses] = useState([])
   const [loading, setLoading] = useState(true)
   const [expandedDates, setExpandedDates] = useState(new Set())
+  const [weekOffset, setWeekOffset] = useState(0)
 
-  const dates = getTwoWeekDates()
+  const dates = getTwoWeekDates(weekOffset)
   const fromDate = toDateStr(dates[0])
   const toDate = toDateStr(dates[dates.length - 1])
+  const rangeLabel = `${dates[0].getMonth() + 1}.${dates[0].getDate()} - ${dates[13].getMonth() + 1}.${dates[13].getDate()}`
 
   useEffect(() => {
     if (!user) return
@@ -74,6 +76,11 @@ export default function MySchedulePage() {
     <div style={S.page}>
       <div style={S.header}>
         <span style={S.headerTitle}>나의 일정</span>
+        <div style={S.nav}>
+          <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
+          <span style={S.navLabel}>{rangeLabel}</span>
+          <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
+        </div>
       </div>
 
       <div style={S.list}>
@@ -107,7 +114,7 @@ export default function MySchedulePage() {
                 <div style={S.monthLabel}>{date.getMonth() + 1}월</div>
               )}
               <div
-                style={{ ...S.card, background: cardBg, border: `1.5px solid ${cardBorder}`, opacity: isPast && !hasStatus ? 0.4 : 1 }}
+                style={{ ...S.card, background: cardBg, border: `1.5px solid ${cardBorder}` }}
                 onClick={() => toggleDate(dateStr)}
               >
                 <div style={S.row}>
@@ -176,8 +183,16 @@ const S = {
   header: {
     padding: '18px 20px 12px', position: 'sticky', top: 0,
     background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
+  nav: { display: 'flex', alignItems: 'center', gap: 8 },
+  navBtn: {
+    width: 26, height: 26, borderRadius: '50%', border: '1px solid #EDE8E3', background: '#fff',
+    color: '#857B72', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', lineHeight: 1,
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+  },
+  navLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#857B72', minWidth: 76, textAlign: 'center' },
   list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 

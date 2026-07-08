@@ -1,11 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-
-function isPotExpired(pot) {
-  if (!pot.end_time || !pot.date) return false
-  const [h, m] = pot.end_time.slice(0, 5).split(':').map(Number)
-  const expiry = new Date(`${pot.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`)
-  return new Date() > expiry
-}
+import { isPotTimeExpired } from '../lib/potConstants'
 
 export default function PotCard({ pot }) {
   const navigate = useNavigate()
@@ -19,7 +13,7 @@ export default function PotCard({ pot }) {
 
   const filled = participants.length
   const isFull = filled >= pot.max_people
-  const expired = isPotExpired(pot)
+  const expired = isPotTimeExpired(pot.date, pot.end_time)
   const timeStr = typeof pot.meal_time === 'string' ? pot.meal_time.slice(0, 5) : pot.meal_time
   const endStr = pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''
 

@@ -45,6 +45,15 @@ const STATUS_DETAILS = {
       '사용자가 직접 선택할 수 없으며, 밥팟 참여 시 자동으로 설정된다.',
       '밥팟에서 나가면 "약속 없음(open)"으로 자동 복원된다.',
       '같은 슬롯에 중복으로 밥팟을 개설하거나 참여할 수 없다.',
+      '밥팟의 종료 시간(end_time)이 지나면 자동으로 "참여완료"로 전환된다.',
+    ],
+    autoSet: true,
+  },
+  참여완료: {
+    description: '참여했던 밥팟의 종료 시간이 지나 마무리된 상태.',
+    rules: [
+      '사용자가 직접 선택할 수 없으며, 참여 중이던 밥팟의 end_time이 지나면 자동으로 설정된다.',
+      '별도로 저장되지 않고, 팟 시간 경과 여부에 따라 매번 파생되어 표시된다.',
     ],
     autoSet: true,
   },
@@ -240,11 +249,18 @@ function TabTransition() {
           note="밥팟에서 나가면 상태가 '약속 없음(open)'으로 자동 복원된다."
         />
         <TransitionCard
+          from="참여중"
+          to="참여완료"
+          trigger="밥팟 종료 시간(end_time) 경과"
+          direction="auto"
+          note="참여 중이던 밥팟의 종료 시간이 지나면 자동으로 '참여완료'로 표시된다."
+        />
+        <TransitionCard
           from="(모든 상태)"
           to="open / skip / closed"
           trigger="사용자 직접 선택"
           direction="manual"
-          note="'참여중' 상태는 사용자가 직접 선택할 수 없다. 다른 세 가지 상태는 언제든 수동 변경 가능."
+          note="'참여중'/'참여완료' 상태는 사용자가 직접 선택할 수 없다. 다른 세 가지 상태는 언제든 수동 변경 가능."
         />
       </div>
     </div>
@@ -387,7 +403,7 @@ function TabSchema() {
             ['user_id',   'uuid',    '사용자 ID (FK → users)'],
             ['date',      'date',    'KST 기준 YYYY-MM-DD'],
             ['slot',      'text',    'SLOT_KEYS 중 하나'],
-            ['status',    'text',    "'open' | 'skip' | 'closed' | '참여중'"],
+            ['status',    'text',    "'open' | 'skip' | 'closed' | '참여중' | '참여완료'"],
             ['meal_time', 'text',    '선택. 식사 예정 시간 (예: "12:10")'],
             ['menu',      'text',    '선택. 메뉴 또는 약속명'],
             ['is_hidden', 'boolean', '해당 날짜 전체 슬롯 숨김 여부'],

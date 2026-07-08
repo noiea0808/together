@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { updateNickname, deleteAccount } from '../lib/db'
+import { updateNickname, uploadAvatar, deleteAccount } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import BottomNav from '../components/BottomNav'
+
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
 export default function MyAccountPage() {
   const navigate = useNavigate()
@@ -20,6 +22,34 @@ export default function MyAccountPage() {
   const [withdrawConfirm, setWithdrawConfirm] = useState('')
   const [withdrawing, setWithdrawing] = useState(false)
   const [withdrawError, setWithdrawError] = useState(null)
+  const [avatarUploading, setAvatarUploading] = useState(false)
+  const [avatarError, setAvatarError] = useState(null)
+  const avatarInputRef = useRef(null)
+
+  const handleAvatarChange = async (e) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    setAvatarError(null)
+    if (!file.type.startsWith('image/')) {
+      setAvatarError('이미지 파일만 업로드할 수 있어요.')
+      return
+    }
+    if (file.size > MAX_AVATAR_SIZE) {
+      setAvatarError('5MB 이하의 이미지만 업로드할 수 있어요.')
+      return
+    }
+    setAvatarUploading(true)
+    try {
+      const avatar_url = await uploadAvatar(user.id, file)
+      login({ ...user, avatar_url })
+    } catch (e) {
+      console.error(e)
+      setAvatarError('사진 업로드에 실패했어요. 잠시 후 다시 시도해주세요.')
+    } finally {
+      setAvatarUploading(false)
+    }
+  }
 
   const handleSave = async () => {
     if (!nickname.trim() || saving) return
@@ -73,10 +103,34 @@ export default function MyAccountPage() {
       <div style={styles.body}>
         {/* 프로필 */}
         <div style={styles.profileCard}>
-          <div style={styles.avatar}>{(user?.nickname ?? '?')[0]}</div>
+          <div style={styles.avatarWrap} onClick={() => !avatarUploading && avatarInputRef.current?.click()}>
+            {user?.avatar_url ? (
+              <img src={user.avatar_url} alt="" style={styles.avatarImg} />
+            ) : (
+              <div style={styles.avatar}>{(user?.nickname ?? '?')[0]}</div>
+            )}
+            <div style={styles.avatarEditBadge}>
+              {avatarUploading ? (
+                <span style={{ fontSize: 9 }}>...</span>
+              ) : (
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
+                  <circle cx="12" cy="13" r="3.3" />
+                </svg>
+              )}
+            </div>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarChange}
+              style={{ display: 'none' }}
+            />
+          </div>
           <div style={styles.profileInfo}>
             <div style={styles.profileName}>{user?.nickname}</div>
             <div style={styles.profileEmail}>{user?.email}</div>
+            {avatarError && <p style={styles.avatarErrorMsg}>{avatarError}</p>}
           </div>
         </div>
 
@@ -129,10 +183,14 @@ export default function MyAccountPage() {
                 else setShowAndroidGuide(true)
               }}
             >
-              <span>{isPC ? '🔖' : '📲'}</span>
+              {isPC ? (
+                <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M6 3a1 1 0 0 0-1 1v17l7-4.5 7 4.5V4a1 1 0 0 0-1-1H6Z" /></svg>
+              ) : (
+                <span>📲</span>
+              )}
               <span>{isPC ? '즐겨찾기에 추가' : '홈 화면에 앱 추가'}</span>
             </button>
-            <p style={styles.installDesc}>{isPC ? '즐겨찾기에서 빠르게 접속할 수 있어요.' : '아이콘을 탭하면 앱처럼 바로 열려요.'}</p>
+            {!isPC && <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>}
           </div>
         )}
         {isInstalled && (
@@ -286,7 +344,15 @@ const styles = {
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
 
   profileCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
-  avatar: { width: 48, height: 48, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
+  avatar: { width: 48, height: 48, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  avatarImg: { width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', display: 'block' },
+  avatarEditBadge: {
+    position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: '50%',
+    background: '#5C5650', color: '#fff', fontSize: 11, display: 'flex',
+    alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface-2)',
+  },
+  avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: '#f44336', margin: 0 },
   profileInfo: { display: 'flex', flexDirection: 'column', gap: 4 },
   profileName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
