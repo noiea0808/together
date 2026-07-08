@@ -421,7 +421,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('group_share_settings')
       .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
-      .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
+      .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
       .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
@@ -525,7 +525,7 @@ export async function getPotByInviteCode(code) {
 export async function getGroupPots(groupId, date) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)')
     .eq('group_id', groupId)
     .eq('date', date)
   if (error) throw error
@@ -542,11 +542,83 @@ export async function getPot(potId) {
   return data // 삭제됐으면 null
 }
 
+// 밥팟 멤버(본인 제외)에게 알림함 기록 + 푸시 알림 발송. 실패해도 원래 동작을 막지 않는다.
+// eventType: 'join' | 'leave' | 'update' | 'comment' — 알림함에서 종류 배지로 표시
+export async function notifyPotMembers(potId, excludeUserId, { title, body, eventType }) {
+  try {
+    const { data: members } = await supabase
+      .from('pot_members')
+      .select('user_id')
+      .eq('pot_id', potId)
+    const userIds = (members ?? []).map(m => m.user_id).filter(id => id !== excludeUserId)
+    if (userIds.length === 0) return
+    const url = `/pot/${potId}`
+
+    // 알림함 기록 — 푸시 구독/권한 여부와 무관하게 항상 남긴다.
+    // supabase-js는 insert 실패 시 throw하지 않고 {error}만 채워서 반환하므로 직접 체크해야 한다.
+    const rows = userIds.map(user_id => ({ user_id, pot_id: potId, title, body, url, event_type: eventType ?? null }))
+    const { error: insertError } = await supabase.from('notifications').insert(rows)
+    if (insertError) {
+      // event_type 컬럼이 DB에 아직 없는 경우(마이그레이션 미실행) 대비 — 컬럼 없이 재시도
+      console.error('notifyPotMembers insert 실패, event_type 없이 재시도:', insertError)
+      const fallbackRows = rows.map(({ event_type, ...rest }) => rest)
+      const retry = await supabase.from('notifications').insert(fallbackRows)
+      if (retry.error) console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error)
+    }
+
+    const { error: pushError } = await supabase.functions.invoke('send-push', {
+      body: { userIds, title, body, url },
+    })
+    if (pushError) console.warn('notifyPotMembers send-push 실패:', pushError)
+  } catch (e) {
+    console.warn('notifyPotMembers:', e)
+  }
+}
+
+// ── 알림함 ──────────────────────────────────────────
+// 날짜/그룹/밥팟 제목을 함께 보여주기 위해 밥팟·그룹 정보를 조인해서 가져온다.
+export async function getMyNotifications(userId, limit = 50) {
+  const { data, error } = await supabase
+    .from('notifications')
+    .select('*, meal_pots(title, date, slot, is_default, groups(name))')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+  if (error) throw error
+  return data
+}
+
+export async function getUnreadNotificationCount(userId) {
+  const { count, error } = await supabase
+    .from('notifications')
+    .select('id', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('is_read', false)
+  if (error) throw error
+  return count ?? 0
+}
+
+export async function markAllNotificationsRead(userId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ is_read: true })
+    .eq('user_id', userId)
+    .eq('is_read', false)
+  if (error) throw error
+}
+
 export async function joinPot(potId, userId) {
   const { error } = await supabase
     .from('pot_members')
     .upsert({ pot_id: potId, user_id: userId })
   if (error) throw error
+
+  const { data: joined } = await supabase.from('users').select('nickname').eq('id', userId).single()
+  await notifyPotMembers(potId, userId, {
+    title: '같이 먹자',
+    body: `${joined?.nickname ?? '누군가'}님이 밥팟에 참여했어요.`,
+    eventType: 'join',
+  })
 }
 
 // 게스트로 밥팟 참여: 익명 세션 발급 → 게스트 프로필 생성 → 참여. 게스트 프로필 반환.
@@ -602,6 +674,17 @@ export async function getGuestHome(potId) {
 }
 
 export async function leavePot(potId, userId) {
+  const { data: left } = await supabase.from('users').select('nickname').eq('id', userId).single()
+
+  // 알림함 INSERT 의 RLS는 "내가 이 팟의 멤버인가"를 검사한다.
+  // pot_members 를 먼저 지워버리면 나가는 사람 본인이 더 이상 멤버가 아니게 되어
+  // 알림 기록이 조용히 실패한다 — 그래서 삭제보다 먼저 알림을 보낸다.
+  await notifyPotMembers(potId, userId, {
+    title: '같이 먹자',
+    body: `${left?.nickname ?? '누군가'}님이 밥팟에서 나갔어요.`,
+    eventType: 'leave',
+  })
+
   const { error } = await supabase
     .from('pot_members')
     .delete()
@@ -897,5 +980,43 @@ export async function updatePotMenu(potId, menu) {
     .from('meal_pots')
     .update({ menu: menu || null })
     .eq('id', potId)
+  if (error) throw error
+}
+
+// ── 밥팟 코멘트 ──────────────────────────────────────
+export async function getPotComments(potId) {
+  const { data, error } = await supabase
+    .from('pot_comments')
+    .select('id, content, created_at, user_id, users(nickname, is_guest)')
+    .eq('pot_id', potId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addPotComment(potId, userId, content) {
+  const trimmed = content.trim()
+  const { data, error } = await supabase
+    .from('pot_comments')
+    .insert({ pot_id: potId, user_id: userId, content: trimmed })
+    .select('id, content, created_at, user_id, users(nickname, is_guest)')
+    .single()
+  if (error) throw error
+
+  const preview = trimmed.length > 40 ? `${trimmed.slice(0, 40)}…` : trimmed
+  await notifyPotMembers(potId, userId, {
+    title: '같이 먹자',
+    body: `${data.users?.nickname ?? '누군가'}: ${preview}`,
+    eventType: 'comment',
+  })
+
+  return data
+}
+
+export async function deletePotComment(commentId, userId) {
+  const { error } = await supabase
+    .from('pot_comments')
+    .delete()
+    .match({ id: commentId, user_id: userId })
   if (error) throw error
 }

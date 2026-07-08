@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, getPotComments, addPotComment, deletePotComment } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
@@ -35,6 +35,15 @@ function durationOf(start, end) {
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)
   return (eh * 60 + em) - (sh * 60 + sm)
+}
+
+function timeAgo(iso) {
+  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+  if (diffMin < 1) return '방금'
+  if (diffMin < 60) return `${diffMin}분 전`
+  const diffHour = Math.floor(diffMin / 60)
+  if (diffHour < 24) return `${diffHour}시간 전`
+  return `${Math.floor(diffHour / 24)}일 전`
 }
 
 function GuestGate({ potId, onJoined, navigate }) {
@@ -120,6 +129,9 @@ export default function PotDetailPage() {
   const [draft, setDraft] = useState(null)
   const [timePicker, setTimePicker] = useState(null)
   const [pickerSnapshot, setPickerSnapshot] = useState(null)
+  const [comments, setComments] = useState([])
+  const [commentText, setCommentText] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
 
   useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker))
   useEscKey(useCallback(() => {
@@ -144,6 +156,34 @@ export default function PotDetailPage() {
   }
 
   useEffect(() => { loadPot() }, [id])
+
+  const loadComments = async () => {
+    try {
+      setComments(await getPotComments(id))
+    } catch (e) { console.error(e) }
+  }
+
+  useEffect(() => { if (user) loadComments() }, [id, user])
+
+  const handlePostComment = async () => {
+    if (!commentText.trim() || postingComment) return
+    setPostingComment(true)
+    try {
+      const comment = await addPotComment(id, user.id, commentText)
+      setComments(prev => [...prev, comment])
+      setCommentText('')
+      invalidateBoard()
+    } catch (e) { console.error(e) }
+    finally { setPostingComment(false) }
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    setComments(prev => prev.filter(c => c.id !== commentId))
+    try {
+      await deletePotComment(commentId, user.id)
+      invalidateBoard()
+    } catch (e) { console.error(e); loadComments() }
+  }
 
   useEffect(() => {
     const onPop = () => loadPot()
@@ -233,15 +273,31 @@ export default function PotDetailPage() {
     if (!draft || actionLoading) return
     setActionLoading(true)
     try {
+      const newMealTime = draft.time_enabled ? draft.meal_time : null
+      const newEndTime = draft.time_enabled ? (draft.end_time || null) : null
+      const newTitle = draft.title || pot.title
+      const changes = []
+      if (newTitle !== pot.title) changes.push('제목')
+      if (newMealTime !== pot.meal_time || newEndTime !== pot.end_time) changes.push('시각')
+
       await updatePot(pot.id, {
-        meal_time: draft.time_enabled ? draft.meal_time : null,
-        end_time: draft.time_enabled ? (draft.end_time || null) : null,
-        title: draft.title || pot.title,
+        meal_time: newMealTime,
+        end_time: newEndTime,
+        title: newTitle,
         menu: draft.menu.trim() || null,
         memo: draft.memo.trim() || null,
         max_people: draft.max_people,
         is_public: draft.is_public,
       }, pot.is_default ? user.id : null)
+
+      if (changes.length > 0) {
+        notifyPotMembers(pot.id, user.id, {
+          title: '같이 먹자',
+          body: `밥팟 ${changes.join('·')}이 변경됐어요.`,
+          eventType: 'update',
+        })
+      }
+
       invalidateBoard()
       await loadPot()
     } catch (e) { console.error(e) }
@@ -307,7 +363,7 @@ export default function PotDetailPage() {
           if (others.length === 0) {
             await deletePot(pot.id)
             invalidateBoard()
-            navigate(-1); return
+            navigate('/today'); return
           } else {
             const next = pot.pot_members.filter(pm => pm.user_id !== user.id).sort((a, b) => new Date(a.joined_at) - new Date(b.joined_at))[0]
             await updatePotCreator(pot.id, next.user_id)
@@ -315,9 +371,7 @@ export default function PotDetailPage() {
         }
         await leavePotWithCleanup(pot.id, user.id)
         invalidateBoard()
-        if (!pot.is_default && participants.length <= 1) {
-          navigate(-1); return
-        }
+        navigate('/today'); return
       } else {
         const myPots = await getMyPotsForSlotAllGroups(user.id, dateStr, pot.slot)
         const otherPot = myPots.find(p => p.pot_id !== pot.id)
@@ -561,6 +615,53 @@ export default function PotDetailPage() {
           </div>
         </div>
 
+        {/* Comments card */}
+        <div style={S.commentsCard}>
+          <div style={S.membersHeader}>
+            <span style={S.membersTitle}>코멘트</span>
+            <span style={S.membersCount}>{comments.length}개</span>
+          </div>
+          <div style={S.commentsList}>
+            {comments.length === 0 && <p style={S.commentsEmpty}>아직 코멘트가 없어요.</p>}
+            {comments.map(c => (
+              <div key={c.id} style={S.commentItem}>
+                <div style={{ ...S.commentAvatar, background: avBg(c.users?.nickname ?? '?') }}>
+                  {(c.users?.nickname ?? '?')[0]}
+                </div>
+                <div style={S.commentBody}>
+                  <div style={S.commentMetaRow}>
+                    <span style={S.commentName}>{c.users?.nickname ?? '탈퇴한 사용자'}</span>
+                    <span style={S.commentTime}>{timeAgo(c.created_at)}</span>
+                  </div>
+                  <div style={S.commentText}>{c.content}</div>
+                </div>
+                {c.user_id === user?.id && (
+                  <button style={S.commentDeleteBtn} onClick={() => handleDeleteComment(c.id)}>삭제</button>
+                )}
+              </div>
+            ))}
+          </div>
+          {isJoined && (
+            <div style={S.commentInputRow}>
+              <input
+                style={S.commentInput}
+                placeholder="코멘트 남기기"
+                value={commentText}
+                onChange={e => setCommentText(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+                maxLength={200}
+              />
+              <button
+                style={{ ...S.commentSendBtn, opacity: commentText.trim() && !postingComment ? 1 : 0.4 }}
+                onClick={handlePostComment}
+                disabled={!commentText.trim() || postingComment}
+              >
+                등록
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Action buttons */}
         {isPotExpired ? (
           <div style={S.expiredCard}>종료된 밥팟이에요</div>
@@ -783,6 +884,22 @@ const S = {
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
   kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   memberName: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
+
+  /* Comments card */
+  commentsCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 18, padding: 16 },
+  commentsList: { display: 'flex', flexDirection: 'column', gap: 12 },
+  commentsEmpty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
+  commentItem: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+  commentAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-2xs)' },
+  commentBody: { flex: 1, minWidth: 0 },
+  commentMetaRow: { display: 'flex', alignItems: 'center', gap: 6 },
+  commentName: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)' },
+  commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
+  commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
+  commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
+  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
+  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
 
   /* Action buttons */
   joinBtn: { ...PRIMARY_ACTION_BUTTON },
