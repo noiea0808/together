@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signUp, signIn, signInWithGoogle } from '../lib/db'
+import { signUp, signIn, signInWithGoogle, signInWithKakao } from '../lib/db'
 import { useUser } from '../lib/UserContext'
 
 const ERROR_MESSAGES = {
@@ -28,7 +28,7 @@ function LoginSelect({ onEmail, hasPendingInvite }) {
         <GoogleIcon />
         <span>Google로 계속하기</span>
       </button>
-      <button style={{ ...styles.socialBtn, ...styles.kakaoBtn }} onClick={() => alert('카카오 로그인 — 준비 중')}>
+      <button style={{ ...styles.socialBtn, ...styles.kakaoBtn }} onClick={async () => { try { await signInWithKakao() } catch (e) { alert('카카오 로그인 실패: ' + e.message) } }}>
         <KakaoIcon />
         <span>카카오로 계속하기</span>
       </button>

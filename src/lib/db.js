@@ -55,6 +55,17 @@ export async function signInWithGoogle() {
   if (error) throw error
 }
 
+export async function signInWithKakao() {
+  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
+  const returnTo = sessionStorage.getItem('returnTo') || '/today'
+  sessionStorage.removeItem('returnTo')
+  const { error } = await supabase.auth.signInWithOAuth({
+    provider: 'kakao',
+    options: { redirectTo: window.location.origin + returnTo },
+  })
+  if (error) throw error
+}
+
 export async function getSessionUser() {
   const { data: { session } } = await supabase.auth.getSession()
   if (!session) return null
