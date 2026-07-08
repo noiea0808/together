@@ -16,3 +16,10 @@ export const DURATION_OPTIONS = [
   { min: 90, label: '1.5시간' },
   { min: 120, label: '2시간' },
 ]
+
+export function isPotTimeExpired(date, end_time) {
+  if (!date || !end_time) return false
+  const [h, m] = end_time.slice(0, 5).split(':').map(Number)
+  const expiry = new Date(`${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
+  return new Date() > expiry
+}

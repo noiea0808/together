@@ -5,6 +5,7 @@ import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatu
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
+import { isPotTimeExpired } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
 import Header from '../components/Header'
@@ -538,7 +539,8 @@ export default function TodayPage() {
             const potCount = myPotsInSlot.length
             const earliestPot = myPotsInSlot[0]
             const isInPot = potCount > 0
-            const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
+            const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
+            const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')) : null
             const displayOpt = lockedOpt ?? opt
 
             const cardStatusOpt = isInPot ? lockedOpt : displayOpt
@@ -774,7 +776,8 @@ export default function TodayPage() {
               .filter(p => p.slot === editingSlot && p.pot_members?.some(pm => pm.user_id === user.id))
               .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
             if (myPotsInSlot.length === 0) return null
-            const lockedOpt = SLOT_STATUS_OPTIONS.find(o => o.key === '참여중')
+            const inPotExpired = isPotTimeExpired(dateStr, myPotsInSlot[0].end_time)
+            const lockedOpt = SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중'))
             return (
               <>
                 <div style={styles.potInfoBanner}>
@@ -1285,6 +1288,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
   const isInPot = amIInAnyPot // 전체 그룹 기준 (상태 표시용)
   const isInThisGroupPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId)) // 이 그룹 팟 참여 여부 (헤더 색상용)
+  const myGroupPot = isInThisGroupPot ? pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId)) : null
+  const isMyGroupPotExpired = isInThisGroupPot && isPotTimeExpired(dateStr, myGroupPot?.end_time)
 
   const getMemberData = (userId) => {
     if (userId === myUserId) {
@@ -1292,8 +1297,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       // mySlots는 time 키 사용 → 표시용 meal_time으로 매핑
       const mine = mySlotData ? { ...mySlotData, meal_time: mySlotData.time } : null
       if (isInThisGroupPot) {
-        const myPot = pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId))
-        return { ...mine, status: '참여중', meal_time: myPot?.meal_time ?? mine?.meal_time, end_time: myPot?.end_time ?? mine?.end_time }
+        const status = isMyGroupPotExpired ? '참여완료' : '참여중'
+        return { ...mine, status, meal_time: myGroupPot?.meal_time ?? mine?.meal_time, end_time: myGroupPot?.end_time ?? mine?.end_time }
       }
       if (amIInAnyPot) {
         // 다른 그룹 팟 참여 → 약속있음. 팟 시간은 파생된 statuses 행에서 가져옴
@@ -1305,7 +1310,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
     const s = statuses.find(s => s.user_id === userId && s.slot === slot)
     if (!s || s.is_hidden) return null
     // 참여중인데 이 그룹 팟에 없으면 → 다른 그룹 팟 참여중 → 약속있음으로 표시
-    if (s.status === '참여중') {
+    if (s.status === '참여중' || s.status === '참여완료') {
       const isInThisPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === userId))
       if (!isInThisPot) return { ...s, status: 'closed' }
     }
@@ -1334,8 +1339,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // 날짜/슬롯을 바꿔가며 볼 때는 '같이 가능' 필터가 선택된 상태로 리셋
   useEffect(() => { setStatusFilter('open') }, [dateStr, slot])
 
-  // Filter tabs: 같이 가능 / 참여중 / 약속있음 / 패스 / 미설정 순서 고정
-  const FILTER_TAB_ORDER = ['open', '참여중', 'closed', 'skip']
+  // Filter tabs: 같이 가능 / 참여중 / 참여완료 / 약속있음 / 패스 / 미설정 순서 고정
+  const FILTER_TAB_ORDER = ['open', '참여중', '참여완료', 'closed', 'skip']
   const filterTabs = [
     ...FILTER_TAB_ORDER.map(key => ({ ...SLOT_STATUS_OPTIONS.find(o => o.key === key), count: statusCounts[key] ?? 0 })),
     { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6', count: unsetMembers.length },
@@ -1357,7 +1362,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>🍚 참여중</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : '🍚 참여중'}</span>
           ) : (
             <button
               style={{
@@ -1475,9 +1480,13 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     )}
                     {members.filter(m => m.id !== myUserId).map(member => (
                       <div key={member.id} style={styles.sheetMemberRow}>
-                        <div style={{ ...styles.avatar, background: '#888' }}>
-                          {member.nickname[0]}
-                        </div>
+                        {member.avatar_url ? (
+                          <img src={member.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                        ) : (
+                          <div style={{ ...styles.avatar, background: '#888' }}>
+                            {member.nickname[0]}
+                          </div>
+                        )}
                         <span style={styles.sheetMemberName}>{member.nickname}</span>
                         <button
                           style={styles.sheetRemoveBtn}
@@ -1609,12 +1618,16 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 padding: '7px 0',
                 borderBottom: `1px solid #F5F0EB`,
               }}>
-                <div style={{
-                  width: 30, height: 30, borderRadius: '50%',
-                  background: isMe ? 'var(--color-primary)' : '#857B72',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
-                }}>{member.nickname[0]}</div>
+                {member.avatar_url ? (
+                  <img src={member.avatar_url} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                ) : (
+                  <div style={{
+                    width: 30, height: 30, borderRadius: '50%',
+                    background: isMe ? 'var(--color-primary)' : '#857B72',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
+                  }}>{member.nickname[0]}</div>
+                )}
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
                   {member.nickname}{isMe ? ' (나)' : ''}
                 </span>

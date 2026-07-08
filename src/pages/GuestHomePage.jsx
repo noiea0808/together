@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getGuestHome } from '../lib/db'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
+import { isPotTimeExpired } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
 const JOINED_OPT = SLOT_STATUS_OPTIONS.find(o => o.key === '참여중')
+const DONE_OPT = SLOT_STATUS_OPTIONS.find(o => o.key === '참여완료')
 
 const WEEKDAYS = ['일', '월', '화', '수', '목', '금', '토']
 function formatDate(dateStr) {
@@ -62,12 +64,13 @@ export default function GuestHomePage() {
             {SLOT_ORDER.map(slot => {
               const pot = potBySlot[slot]
               const isInPot = !!pot
+              const opt = isInPot && isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT
               return (
                 <div
                   key={slot}
                   style={{
                     ...styles.slotCard,
-                    background: isInPot ? JOINED_OPT.color + '0d' : 'var(--color-surface)',
+                    background: isInPot ? opt.color + '0d' : 'var(--color-surface)',
                     opacity: isInPot ? 1 : 0.55,
                   }}
                 >
@@ -76,8 +79,8 @@ export default function GuestHomePage() {
                     {isInPot ? (
                       <>
                         <div style={styles.slotStatusRow}>
-                          <span style={{ fontSize: 18, lineHeight: 1 }}>{JOINED_OPT.emoji}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: JOINED_OPT.color }}>{JOINED_OPT.label}</span>
+                          <span style={{ fontSize: 18, lineHeight: 1 }}>{opt.emoji}</span>
+                          <span style={{ fontSize: 12, fontWeight: 700, color: opt.color }}>{opt.label}</span>
                         </div>
                         <div style={styles.slotMeta}>{pot.meal_time?.slice(0, 5)}</div>
                         <div style={{ ...styles.slotMeta, fontSize: 11 }}>{pot.title}</div>

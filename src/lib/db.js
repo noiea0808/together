@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { isPotTimeExpired } from './potConstants'
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {
@@ -335,10 +336,11 @@ function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenK
     if (mp.group_id === groupId) {
       map[key] = {
         user_id: pm.user_id, date, slot: mp.slot,
-        status: '참여중', meal_time: mp.meal_time,
+        status: isPotTimeExpired(date, mp.end_time) ? '참여완료' : '참여중',
+        meal_time: mp.meal_time, end_time: mp.end_time,
         menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
       }
-    } else if (!existing || existing.status !== '참여중') {
+    } else if (!existing || (existing.status !== '참여중' && existing.status !== '참여완료')) {
       // 다른 그룹 팟 참여 → 약속있음. 시간은 노출하되 메뉴(상대 그룹 정보)는 비노출
       map[key] = {
         user_id: pm.user_id, date, slot: mp.slot,
@@ -367,7 +369,7 @@ export async function getGroupStatuses(groupId, date) {
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('pot_members')
-      .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
+      .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
   ])
   if (statusRes.error) throw statusRes.error
@@ -421,7 +423,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('meal_pots')
       .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
-      .select('user_id, meal_pots!inner(group_id, slot, meal_time, date)')
+      .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
   ])
   if (statusRes.error) throw statusRes.error
@@ -633,7 +635,7 @@ export async function getMySchedule(userId, fromDate, toDate) {
     supabase.from('daily_status')
       .select('*').eq('user_id', userId).gte('date', fromDate).lte('date', toDate),
     supabase.from('pot_members')
-      .select('meal_pots!inner(slot, meal_time, date)')
+      .select('meal_pots!inner(slot, meal_time, end_time, date)')
       .eq('user_id', userId)
       .gte('meal_pots.date', fromDate)
       .lte('meal_pots.date', toDate),
@@ -649,7 +651,8 @@ export async function getMySchedule(userId, fromDate, toDate) {
     const existing = map[key]
     map[key] = {
       user_id: userId, date: mp.date, slot: mp.slot,
-      status: '참여중', meal_time: mp.meal_time,
+      status: isPotTimeExpired(mp.date, mp.end_time) ? '참여완료' : '참여중',
+      meal_time: mp.meal_time, end_time: mp.end_time,
       menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
     }
   })
@@ -720,6 +723,29 @@ export async function updateNickname(userId, nickname) {
     .update({ nickname })
     .eq('id', userId)
   if (error) throw error
+}
+
+export async function uploadAvatar(userId, file) {
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) throw new Error('로그인이 필요합니다.')
+
+  const ext = file.name.split('.').pop()
+  const path = `${authUser.id}/avatar.${ext}`
+  const { error: uploadError } = await supabase.storage
+    .from('avatars')
+    .upload(path, file, { upsert: true, cacheControl: '3600' })
+  if (uploadError) throw uploadError
+
+  const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(path)
+  const avatar_url = `${publicUrl}?t=${Date.now()}`
+
+  const { error: updateError } = await supabase
+    .from('users')
+    .update({ avatar_url })
+    .eq('id', userId)
+  if (updateError) throw updateError
+
+  return avatar_url
 }
 
 // 그룹 전용 닉네임 설정 (null 이면 기본 닉네임으로 복원)
