@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
+import { getDeferredInstallPrompt, onInstallPromptReady, clearDeferredInstallPrompt } from '../lib/installPrompt'
 
 export function useInstallPrompt() {
-  const [installPrompt, setInstallPrompt] = useState(null)
+  const [installPrompt, setInstallPrompt] = useState(() => getDeferredInstallPrompt())
   const [isInstalled, setIsInstalled] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const [isAndroid, setIsAndroid] = useState(false)
@@ -17,19 +18,19 @@ export function useInstallPrompt() {
       || window.navigator.standalone === true
     setIsInstalled(installed)
 
-    const handler = (e) => {
-      e.preventDefault()
-      setInstallPrompt(e)
-    }
-    window.addEventListener('beforeinstallprompt', handler)
-    return () => window.removeEventListener('beforeinstallprompt', handler)
+    // main.jsx 로드 시점에 이미 캡처됐을 수도 있는 이벤트를 즉시 받고,
+    // 이 훅이 마운트된 이후에 뒤늦게 발생하는 경우도 계속 구독한다.
+    return onInstallPromptReady(setInstallPrompt)
   }, [])
 
   const triggerInstall = async () => {
     if (!installPrompt) return false
     installPrompt.prompt()
     const { outcome } = await installPrompt.userChoice
-    if (outcome === 'accepted') setInstallPrompt(null)
+    if (outcome === 'accepted') {
+      clearDeferredInstallPrompt()
+      setInstallPrompt(null)
+    }
     return outcome === 'accepted'
   }
 
