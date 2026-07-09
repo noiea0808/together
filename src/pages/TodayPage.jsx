@@ -17,7 +17,7 @@ import RiceBowlIcon from '../components/RiceBowlIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
-const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
+const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
 
 const SLOT_TIME_PRESETS = {
@@ -78,6 +78,14 @@ export default function TodayPage() {
   const [selectedSlot, setSelectedSlot] = useState(
     () => localStorage.getItem('lastSelectedSlot') || '점심'
   )
+  const subSlotRowRef = useRef(null)
+  // scrollBy({behavior:'smooth'}) 옵션객체 시그니처는 일부 인앱 브라우저(WebView)에서 지원이 불안정해
+  // CSS scrollBehavior + 직접 scrollLeft 대입 방식(범용 호환)으로 스크롤한다.
+  const scrollSubSlots = (dir) => {
+    const el = subSlotRowRef.current
+    if (!el) return
+    el.scrollLeft += dir * 200
+  }
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
   const [slotEndPickerOpen, setSlotEndPickerOpen] = useState(false)
@@ -565,76 +573,90 @@ export default function TodayPage() {
         </button>
       </div>
 
-      {/* 나의 상태 — 메인 표시창 + 서브 참여창 */}
-      <div style={styles.myCard}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={styles.myCardTitle}>내 {selectedSlot} 상태</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {(() => {
-              const info = getSlotInfo(selectedSlot)
-              if (info.isPastDate) return null
-              return (
-                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
-              )
-            })()}
-            <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
-              ↺ 초기화
-            </button>
-          </div>
-        </div>
-
-        {/* 메인 표시창: 선택된 슬롯의 상태를 크게 표시 */}
+      {/* 나의 상태 — 메인 표시창 + 서브 참여창: 화면 좌우 끝까지 꽉 채워 표시 */}
+      <div style={styles.myStatusSection}>
+        {/* 메인 표시창: 선택된 슬롯의 상태를 화면 폭 가득 크게 표시 */}
         {(() => {
           const info = getSlotInfo(selectedSlot)
           return (
             <div style={{ ...styles.mainStatusCard, background: info.bg, borderColor: info.border }}>
-              <div style={styles.mainStatusIconWrap}>
-                <span style={{ fontSize: 30 }}>{info.emoji}</span>
+              <div style={styles.mainStatusHeaderRow}>
+                <span style={styles.mainStatusTitle}>내 {selectedSlot} 상태</span>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  {!info.isPastDate && (
+                    <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
+                  )}
+                  <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
+                    ↺ 초기화
+                  </button>
+                </div>
               </div>
-              <div style={styles.mainStatusTextCol}>
-                {info.label ? (
-                  <>
-                    <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
-                    {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
-                    {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
-                  </>
-                ) : (
-                  <span style={styles.mainStatusEmpty}>
-                    {info.isPastDate ? '기록 없음' : '탭해서 상태를 설정해보세요'}
-                  </span>
-                )}
+              <div style={styles.mainStatusBody}>
+                <div style={styles.mainStatusIconWrap}>
+                  <span style={{ fontSize: 30 }}>{SLOT_EMOJI[selectedSlot]}</span>
+                </div>
+                <div style={styles.mainStatusTextCol}>
+                  {info.label ? (
+                    <>
+                      <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                      {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
+                      {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
+                    </>
+                  ) : (
+                    <span style={styles.mainStatusEmpty}>
+                      {info.isPastDate ? '기록 없음' : '탭해서 상태를 설정해보세요'}
+                    </span>
+                  )}
+                </div>
+                {info.isInPot && <RiceBowlIcon size={52} style={{ flexShrink: 0, opacity: 0.9 }} />}
               </div>
-              {info.isInPot && <RiceBowlIcon size={52} style={{ flexShrink: 0, opacity: 0.9 }} />}
             </div>
           )
         })()}
 
-        {/* 서브 참여창: 슬롯 선택 */}
-        <div style={styles.subSlotRow}>
-          {SLOT_ORDER.map(slot => {
-            const info = getSlotInfo(slot)
-            const isSelected = selectedSlot === slot
-            return (
-              <button
-                key={slot}
-                style={{
-                  ...styles.subSlotBtn,
-                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                  background: isSelected ? 'rgba(255,107,53,0.06)' : 'var(--color-surface)',
-                  opacity: info.isPastDate ? 0.65 : 1,
-                }}
-                onClick={() => {
-                  setSelectedSlot(slot)
-                  localStorage.setItem('lastSelectedSlot', slot)
-                }}
-              >
-                <span style={styles.subSlotEmoji}>{SLOT_EMOJI[slot]}</span>
-                <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : 'var(--color-text)' }}>{slot}</span>
-                <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
-              </button>
-            )
-          })}
+        {/* 서브 참여창: 슬롯 선택 — 아이콘은 텍스트 왼쪽, 화면 끝까지 꽉 채우고 좌우 화살표는 겹쳐서 표시 */}
+        {(() => {
+          const mainInfo = getSlotInfo(selectedSlot)
+          return (
+        <div style={{ ...styles.subSlotWrap, background: mainInfo.bg }}>
+          <div style={styles.subSlotRow} className="no-scrollbar" ref={subSlotRowRef}>
+            {SLOT_ORDER.map(slot => {
+              const info = getSlotInfo(slot)
+              const isSelected = selectedSlot === slot
+              return (
+                <button
+                  key={slot}
+                  style={{
+                    ...styles.subSlotBtn,
+                    borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                    background: isSelected ? 'rgba(255,107,53,0.06)' : 'var(--color-surface)',
+                    opacity: info.isPastDate ? 0.65 : 1,
+                  }}
+                  onClick={() => {
+                    setSelectedSlot(slot)
+                    localStorage.setItem('lastSelectedSlot', slot)
+                  }}
+                >
+                  <span style={styles.subSlotEmojiWrap}>{SLOT_EMOJI[slot]}</span>
+                  <span style={styles.subSlotTextCol}>
+                    <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : 'var(--color-text)' }}>{slot}</span>
+                    <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+          <div style={{ ...styles.subSlotFadeLeft, background: `linear-gradient(to right, ${mainInfo.bg}, transparent)` }} />
+          <div style={{ ...styles.subSlotFadeRight, background: `linear-gradient(to left, ${mainInfo.bg}, transparent)` }} />
+          <button style={{ ...styles.subSlotArrowBtn, left: 2 }} onClick={() => scrollSubSlots(-1)} aria-label="이전">
+            <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
+          <button style={{ ...styles.subSlotArrowBtn, right: 2 }} onClick={() => scrollSubSlots(1)} aria-label="다음">
+            <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7.5 7.5L1.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+          </button>
         </div>
+          )
+        })()}
       </div>
 
       {/* 그룹별 현황 */}
@@ -1795,9 +1817,8 @@ const styles = {
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
-  myCard: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
-  myCardTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
-  resetAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' },
+  myStatusSection: { display: 'flex', flexDirection: 'column', gap: 0, width: 'calc(100% + 2 * var(--spacing-md))', margin: 'calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) 0' },
+  resetAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid #D8CFC2', color: 'var(--color-text-muted)' },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
@@ -1833,17 +1854,25 @@ const styles = {
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { width: '100%', padding: 13, background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
-  mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '4px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-primary)', border: 'none', color: '#fff' },
-  mainStatusCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: '1.5px solid', transition: 'background 0.15s, border-color 0.15s' },
+  mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '6px 14px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: '#fff', border: '1px solid var(--color-border)', color: 'var(--color-text)' },
+  mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 10, width: '100%', boxSizing: 'border-box', padding: '16px var(--spacing-md)', borderRadius: 0, border: '1.5px solid', transition: 'background 0.15s, border-color 0.15s' },
+  mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  mainStatusTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
+  mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
   mainStatusIconWrap: { width: 56, height: 56, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
-  mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 800, letterSpacing: '-0.3px' },
+  mainStatusLabel: { fontSize: 'var(--font-size-base)', fontWeight: 800, letterSpacing: '-0.3px' },
   mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: '#857B72', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-sm)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
-  subSlotRow: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 },
-  subSlotBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 2px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
-  subSlotEmoji: { fontSize: 16 },
+  subSlotWrap: { position: 'relative' },
+  subSlotFadeLeft: { position: 'absolute', top: 0, bottom: 2, left: 0, width: 30, background: 'linear-gradient(to right, var(--color-bg), transparent)', pointerEvents: 'none', zIndex: 2 },
+  subSlotFadeRight: { position: 'absolute', top: 0, bottom: 2, right: 0, width: 30, background: 'linear-gradient(to left, var(--color-bg), transparent)', pointerEvents: 'none', zIndex: 2 },
+  subSlotArrowBtn: { position: 'absolute', top: '50%', transform: 'translateY(-50%)', zIndex: 3, width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: '#857B72', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.14)' },
+  subSlotRow: { display: 'flex', alignItems: 'center', gap: 8, overflowX: 'auto', WebkitOverflowScrolling: 'touch', padding: '8.5px var(--spacing-md)' },
+  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 50, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 14, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
+  subSlotEmojiWrap: { width: 32, height: 32, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, flexShrink: 0, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
+  subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
   subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
   sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
