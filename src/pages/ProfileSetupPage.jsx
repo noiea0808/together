@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getActiveTerms, completeOnboarding } from '../lib/db'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 const LIFESTYLE_OPTIONS = ['학생', '주부', '직장인', '자영업', '프리랜서', '기타']
 
@@ -69,7 +70,7 @@ export default function ProfileSetupPage() {
   return (
     <div style={styles.page}>
       <div style={styles.top}>
-        <div style={styles.logo}>🍚</div>
+        <div style={styles.logo}><RiceBowlIcon size={48} /></div>
         <h1 style={styles.title}>거의 다 왔어요!</h1>
         <p style={styles.sub}>같이 먹자를 시작하기 전에{'\n'}몇 가지만 알려주세요.</p>
       </div>

@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
+import RiceBowlIcon from '../../components/RiceBowlIcon'
 
 const NAV_SECTIONS = [
   {
@@ -33,7 +34,7 @@ export default function AdminLayout() {
       {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.brand}>
-          <span style={s.brandIcon}>🍚</span>
+          <RiceBowlIcon size={28} />
           <div>
             <div style={s.brandName}>같이먹자</div>
             <div style={s.brandSub}>Admin</div>

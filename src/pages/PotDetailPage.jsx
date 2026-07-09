@@ -8,6 +8,7 @@ import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -71,7 +72,7 @@ function GuestGate({ potId, onJoined, navigate }) {
 
   return (
     <div style={gateStyles.page}>
-      <div style={gateStyles.logo}>🍚</div>
+      <div style={gateStyles.logo}><RiceBowlIcon size={52} /></div>
       <h1 style={gateStyles.title}>밥팟에 초대받으셨어요!</h1>
       <p style={gateStyles.sub}>닉네임만 입력하면 바로 참여할 수 있어요.</p>
       <div style={gateStyles.card}>
@@ -387,7 +388,7 @@ export default function PotDetailPage() {
   const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
 
   if (!user) return <GuestGate potId={id} onJoined={login} navigate={navigate} />
-  if (loading) return <div style={S.loadingPage}>🍚</div>
+  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={40} /></div>
   if (!pot) return <div style={S.loadingPage}>밥팟을 찾을 수 없어요.</div>
 
   const timeStr = pot.meal_time ? `${pot.meal_time.slice(0,5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0,5)}` : ''}` : '미정'
@@ -439,7 +440,7 @@ export default function PotDetailPage() {
             </div>
             {/* Icon + title */}
             <div style={S.heroHeader}>
-              <div style={S.heroIcon}>🍚</div>
+              <div style={S.heroIcon}><RiceBowlIcon size={40} /></div>
               <div>
                 <div style={S.heroTitle}>{pot.title}</div>
                 <div style={S.heroSlot}>{pot.slot}</div>
@@ -830,7 +831,7 @@ const S = {
   publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#857B72' },
   publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 99, padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
-  heroIcon: { width: 48, height: 48, background: 'var(--color-primary)', borderRadius: 14, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24, flexShrink: 0 },
+  heroIcon: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
   heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },

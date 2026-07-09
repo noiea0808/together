@@ -5,6 +5,7 @@ import { getGuestHome } from '../lib/db'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
 const JOINED_OPT = SLOT_STATUS_OPTIONS.find(o => o.key === '참여중')
@@ -45,7 +46,7 @@ export default function GuestHomePage() {
   })
 
   if (loading) {
-    return <div style={styles.loadingPage}>🍚<br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
+    return <div style={styles.loadingPage}><RiceBowlIcon size={48} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
   return (

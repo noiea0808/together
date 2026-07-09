@@ -5,6 +5,7 @@ import { getMySchedule } from '../lib/db'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -85,7 +86,7 @@ export default function MySchedulePage() {
 
       <div style={S.list}>
         {loading ? (
-          <div style={S.empty}>🍚</div>
+          <div style={S.empty}><RiceBowlIcon size={40} /></div>
         ) : dates.map((date, idx) => {
           const dateStr = toDateStr(date)
           const dayStatuses = byDate[dateStr] ?? {}

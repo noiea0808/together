@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signUp, signIn, signInWithGoogle, signInWithKakao } from '../lib/db'
 import { useUser } from '../lib/UserContext'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 const ERROR_MESSAGES = {
   'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
@@ -192,7 +193,7 @@ export default function OnboardingPage() {
   return (
     <div style={styles.page}>
       <div style={styles.top}>
-        <div style={styles.logo}>🍚</div>
+        <div style={styles.logo}><RiceBowlIcon size={56} /></div>
         <h1 style={styles.title}>같이 먹자</h1>
         <p style={styles.sub}>오늘 같이 먹을 사람,{'\n'}묻지 말고 확인하기</p>
       </div>

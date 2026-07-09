@@ -4,6 +4,7 @@ import { useHideOnScroll } from '../lib/useHideOnScroll'
 import { useUser } from '../lib/UserContext'
 import { getUnreadNotificationCount } from '../lib/db'
 import { supabase } from '../lib/supabase'
+import RiceBowlIcon from './RiceBowlIcon'
 
 // hidden을 상위에서 넘기면(dateNav 등 다른 sticky 요소와 동기화할 때) 그 값을 쓰고,
 // 아니면 내부에서 스스로 스크롤을 감지한다.
@@ -38,7 +39,7 @@ export default function Header({ hidden: hiddenProp }) {
         borderBottomColor: hidden ? 'transparent' : 'var(--color-border)',
       }}
     >
-      <span style={styles.logo}>🍚</span>
+      <RiceBowlIcon size={22} />
       <span style={styles.title}>같이 먹자</span>
       <button style={styles.bellBtn} onClick={() => navigate('/notifications')} aria-label="알림">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

@@ -13,10 +13,12 @@ import GroupSetupModal from '../components/GroupSetupModal'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
+const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
 
 const SLOT_TIME_PRESETS = {
   '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
@@ -278,7 +280,9 @@ export default function TodayPage() {
           scheduleReload(groupsForUser(changedUserId))
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') console.log('[realtime] daily_status', status, err ?? '')
+      })
 
     const potSub = supabase
       .channel(`pot_changes_${user.id}`)
@@ -297,7 +301,9 @@ export default function TodayPage() {
           scheduleReload(groupsForUser(changedUserId))
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') console.log('[realtime] pot_changes', status, err ?? '')
+      })
 
     const shareSub = supabase
       .channel(`share_settings_${user.id}`)
@@ -317,7 +323,9 @@ export default function TodayPage() {
           }
         }
       )
-      .subscribe()
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') console.log('[realtime] share_settings', status, err ?? '')
+      })
 
     return () => {
       if (timer) clearTimeout(timer)
@@ -492,8 +500,47 @@ export default function TodayPage() {
     try { await setGroupShareSettingBulk(user.id, groupId, dateStr, slot, isShared) } catch {}
   }
 
+  // 슬롯별 현재 상태 요약 — 메인 표시창 / 서브 표시창 공용
+  const getSlotInfo = (slot) => {
+    const data = mySlots[slot]
+    const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+    const isPastDate = currentDate < TODAY
+
+    const myPotsInSlot = Object.values(potsMap).flat()
+      .filter(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
+      .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
+    const potCount = myPotsInSlot.length
+    const earliestPot = myPotsInSlot[0]
+    const isInPot = potCount > 0
+    const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
+    const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')) : null
+    const displayOpt = lockedOpt ?? opt
+
+    let timeStr = null, desc = null
+    if (isInPot) {
+      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
+      const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
+      desc = groupName ? `${groupName}에서 같이 먹는 중` : earliestPot.title
+    } else if (data?.time) {
+      timeStr = `${data.time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
+      desc = data?.menu ?? null
+    }
+
+    return {
+      emoji: displayOpt?.emoji ?? SLOT_EMOJI[slot],
+      label: displayOpt?.label ?? null,
+      color: displayOpt?.color ?? '#ADA59B',
+      bg: isPastDate ? '#F0EEEB' : (displayOpt?.bg ?? 'var(--color-surface)'),
+      border: isPastDate ? '#E8E3DE' : (displayOpt?.border ?? 'var(--color-border)'),
+      timeStr,
+      desc,
+      isInPot,
+      isPastDate,
+    }
+  }
+
   if (loading) {
-    return <div style={styles.loadingPage}>🍚<br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
+    return <div style={styles.loadingPage}><RiceBowlIcon size={40} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
 
@@ -518,118 +565,73 @@ export default function TodayPage() {
         </button>
       </div>
 
-      {/* 나의 상태 슬롯 그리드 */}
+      {/* 나의 상태 — 메인 표시창 + 서브 참여창 */}
       <div style={styles.myCard}>
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={styles.myCardTitle}>오늘 나는?</div>
-          <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
-            ↺ 초기화
-          </button>
+          <div style={styles.myCardTitle}>내 {selectedSlot} 상태</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {(() => {
+              const info = getSlotInfo(selectedSlot)
+              if (info.isPastDate) return null
+              return (
+                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
+              )
+            })()}
+            <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
+              ↺ 초기화
+            </button>
+          </div>
         </div>
-        <div style={styles.slotGrid}>
+
+        {/* 메인 표시창: 선택된 슬롯의 상태를 크게 표시 */}
+        {(() => {
+          const info = getSlotInfo(selectedSlot)
+          return (
+            <div style={{ ...styles.mainStatusCard, background: info.bg, borderColor: info.border }}>
+              <div style={styles.mainStatusIconWrap}>
+                <span style={{ fontSize: 30 }}>{info.emoji}</span>
+              </div>
+              <div style={styles.mainStatusTextCol}>
+                {info.label ? (
+                  <>
+                    <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                    {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
+                    {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
+                  </>
+                ) : (
+                  <span style={styles.mainStatusEmpty}>
+                    {info.isPastDate ? '기록 없음' : '탭해서 상태를 설정해보세요'}
+                  </span>
+                )}
+              </div>
+              {info.isInPot && <RiceBowlIcon size={52} style={{ flexShrink: 0, opacity: 0.9 }} />}
+            </div>
+          )
+        })()}
+
+        {/* 서브 참여창: 슬롯 선택 */}
+        <div style={styles.subSlotRow}>
           {SLOT_ORDER.map(slot => {
-            const data = mySlots[slot]
-            const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+            const info = getSlotInfo(slot)
             const isSelected = selectedSlot === slot
-            const isPastDate = currentDate < TODAY
-
-            const myPotsInSlot = Object.values(potsMap).flat()
-              .filter(p => p.slot === slot && p.pot_members?.some(pm => pm.user_id === user.id))
-              .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
-            const potCount = myPotsInSlot.length
-            const earliestPot = myPotsInSlot[0]
-            const isInPot = potCount > 0
-            const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
-            const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')) : null
-            const displayOpt = lockedOpt ?? opt
-
-            const cardStatusOpt = isInPot ? lockedOpt : displayOpt
-            const cardBg = isPastDate ? '#F0EEEB' : cardStatusOpt ? (cardStatusOpt.bg ?? cardStatusOpt.color + '15') : 'var(--color-surface)'
-            const cardBorder = isPastDate ? '#E8E3DE' : isSelected ? 'var(--color-primary)' : cardStatusOpt ? (cardStatusOpt.border ?? 'var(--color-border)') : 'var(--color-border)'
-
             return (
-              <div
+              <button
                 key={slot}
                 style={{
-                  background: cardBg,
-                  border: `${isSelected && !isPastDate ? 2 : 1.5}px solid ${cardBorder}`,
-                  borderRadius: 14,
-                  overflow: 'hidden',
-                  opacity: isPastDate ? 0.65 : 1,
-                  WebkitTapHighlightColor: 'transparent',
-                  transition: 'border-color 0.15s',
-                  display: 'flex',
-                  flexDirection: 'column',
+                  ...styles.subSlotBtn,
+                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  background: isSelected ? 'rgba(255,107,53,0.06)' : 'var(--color-surface)',
+                  opacity: info.isPastDate ? 0.65 : 1,
+                }}
+                onClick={() => {
+                  setSelectedSlot(slot)
+                  localStorage.setItem('lastSelectedSlot', slot)
                 }}
               >
-                {/* 제목부: 탭하면 현황만 보기 (편집 없음) */}
-                <div
-                  style={{
-                    padding: '8px 9px 7px',
-                    borderBottom: `1px solid ${cardStatusOpt ? (cardStatusOpt.border ?? 'var(--color-border)') : 'var(--color-border)'}`,
-                    background: 'rgba(0,0,0,0.03)',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                  }}
-                  onClick={() => {
-                    setSelectedSlot(slot)
-                    localStorage.setItem('lastSelectedSlot', slot)
-                  }}
-                >
-                  <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', fontWeight: 700, letterSpacing: '-0.1px' }}>
-                    {({ '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' })[slot]} {slot}
-                  </span>
-                </div>
-
-                {/* 설정부: 탭하면 현황 보기 + 편집 가능 */}
-                <div
-                  style={{
-                    flex: 1,
-                    minHeight: 62,
-                    padding: '8px 9px 9px',
-                    cursor: isPastDate ? 'default' : 'pointer',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: 3,
-                  }}
-                  onClick={() => {
-                    if (isPastDate) return
-                    setSelectedSlot(slot)
-                    localStorage.setItem('lastSelectedSlot', slot)
-                    openSlotEditor(slot)
-                  }}
-                >
-                  {isInPot ? (
-                    <>
-                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#FF6B35' }}>{lockedOpt.label}</span>
-                      <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72' }}>
-                        {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
-                      </span>
-                      {earliestPot.title && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
-                      )}
-                    </>
-                  ) : displayOpt ? (
-                    <>
-                      <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 800, color: displayOpt.color }}>{displayOpt.label}</span>
-                      {data?.time && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72' }}>
-                          {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
-                        </span>
-                      )}
-                      {data?.menu && (
-                        <span style={{ fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
-                      )}
-                    </>
-                  ) : (
-                    <span style={{ fontSize: 'var(--font-size-xs)', color: '#ADA59B', letterSpacing: '-0.1px' }}>
-                      {isPastDate ? '' : '탭해서 설정'}
-                    </span>
-                  )}
-                </div>
-              </div>
+                <span style={styles.subSlotEmoji}>{SLOT_EMOJI[slot]}</span>
+                <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : 'var(--color-text)' }}>{slot}</span>
+                <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
+              </button>
             )
           })}
         </div>
@@ -700,7 +702,7 @@ export default function TodayPage() {
           + 그룹 만들기 / 참여하기
         </button>
         <button style={styles.joinPotBtn} onClick={() => setShowJoinPot(true)}>
-          🍚 밥팟 참여하기
+          <RiceBowlIcon size={16} /> 밥팟 참여하기
         </button>
       </div>
     </div>
@@ -1136,7 +1138,7 @@ export default function TodayPage() {
     {showJoinPot && (
       <div style={styles.overlay} onClick={() => { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError('') }}>
         <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-          <div style={{ fontSize: 36 }}>🍚</div>
+          <div><RiceBowlIcon size={36} /></div>
           <div style={styles.dialogTitle}>밥팟 참여하기</div>
           <p style={styles.dialogDesc}>초대 코드를 입력하거나{'\n'}밥팟 링크를 붙여넣으세요</p>
           <input
@@ -1362,7 +1364,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : '🍚 참여중'}</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : <><RiceBowlIcon size={14} /> 참여중</>}</span>
           ) : (
             <button
               style={{
@@ -1503,7 +1505,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             {/* 4. 기본 밥팟 추가 */}
             <button style={styles.sheetRow} onClick={() => { setShowSettings(false); onNavigate(`/group/${group.id}/settings`) }}>
-              <span>🍚</span><span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
+              <RiceBowlIcon size={20} /><span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
             </button>
 
             {/* 4. 그룹 초대하기 */}
@@ -1675,7 +1677,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               >
                 {/* 1행: 제목 + 코멘트 개수 + 기본팟 태그 */}
                 <div style={potListStyles.row1}>
-                  <span style={potListStyles.icon}>{pot.is_default ? '🍚' : '🎉'}</span>
+                  <span style={potListStyles.icon}>{pot.is_default ? <RiceBowlIcon size={16} /> : '🎉'}</span>
                   <span style={potListStyles.title}>{pot.title}</span>
                   {commentCount > 0 && (
                     <span style={{
@@ -1831,9 +1833,19 @@ const styles = {
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { width: '100%', padding: 13, background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
-  slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
-  slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: 'var(--radius-md)', transition: 'border-color 0.15s', overflow: 'hidden' },
-  slotName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer' },
+  mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '4px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-primary)', border: 'none', color: '#fff' },
+  mainStatusCard: { display: 'flex', alignItems: 'center', gap: 12, padding: 14, borderRadius: 16, border: '1.5px solid', transition: 'background 0.15s, border-color 0.15s' },
+  mainStatusIconWrap: { width: 56, height: 56, borderRadius: '50%', background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 4px rgba(0,0,0,0.08)', flexShrink: 0 },
+  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 3, minWidth: 0 },
+  mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 800, letterSpacing: '-0.3px' },
+  mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: '#857B72', fontWeight: 600 },
+  mainStatusDesc: { fontSize: 'var(--font-size-sm)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
+  subSlotRow: { display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 6 },
+  subSlotBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '8px 2px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
+  subSlotEmoji: { fontSize: 16 },
+  subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
+  subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
   sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
   groupCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 14, marginBottom: 10, transition: 'opacity 0.2s' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },

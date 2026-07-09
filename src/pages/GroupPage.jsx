@@ -4,6 +4,7 @@ import { getMyGroups, getGroupMembers, getGroupStatuses } from '../lib/db'
 import { SLOT_KEYS, SLOT_EMOJI } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -99,7 +100,7 @@ export default function GroupPage() {
   const selectedFriend = friends.find(f => f.id === selectedFriendId) ?? null
   const relLabel = getRelativeLabel(currentDate)
 
-  if (loading) return <div style={styles.loadingPage}>🍚</div>
+  if (loading) return <div style={styles.loadingPage}><RiceBowlIcon size={40} /></div>
 
   return (
     <div style={styles.page}>

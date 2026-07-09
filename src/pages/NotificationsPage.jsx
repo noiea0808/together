@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyNotifications, markAllNotificationsRead } from '../lib/db'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function timeAgo(iso) {
   const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -59,7 +60,7 @@ export default function NotificationsPage() {
 
       <div style={S.list}>
         {loading ? (
-          <div style={S.empty}>🍚</div>
+          <div style={S.empty}><RiceBowlIcon size={40} /></div>
         ) : notifications.length === 0 ? (
           <div style={S.emptyState}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🔔</div>

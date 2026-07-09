@@ -17,12 +17,13 @@ import NotificationsPage from './pages/NotificationsPage'
 import AdminLayout from './pages/admin/AdminLayout'
 import StatusGuidePage from './pages/admin/guide/StatusGuidePage'
 import TermsPage from './pages/admin/TermsPage'
+import RiceBowlIcon from './components/RiceBowlIcon'
 
 function AppRoutes() {
   const { user } = useUser()
 
   if (user === undefined) {
-    return <div style={styles.loading}>🍚</div>
+    return <div style={styles.loading}><RiceBowlIcon size={48} /></div>
   }
 
   // 로그인 + 온보딩 완료까지 요구. 온보딩 미완료 사용자는 /welcome 으로 보낸다.
