@@ -1421,12 +1421,14 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
       </div>
 
-      {/* 그룹 상태 요약 — 접혀 있어도 항상 보이는 한눈에 보기 칩 */}
-      <div style={styles.groupStatusSummary}>
-        <span style={{ ...styles.groupStatusChip, color: '#2E9E4F', background: '#E8F5E9' }}>같이가능 {statusCounts['open'] ?? 0}</span>
-        <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>참여중 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
-        <span style={{ ...styles.groupStatusChip, color: '#857B72', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
-      </div>
+      {/* 그룹 상태 요약 — 펼친 상태에선 아래 상태 필터 탭과 내용이 겹쳐 접혀 있을 때만 한눈에 보기 칩으로 표시 */}
+      {collapsed && (
+        <div style={styles.groupStatusSummary}>
+          <span style={{ ...styles.groupStatusChip, color: '#2E9E4F', background: '#E8F5E9' }}>같이가능 {statusCounts['open'] ?? 0}</span>
+          <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>참여중 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
+          <span style={{ ...styles.groupStatusChip, color: '#857B72', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
+        </div>
+      )}
 
       {/* 그룹 설정 바텀시트 */}
       {showSettings && (
@@ -1705,7 +1707,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {!collapsed && pots.length > 0 && (
         <div style={styles.groupMealList}>
           {pots.map(pot => (
-            <GroupMealRow key={pot.id} pot={pot} onNavigate={onNavigate} />
+            <MealPodCard key={pot.id} pot={pot} onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -1720,45 +1722,6 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 }
 
 // 그룹별 보기 전용 — 팀명을 반복하지 않는 슬림한 타임 행 (밥팟별 보기의 독립 카드와 의도적으로 다른 형태)
-function GroupMealRow({ pot, onNavigate }) {
-  const filled = pot.pot_members?.length ?? 0
-  const isFull = filled >= pot.max_people
-  const timeStr = pot.meal_time?.slice(0, 5)
-  const endStr = pot.end_time ? `~${pot.end_time.slice(0, 5)}` : ''
-
-  return (
-    <div style={groupMealRowStyles.row} onClick={() => onNavigate(`/pot/${pot.id}`)}>
-      <span style={groupMealRowStyles.icon}>{pot.is_default ? <RiceBowlIcon size={13} /> : '🎉'}</span>
-      <div style={groupMealRowStyles.textCol}>
-        <span style={groupMealRowStyles.title}>{pot.title}</span>
-        <span style={groupMealRowStyles.meta}>
-          {timeStr && `🕒 ${timeStr}${endStr}`}{timeStr && ' · '}{filled}/{pot.max_people}명
-        </span>
-      </div>
-      <span style={{ ...groupMealRowStyles.statusPill, ...(isFull ? groupMealRowStyles.statusPillFull : groupMealRowStyles.statusPillOpen) }}>
-        {isFull ? '마감' : '참여 가능'}
-      </span>
-      <button type="button" style={groupMealRowStyles.joinBtn}>참여</button>
-    </div>
-  )
-}
-
-const groupMealRowStyles = {
-  row: { display: 'flex', alignItems: 'center', gap: 8, padding: '8px 2px', borderBottom: '1px solid #F5F0EB', cursor: 'pointer' },
-  icon: { fontSize: 13, flexShrink: 0, display: 'flex' },
-  textCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
-  title: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  meta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-  statusPill: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
-  statusPillOpen: { color: '#2E9E4F', background: '#E8F5E9' },
-  statusPillFull: { color: '#9E958B', background: '#F0EEEB' },
-  joinBtn: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
-    background: 'var(--color-surface-2)', border: 'none', borderRadius: 99,
-    padding: '5px 10px', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
-  },
-}
-
 // 밥팟별 보기 — 슬롯 구분 없이 해당 날짜에 열린 전체 밥팟을 그룹/슬롯 순으로 나열
 function AllPotsView({ groups, potsMap, onNavigate }) {
   const allPots = Object.entries(potsMap)
@@ -1784,14 +1747,14 @@ function AllPotsView({ groups, potsMap, onNavigate }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {allPots.map(({ pot, groupName }) => (
-        <MealPodCard key={pot.id} pot={pot} groupName={groupName} onNavigate={onNavigate} />
+        <MealPodCard key={pot.id} pot={pot} groupName={groupName} showMeta onNavigate={onNavigate} />
       ))}
     </div>
   )
 }
 
-// 밥팟별 보기 전용 — 완전히 독립된 피드형 카드. 그룹별 보기의 GroupMealRow와 의도적으로 다른 형태(카드+진한 CTA)
-function MealPodCard({ pot, groupName, onNavigate }) {
+// 그룹별 보기 · 밥팟별 보기 공용 카드 — showMeta일 때만 상단에 슬롯/그룹 태그 표시
+function MealPodCard({ pot, groupName, showMeta = false, onNavigate }) {
   const potParticipants = (pot.pot_members ?? []).map(pm => {
     const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
     return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
@@ -1808,20 +1771,30 @@ function MealPodCard({ pot, groupName, onNavigate }) {
       style={potListStyles.card}
       onClick={() => onNavigate(`/pot/${pot.id}`)}
     >
-      {/* 끼니 · 그룹명 — 카드 상단의 보조 칩 (우선순위 4~5순위 정보) */}
-      <div style={potListStyles.metaRow}>
-        <span style={potListStyles.metaBadge}>{SLOT_EMOJI[pot.slot]} {pot.slot}</span>
-        <span style={potListStyles.metaBadge}>👥 {groupName}</span>
-      </div>
+      {/* 끼니 · 그룹명 — 밥팟별 보기에서만 표시 (그룹별 보기는 이미 슬롯/그룹 문맥 안이라 생략) */}
+      {showMeta && (
+        <div style={potListStyles.metaRow}>
+          <span style={potListStyles.metaBadge}>{SLOT_EMOJI[pot.slot]} {pot.slot}</span>
+          <span style={potListStyles.metaBadge}>👥 {groupName}</span>
+        </div>
+      )}
 
       {/* 1순위: 타임명  2순위: 시간 */}
       <div style={potListStyles.row1}>
-        <span style={potListStyles.icon}>{pot.is_default ? <RiceBowlIcon size={13} /> : '🎉'}</span>
+        <span style={potListStyles.icon}>{pot.is_default ? <RiceBowlIcon size={26} /> : <span style={{ fontSize: 26 }}>🎉</span>}</span>
         <span style={potListStyles.title}>{pot.title}</span>
         {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
       </div>
 
-      {/* 3순위: 참여 인원 · 참여자 아바타  5순위: 참여 가능 배지 */}
+      {/* 메뉴 · 메모 */}
+      {(pot.menu || pot.memo) && (
+        <div style={potListStyles.detailCol}>
+          {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
+          {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+        </div>
+      )}
+
+      {/* 3순위: 참여 인원 · 참여자 아바타 */}
       <div style={potListStyles.row3}>
         <div style={potListStyles.avatarStack}>
           {visibleAvatars.map((m, i) => (
@@ -1833,9 +1806,6 @@ function MealPodCard({ pot, groupName, onNavigate }) {
           {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
           <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
         </div>
-        <span style={{ ...potListStyles.statusPill, ...(isFull ? potListStyles.statusPillFull : potListStyles.statusPillOpen) }}>
-          {isFull ? '마감' : '참여 가능'}
-        </span>
         <button type="button" style={{ ...potListStyles.joinBtn, ...(isFull ? potListStyles.joinBtnFull : {}) }}>
           {isFull ? '마감' : '참여하기'}
         </button>
@@ -1852,13 +1822,13 @@ const potListStyles = {
     display: 'flex', flexDirection: 'column', gap: 5,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
-  row1: { display: 'flex', alignItems: 'center', gap: 6 },
-  icon: { fontSize: 14, flexShrink: 0, display: 'flex' },
+  row1: { display: 'flex', alignItems: 'center', gap: 8 },
+  icon: { width: 26, height: 26, fontSize: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   time: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0 },
-  statusPill: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
-  statusPillOpen: { color: '#2E9E4F', background: '#E8F5E9' },
-  statusPillFull: { color: '#9E958B', background: '#F0EEEB' },
+  detailCol: { display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 34 },
+  menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  memoText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
   avatarStack: { display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 },
   avatarDot: {
@@ -1941,7 +1911,7 @@ const styles = {
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 10 },
   mainStatusIconWrap: { width: 40, height: 40, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
+  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 64 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
   mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: '#857B72', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -1962,7 +1932,7 @@ const styles = {
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
   groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '3px 9px', whiteSpace: 'nowrap' },
   memberSection: { padding: '0 0 8px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
-  groupMealList: { marginTop: 4, background: '#fff', borderRadius: 12, padding: '2px 10px' },
+  groupMealList: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 },
   groupCreateBtn: { width: '100%', textAlign: 'center', padding: '9px 0', marginTop: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
   groupSettingsBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '0 2px' },

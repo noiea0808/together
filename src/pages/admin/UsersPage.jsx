@@ -13,7 +13,8 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [query, setQuery] = useState('')
   const [updatingId, setUpdatingId] = useState(null)
-  const [deletingId, setDeletingId] = useState(null)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const load = () => {
     setLoading(true)
@@ -28,6 +29,10 @@ export default function UsersPage() {
       u.nickname?.toLowerCase().includes(q) || u.email?.toLowerCase().includes(q)
     )
   }, [users, query])
+
+  // 본인 계정은 일괄 삭제 대상에서 항상 제외
+  const selectableUsers = useMemo(() => filtered.filter(u => u.id !== adminUser?.id), [filtered, adminUser])
+  const isAllSelected = selectableUsers.length > 0 && selectableUsers.every(u => selectedIds.has(u.id))
 
   const toggleAdmin = async (u) => {
     if (u.id === adminUser?.id) return // 본인 권한은 여기서 해제 불가 (실수 방지)
@@ -44,17 +49,41 @@ export default function UsersPage() {
     }
   }
 
-  const handleDelete = async (u) => {
-    if (u.id === adminUser?.id) return // 본인 계정은 여기서 삭제 불가
-    if (!confirm(`"${u.nickname}" 계정을 완전히 삭제할까요?\n\n작성한 상태·밥팟 참여·그룹 정보가 모두 삭제되며 되돌릴 수 없습니다.`)) return
-    setDeletingId(u.id)
+  const toggleRowSelected = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (isAllSelected) {
+        selectableUsers.forEach(u => next.delete(u.id))
+      } else {
+        selectableUsers.forEach(u => next.add(u.id))
+      }
+      return next
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    const ids = Array.from(selectedIds).filter(id => id !== adminUser?.id)
+    if (ids.length === 0) return
+    if (!confirm(`선택한 ${ids.length}명의 계정을 완전히 삭제할까요?\n\n작성한 상태·밥팟 참여·그룹 정보가 모두 삭제되며 되돌릴 수 없습니다.`)) return
+    setBulkDeleting(true)
     try {
-      await deleteUserAdmin(u.id)
+      const results = await Promise.allSettled(ids.map(id => deleteUserAdmin(id)))
+      const failedCount = results.filter(r => r.status === 'rejected').length
+      if (failedCount > 0) {
+        alert(`${failedCount}건 삭제에 실패했습니다.`)
+      }
+      setSelectedIds(new Set())
       load()
-    } catch (e) {
-      alert('삭제 실패: ' + e.message)
     } finally {
-      setDeletingId(null)
+      setBulkDeleting(false)
     }
   }
 
@@ -65,12 +94,22 @@ export default function UsersPage() {
           <h1 style={s.title}>사용자 관리</h1>
           <p style={s.subtitle}>현재 등록된 전체 사용자 목록입니다. 관리자 권한은 아래 토글로 부여/해제할 수 있습니다.</p>
         </div>
-        <input
-          style={s.search}
-          placeholder="닉네임 또는 이메일 검색"
-          value={query}
-          onChange={e => setQuery(e.target.value)}
-        />
+        <div style={s.actions}>
+          {selectedIds.size > 0 && <span style={s.selectedCount}>{selectedIds.size}명 선택됨</span>}
+          <button
+            style={s.bulkDeleteBtn}
+            onClick={handleBulkDelete}
+            disabled={selectedIds.size === 0 || bulkDeleting}
+          >
+            {bulkDeleting ? '삭제 중...' : '삭제'}
+          </button>
+          <input
+            style={s.search}
+            placeholder="닉네임 또는 이메일 검색"
+            value={query}
+            onChange={e => setQuery(e.target.value)}
+          />
+        </div>
       </div>
 
       {loading ? (
@@ -81,6 +120,14 @@ export default function UsersPage() {
         <table style={s.table}>
           <thead>
             <tr>
+              <th style={{ ...s.th, width: 36 }}>
+                <input
+                  type="checkbox"
+                  checked={isAllSelected}
+                  onChange={toggleSelectAll}
+                  disabled={selectableUsers.length === 0}
+                />
+              </th>
               <th style={s.th}>닉네임</th>
               <th style={s.th}>이메일</th>
               <th style={s.th}>가입일</th>
@@ -90,12 +137,20 @@ export default function UsersPage() {
               <th style={s.th}>약관동의</th>
               <th style={s.th}>그룹 수</th>
               <th style={s.th}>관리자</th>
-              <th style={s.th}></th>
             </tr>
           </thead>
           <tbody>
             {filtered.map(u => (
               <tr key={u.id} style={s.tr}>
+                <td style={s.td}>
+                  <input
+                    type="checkbox"
+                    checked={selectedIds.has(u.id)}
+                    onChange={() => toggleRowSelected(u.id)}
+                    disabled={u.id === adminUser?.id}
+                    title={u.id === adminUser?.id ? '본인 계정은 선택할 수 없습니다' : undefined}
+                  />
+                </td>
                 <td style={{ ...s.td, fontWeight: 600 }}>{u.nickname}</td>
                 <td style={s.td}>{u.email || '—'}</td>
                 <td style={s.td}>{formatDate(u.created_at)}</td>
@@ -132,16 +187,6 @@ export default function UsersPage() {
                     {u.is_admin ? 'ON' : 'OFF'}
                   </button>
                 </td>
-                <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button
-                    style={s.deleteBtn}
-                    onClick={() => handleDelete(u)}
-                    disabled={deletingId === u.id || u.id === adminUser?.id}
-                    title={u.id === adminUser?.id ? '본인 계정은 여기서 삭제할 수 없습니다' : undefined}
-                  >
-                    {deletingId === u.id ? '삭제 중...' : '삭제'}
-                  </button>
-                </td>
               </tr>
             ))}
           </tbody>
@@ -156,6 +201,9 @@ const s = {
   title: { fontSize: 22, fontWeight: 800, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 540, lineHeight: 1.5 },
   search: { flexShrink: 0, padding: '10px 14px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 13, outline: 'none', width: 220 },
+  actions: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 },
+  selectedCount: { fontSize: 12, fontWeight: 600, color: '#6A6A80' },
+  bulkDeleteBtn: { flexShrink: 0, border: '1.5px solid #E04545', background: '#fff', color: '#E04545', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
   muted: { color: '#8A8AA0', fontSize: 14 },
   table: { width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
   th: { textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#8A8AA0', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 14px', borderBottom: '1px solid #EEE', background: '#FAFAFC' },
@@ -166,5 +214,4 @@ const s = {
   badgeGuest: { fontSize: 11, fontWeight: 700, color: '#7070A0', background: '#F0F0F8', padding: '2px 8px', borderRadius: 4 },
   toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   toggleOn: { borderColor: '#FF6B35', background: '#FF6B35', color: '#fff' },
-  deleteBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#E04545', fontWeight: 600, padding: 2 },
 }

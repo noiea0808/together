@@ -47,18 +47,43 @@ Deno.serve(async (req) => {
 
   if (profile) {
     const uid = profile.id
+
+    // groups/meal_pots 는 created_by 등이 ON DELETE CASCADE 가 아니라
+    // (nullable) NULL 로 비워줘야 users 삭제 시 FK 위반이 나지 않는다.
+    const nullOutSteps = [
+      admin.from('groups').update({ created_by: null }).eq('created_by', uid),
+      admin.from('meal_pots').update({ created_by: null }).eq('created_by', uid),
+      admin.from('meal_pots').update({ last_modified_by: null }).eq('last_modified_by', uid),
+      admin.from('group_default_pot_configs').update({ last_modified_by: null }).eq('last_modified_by', uid),
+    ]
+    for (const step of nullOutSteps) {
+      const { error } = await step
+      if (error) return json({ error: error.message }, 500)
+    }
+
     // 자식 데이터부터 정리 (FK 제약 회피)
-    await admin.from('pot_members').delete().eq('user_id', uid)
-    await admin.from('daily_status').delete().eq('user_id', uid)
-    await admin.from('group_share_settings').delete().eq('user_id', uid)
-    await admin.from('group_members').delete().eq('user_id', uid)
-    await admin.from('user_term_agreements').delete().eq('user_id', uid)
-    await admin.from('users').delete().eq('id', uid)
+    // 나머지(pot_comments, notifications, push_subscriptions 등)는 ON DELETE CASCADE 라 자동 정리됨
+    const deleteSteps = [
+      admin.from('pot_members').delete().eq('user_id', uid),
+      admin.from('daily_status').delete().eq('user_id', uid),
+      admin.from('group_share_settings').delete().eq('user_id', uid),
+      admin.from('group_members').delete().eq('user_id', uid),
+      admin.from('user_term_agreements').delete().eq('user_id', uid),
+    ]
+    for (const step of deleteSteps) {
+      const { error } = await step
+      if (error) return json({ error: error.message }, 500)
+    }
+
+    const { error: userDeleteError } = await admin.from('users').delete().eq('id', uid)
+    if (userDeleteError) return json({ error: userDeleteError.message }, 500)
   }
 
-  // 3. auth 계정 영구 삭제
+  // 3. auth 계정 영구 삭제 (앱 데이터 삭제가 모두 끝난 뒤에만 수행)
+  // 이전 시도에서 auth 계정만 먼저 지워진 상태(orphan row)였을 수 있으므로
+  // "존재하지 않음" 에러는 이미 목표가 달성된 것으로 보고 무시한다.
   const { error: delErr } = await admin.auth.admin.deleteUser(user.id)
-  if (delErr) return json({ error: delErr.message }, 500)
+  if (delErr && !/not.*found/i.test(delErr.message)) return json({ error: delErr.message }, 500)
 
   return json({ success: true })
 })
