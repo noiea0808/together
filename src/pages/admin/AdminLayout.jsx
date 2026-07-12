@@ -8,15 +8,13 @@ const NAV_SECTIONS = [
     title: '가이드',
     items: [
       { to: '/admin/guide/status',   label: '사용자 상태', icon: '🟢' },
-      { to: '/admin/guide/slots',    label: '식사 슬롯',   icon: '🍽️', disabled: true },
-      { to: '/admin/guide/pots',     label: '밥팟 규칙',   icon: '🍲', disabled: true },
     ],
   },
   {
     title: '서비스 관리',
     items: [
       { to: '/admin/terms',    label: '약관',     icon: '📜' },
-      { to: '/admin/users',    label: '사용자',   icon: '👤', disabled: true },
+      { to: '/admin/users',    label: '사용자',   icon: '👤' },
       { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
       { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },
     ],
@@ -29,7 +27,7 @@ export default function AdminLayout() {
 
   useEffect(() => {
     const prev = document.title
-    document.title = '같이먹자_Admin'
+    document.title = 'Admin'
     return () => { document.title = prev }
   }, [])
 
