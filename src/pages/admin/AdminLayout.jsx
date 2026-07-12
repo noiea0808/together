@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import RiceBowlIcon from '../../components/RiceBowlIcon'
+import { useAdminAuth } from '../../lib/AdminAuthContext'
 
 const NAV_SECTIONS = [
   {
@@ -23,11 +24,19 @@ const NAV_SECTIONS = [
 ]
 
 export default function AdminLayout() {
+  const navigate = useNavigate()
+  const { adminUser, logout } = useAdminAuth()
+
   useEffect(() => {
     const prev = document.title
     document.title = '같이먹자_Admin'
     return () => { document.title = prev }
   }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/admin/login', { replace: true })
+  }
 
   return (
     <div style={s.root}>
@@ -70,6 +79,8 @@ export default function AdminLayout() {
         </nav>
 
         <div style={s.sidebarFooter}>
+          {adminUser?.email && <div style={s.adminEmail}>{adminUser.email}</div>}
+          <button style={s.logoutBtn} onClick={handleLogout}>로그아웃</button>
           <a href="/today" style={s.backLink}>← 서비스로 돌아가기</a>
         </div>
       </aside>
@@ -156,6 +167,25 @@ const s = {
   sidebarFooter: {
     padding: '14px 20px',
     borderTop: '1px solid #2E2E42',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  adminEmail: {
+    fontSize: 11,
+    color: '#5A5A7A',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  logoutBtn: {
+    fontSize: 12,
+    color: '#9090A8',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    textAlign: 'left',
+    cursor: 'pointer',
   },
   backLink: {
     fontSize: 12,

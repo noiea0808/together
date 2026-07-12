@@ -14,12 +14,10 @@ import GroupSetupPage from './pages/GroupSetupPage'
 import GroupSettingsPage from './pages/GroupSettingsPage'
 import JoinPage from './pages/JoinPage'
 import NotificationsPage from './pages/NotificationsPage'
-import AdminLayout from './pages/admin/AdminLayout'
-import StatusGuidePage from './pages/admin/guide/StatusGuidePage'
-import TermsPage from './pages/admin/TermsPage'
+import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 
-function AppRoutes() {
+function ConsumerRoutes() {
   const { user } = useUser()
 
   if (user === undefined) {
@@ -53,22 +51,28 @@ function AppRoutes() {
       <Route path="/group/:id/settings" element={guestSafe(<GroupSettingsPage />)} />
       <Route path="/join/:code"  element={<JoinPage />} />
       <Route path="/notifications" element={guestSafe(<NotificationsPage />)} />
-      <Route path="/admin" element={<AdminLayout />}>
-        <Route index element={<Navigate to="/admin/guide/status" replace />} />
-        <Route path="guide/status" element={<StatusGuidePage />} />
-        <Route path="terms" element={<TermsPage />} />
-      </Route>
       <Route path="*" element={<Navigate to={user ? '/today' : '/onboarding'} replace />} />
     </Routes>
   )
 }
 
+function ConsumerApp() {
+  return (
+    <UserProvider>
+      <ConsumerRoutes />
+    </UserProvider>
+  )
+}
+
+// 어드민(/admin)은 일반 회원 로그인/온보딩 상태와 완전히 분리된 별도 접근경로다.
+// UserProvider 바깥에서 독립적으로 렌더링되며, 자체 로그인 화면과 세션을 가진다.
 export default function App() {
   return (
     <BrowserRouter>
-      <UserProvider>
-        <AppRoutes />
-      </UserProvider>
+      <Routes>
+        <Route path="/admin/*" element={<AdminApp />} />
+        <Route path="/*" element={<ConsumerApp />} />
+      </Routes>
     </BrowserRouter>
   )
 }

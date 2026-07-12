@@ -14,6 +14,7 @@ export default function TermsPage() {
   const [terms, setTerms] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // null | term object (id 없으면 신규)
+  const [viewing, setViewing] = useState(null) // null | term object (읽기 전용 보기)
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -113,6 +114,7 @@ export default function TermsPage() {
                   </button>
                 </td>
                 <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <button style={s.linkBtn} onClick={() => setViewing(t)}>보기</button>
                   <button style={s.linkBtn} onClick={() => openEdit(t)}>수정</button>
                   <button style={{ ...s.linkBtn, color: '#E04545' }} onClick={() => remove(t)}>삭제</button>
                 </td>
@@ -120,6 +122,26 @@ export default function TermsPage() {
             ))}
           </tbody>
         </table>
+      )}
+
+      {/* 보기 모달 (읽기 전용) */}
+      {viewing && (
+        <div style={s.overlay} onClick={() => setViewing(null)}>
+          <div style={s.modal} onClick={e => e.stopPropagation()}>
+            <h2 style={s.modalTitle}>{viewing.title}</h2>
+            <div style={s.viewMeta}>
+              <span style={viewing.is_required ? s.badgeReq : s.badgeOpt}>{viewing.is_required ? '필수' : '선택'}</span>
+              <span style={s.viewMetaText}>{typeLabel(viewing.type)}</span>
+              {viewing.version && <span style={s.viewMetaText}>버전 {viewing.version}</span>}
+              <span style={viewing.is_active ? s.viewMetaOn : s.viewMetaOff}>{viewing.is_active ? '활성' : '비활성'}</span>
+            </div>
+            <div style={s.viewContent}>{viewing.content || '등록된 내용이 없습니다.'}</div>
+            <div style={s.modalBtns}>
+              <button style={s.cancelBtn} onClick={() => setViewing(null)}>닫기</button>
+              <button style={s.saveBtn} onClick={() => { openEdit(viewing); setViewing(null) }}>수정</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* 편집 모달 */}
@@ -205,6 +227,11 @@ const s = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 24 },
   modal: { width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 14, padding: 28, display: 'flex', flexDirection: 'column', gap: 16 },
   modalTitle: { fontSize: 18, fontWeight: 800, margin: 0 },
+  viewMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: -8 },
+  viewMetaText: { fontSize: 12, color: '#8A8AA0', fontWeight: 600 },
+  viewMetaOn: { fontSize: 11, fontWeight: 700, color: '#34A853', background: '#EAF7EE', padding: '2px 8px', borderRadius: 4 },
+  viewMetaOff: { fontSize: 11, fontWeight: 700, color: '#9090A8', background: '#F0F0F4', padding: '2px 8px', borderRadius: 4 },
+  viewContent: { fontSize: 14, color: '#1A1A1A', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '50vh', overflowY: 'auto', background: '#FAFAFC', border: '1px solid #EEE', borderRadius: 8, padding: 14 },
   formRow: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 },
   formGrid: { display: 'flex', gap: 16 },
   label: { fontSize: 12, fontWeight: 700, color: '#4A4A60' },
