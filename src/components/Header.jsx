@@ -20,14 +20,24 @@ export default function Header({ hidden: hiddenProp }) {
     if (!user) return
     // 서버 VAPID 키가 재발급된 경우를 대비해, 이미 구독 중인 기기의 키가 최신인지 조용히 확인/복구한다.
     syncPushSubscription(user.id).catch(() => {})
-    const refresh = () => getUnreadNotificationCount(user.id).then(count => {
-      setUnread(count)
-      // OS/홈 화면 앱 아이콘 뱃지 — 지원 브라우저(설치된 PWA)에서만 동작
-      if ('setAppBadge' in navigator) {
-        if (count > 0) navigator.setAppBadge(count).catch(() => {})
-        else navigator.clearAppBadge?.().catch(() => {})
-      }
-    }).catch(() => {})
+
+    // markAllNotificationsRead처럼 한 번에 여러 행을 바꾸면 Realtime이 행 개수만큼
+    // 이벤트를 따로 쏴서 refresh()가 짧은 시간에 여러 번 겹쳐 호출될 수 있다.
+    // 응답 순서는 보장되지 않으니, 가장 나중에 시작한 요청의 결과만 반영해야
+    // 먼저 시작했지만 늦게 끝난 응답이 최신 상태를 덮어쓰는 걸 막을 수 있다.
+    let requestId = 0
+    const refresh = () => {
+      const myRequestId = ++requestId
+      getUnreadNotificationCount(user.id).then(count => {
+        if (myRequestId !== requestId) return
+        setUnread(count)
+        // OS/홈 화면 앱 아이콘 뱃지 — 지원 브라우저(설치된 PWA)에서만 동작
+        if ('setAppBadge' in navigator) {
+          if (count > 0) navigator.setAppBadge(count).catch(() => {})
+          else navigator.clearAppBadge?.().catch(() => {})
+        }
+      }).catch(() => {})
+    }
     refresh()
 
     // 실시간 구독 — 알림이 새로 쌓이거나(참여/나가기/수정/코멘트) 다른 화면에서
