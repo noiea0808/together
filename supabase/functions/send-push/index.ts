@@ -21,14 +21,23 @@ const json = (body: unknown, status = 200) =>
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   })
 
-webpush.setVapidDetails(
-  Deno.env.get('VAPID_SUBJECT')!,
-  Deno.env.get('VAPID_PUBLIC_KEY')!,
-  Deno.env.get('VAPID_PRIVATE_KEY')!,
-)
+// VAPID 설정(예: SUBJECT가 mailto:/https: URL이 아닌 경우)이 잘못되면 setVapidDetails가 즉시 throw하는데,
+// 이걸 모듈 최상단에서 그대로 던지면 함수 전체가 매 요청마다 부팅조차 못 하고 죽어서
+// 로그에만 남고 호출자는 원인을 알 방법이 없다. 그래서 여기서 잡아두고 요청 시점에 명확히 알려준다.
+let vapidInitError: string | null = null
+try {
+  webpush.setVapidDetails(
+    Deno.env.get('VAPID_SUBJECT')!,
+    Deno.env.get('VAPID_PUBLIC_KEY')!,
+    Deno.env.get('VAPID_PRIVATE_KEY')!,
+  )
+} catch (e) {
+  vapidInitError = e instanceof Error ? e.message : String(e)
+}
 
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })
+  if (vapidInitError) return json({ error: `VAPID 설정 오류: ${vapidInitError}` }, 500)
 
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) return json({ error: 'Unauthorized' }, 401)
@@ -68,10 +77,18 @@ Deno.serve(async (req) => {
   )
 
   const staleEndpoints: string[] = []
+  const failures: { endpoint: string; statusCode?: number; message: string }[] = []
   results.forEach((r, i) => {
     if (r.status === 'rejected') {
-      const statusCode = (r.reason as { statusCode?: number })?.statusCode
+      const reason = r.reason as { statusCode?: number; body?: string; message?: string }
+      const statusCode = reason?.statusCode
       if (statusCode === 404 || statusCode === 410) staleEndpoints.push(subs![i].endpoint)
+      // endpoint 전체는 구독자 식별에 쓰일 수 있어 응답엔 끝 8자만 남긴다.
+      failures.push({
+        endpoint: '...' + subs![i].endpoint.slice(-8),
+        statusCode,
+        message: reason?.body || reason?.message || String(reason),
+      })
     }
   })
   if (staleEndpoints.length > 0) {
@@ -81,5 +98,6 @@ Deno.serve(async (req) => {
   return json({
     sent: results.filter((r) => r.status === 'fulfilled').length,
     failed: results.filter((r) => r.status === 'rejected').length,
+    failures,
   })
 })
