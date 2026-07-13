@@ -39,7 +39,7 @@ self.addEventListener('push', (e) => {
         badge: '/icon-192.png',
         data: { url: payload.url || '/' },
       }),
-      self.registration.setAppBadge ? self.registration.setAppBadge().catch(() => {}) : Promise.resolve(),
+      self.navigator.setAppBadge ? self.navigator.setAppBadge().catch(() => {}) : Promise.resolve(),
     ])
   )
 })

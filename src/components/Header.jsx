@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import { useUser } from '../lib/UserContext'
 import { getUnreadNotificationCount } from '../lib/db'
+import { syncPushSubscription } from '../lib/push'
 import { supabase } from '../lib/supabase'
 import RiceBowlIcon from './RiceBowlIcon'
 
@@ -17,6 +18,8 @@ export default function Header({ hidden: hiddenProp }) {
 
   useEffect(() => {
     if (!user) return
+    // 서버 VAPID 키가 재발급된 경우를 대비해, 이미 구독 중인 기기의 키가 최신인지 조용히 확인/복구한다.
+    syncPushSubscription(user.id).catch(() => {})
     const refresh = () => getUnreadNotificationCount(user.id).then(count => {
       setUnread(count)
       // OS/홈 화면 앱 아이콘 뱃지 — 지원 브라우저(설치된 PWA)에서만 동작
