@@ -121,13 +121,17 @@ export default function TodayPage() {
   // 그룹 순서 편집
   const [editingOrder, setEditingOrder] = useState(false)
   const [localGroups, setLocalGroups] = useState([])
+  // 밥팟 나가기 확인 팝업
+  const [leavePotConfirm, setLeavePotConfirm] = useState(null) // pot 객체
+  const [leavingPot, setLeavingPot] = useState(false)
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot || showGroupSetup))
+  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot || showGroupSetup || leavePotConfirm))
   useEscKey(useCallback(() => {
+    if (leavePotConfirm) { setLeavePotConfirm(null); return }
     if (slotEndPickerOpen) { setSlotEndPickerOpen(false); return }
     if (slotStartPickerOpen) { setSlotStartPickerOpen(false); return }
     if (editingSlot) { setEditingSlot(null); return }
@@ -137,7 +141,7 @@ export default function TodayPage() {
     if (shareTogglePending) { setShareTogglePending(null); return }
     if (createConflict) { setCreateConflict(null); return }
     if (showResetConfirm) { setShowResetConfirm(false); return }
-  }, [slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
+  }, [leavePotConfirm, slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -427,6 +431,20 @@ export default function TodayPage() {
     )
     setMySlots({})
     loadData({ force: true })
+  }
+
+  const handleLeavePot = async () => {
+    if (!leavePotConfirm || leavingPot) return
+    setLeavingPot(true)
+    try {
+      await leavePotWithCleanup(leavePotConfirm.id, user.id)
+      setLeavePotConfirm(null)
+      loadData({ force: true })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLeavingPot(false)
+    }
   }
 
   const startEditingOrder = () => {
@@ -729,7 +747,7 @@ export default function TodayPage() {
             )
           })
         })() : (
-          <AllPotsView groups={groups} potsMap={potsMap} onNavigate={navigate} />
+          <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} />
         )}
       </div>
 
@@ -857,6 +875,11 @@ export default function TodayPage() {
                         <span style={styles.potInfoLabel}>인원</span>
                         <span style={styles.potInfoValue}>{pot.pot_members?.length ?? 0}명 참여 중</span>
                       </div>
+                      {currentDate >= TODAY && (
+                        <button style={styles.potLeaveBtn} onClick={() => setLeavePotConfirm(pot)}>
+                          밥팟 나가기
+                        </button>
+                      )}
                     </div>
                   )
                 })}
@@ -1178,7 +1201,7 @@ export default function TodayPage() {
       <div style={styles.overlay} onClick={() => { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError('') }}>
         <div style={styles.dialog} onClick={e => e.stopPropagation()}>
           <div><RiceBowlIcon size={36} /></div>
-          <div style={styles.dialogTitle}>밥팟 참여하기</div>
+          <div style={styles.dialogTitle}>밥팟 같이 먹기</div>
           <p style={styles.dialogDesc}>초대 코드를 입력하거나{'\n'}밥팟 링크를 붙여넣으세요</p>
           <input
             style={{ width: '100%', padding: '11px 14px', border: `1.5px solid ${joinPotError ? '#f44336' : 'var(--color-border)'}`, borderRadius: 'var(--radius-md)', fontSize: 16, fontWeight: 700, letterSpacing: 2, textAlign: 'center', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
@@ -1192,7 +1215,7 @@ export default function TodayPage() {
           {joinPotError && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{joinPotError}</p>}
           <div style={styles.dialogBtns}>
             <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-primary)' }} onClick={handleJoinPotByCode}>
-              참여하기
+              같이 먹기
             </button>
             <button style={styles.dialogBtnCancel} onClick={() => { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError('') }}>취소</button>
           </div>
@@ -1253,6 +1276,25 @@ export default function TodayPage() {
           <div style={styles.dialogBtns}>
             <button style={styles.dialogBtnPrimary} onClick={resetAll}>초기화하기</button>
             <button style={styles.dialogBtnCancel} onClick={() => setShowResetConfirm(false)}>취소</button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {leavePotConfirm && (
+      <div style={styles.overlay} onClick={() => !leavingPot && setLeavePotConfirm(null)}>
+        <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+          <div style={{ fontSize: 36 }}>🚪</div>
+          <div style={styles.dialogTitle}>밥팟을 나갈까요?</div>
+          <p style={styles.dialogDesc}>
+            <strong>{leavePotConfirm.title}</strong>에서 나가면{'\n'}
+            다시 참여하려면 새로 들어와야 해요.
+          </p>
+          <div style={styles.dialogBtns}>
+            <button style={{ ...styles.dialogBtnPrimary, opacity: leavingPot ? 0.6 : 1 }} onClick={handleLeavePot} disabled={leavingPot}>
+              {leavingPot ? '나가는 중...' : '나가기'}
+            </button>
+            <button style={styles.dialogBtnCancel} onClick={() => setLeavePotConfirm(null)} disabled={leavingPot}>취소</button>
           </div>
         </div>
       </div>
@@ -1403,7 +1445,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : <><RiceBowlIcon size={14} /> 참여중</>}</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : <><RiceBowlIcon size={14} /> 같이 먹기로 함</>}</span>
           ) : (
             <button
               style={{
@@ -1425,7 +1467,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {collapsed && (
         <div style={styles.groupStatusSummary}>
           <span style={{ ...styles.groupStatusChip, color: '#2E9E4F', background: '#E8F5E9' }}>같이가능 {statusCounts['open'] ?? 0}</span>
-          <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>참여중 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
+          <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>같이 먹기로 함 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
           <span style={{ ...styles.groupStatusChip, color: '#857B72', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
         </div>
       )}
@@ -1707,7 +1749,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {!collapsed && pots.length > 0 && (
         <div style={styles.groupMealList}>
           {pots.map(pot => (
-            <MealPodCard key={pot.id} pot={pot} onNavigate={onNavigate} />
+            <MealPodCard key={pot.id} pot={pot} myUserId={myUserId} onNavigate={onNavigate} />
           ))}
         </div>
       )}
@@ -1723,7 +1765,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
 // 그룹별 보기 전용 — 팀명을 반복하지 않는 슬림한 타임 행 (밥팟별 보기의 독립 카드와 의도적으로 다른 형태)
 // 밥팟별 보기 — 슬롯 구분 없이 해당 날짜에 열린 전체 밥팟을 그룹/슬롯 순으로 나열
-function AllPotsView({ groups, potsMap, onNavigate }) {
+function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
   const allPots = Object.entries(potsMap)
     .flatMap(([groupId, pots]) => pots.map(pot => ({ pot, groupName: groups.find(g => g.id === groupId)?.name ?? '' })))
     .sort((a, b) => {
@@ -1747,20 +1789,21 @@ function AllPotsView({ groups, potsMap, onNavigate }) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       {allPots.map(({ pot, groupName }) => (
-        <MealPodCard key={pot.id} pot={pot} groupName={groupName} showMeta onNavigate={onNavigate} />
+        <MealPodCard key={pot.id} pot={pot} groupName={groupName} showMeta myUserId={myUserId} onNavigate={onNavigate} />
       ))}
     </div>
   )
 }
 
 // 그룹별 보기 · 밥팟별 보기 공용 카드 — showMeta일 때만 상단에 슬롯/그룹 태그 표시
-function MealPodCard({ pot, groupName, showMeta = false, onNavigate }) {
+function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate }) {
   const potParticipants = (pot.pot_members ?? []).map(pm => {
     const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
     return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
   })
   const filled = potParticipants.length
   const isFull = filled >= pot.max_people
+  const isJoined = potParticipants.some(p => p.id === myUserId)
   const timeStr = pot.meal_time?.slice(0, 5)
   const endStr = pot.end_time ? ` ~ ${pot.end_time.slice(0, 5)}` : ''
   const visibleAvatars = potParticipants.slice(0, 4)
@@ -1806,8 +1849,8 @@ function MealPodCard({ pot, groupName, showMeta = false, onNavigate }) {
           {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
           <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
         </div>
-        <button type="button" style={{ ...potListStyles.joinBtn, ...(isFull ? potListStyles.joinBtnFull : {}) }}>
-          {isFull ? '마감' : '참여하기'}
+        <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
+          {isJoined ? '같이 먹기로 함' : isFull ? '마감' : '같이 먹기'}
         </button>
       </div>
     </div>
@@ -1845,6 +1888,7 @@ const potListStyles = {
     padding: '6px 14px', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
   },
   joinBtnFull: { background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
+  joinBtnJoined: { background: '#E8F5E9', color: '#4CAF50', border: '1px solid #A5D6A7' },
   metaRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 },
   metaBadge: {
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#857B72',
@@ -1895,6 +1939,7 @@ const styles = {
   potInfoRow: { display: 'flex', alignItems: 'center', gap: 8 },
   potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
   potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
+  potLeaveBtn: { alignSelf: 'flex-start', marginTop: 2, padding: '4px 10px', background: 'none', border: '1px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
   slotPopupBtns: { display: 'flex', gap: 8 },
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },

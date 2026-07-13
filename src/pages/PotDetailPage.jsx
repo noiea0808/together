@@ -92,7 +92,7 @@ function GuestGate({ potId, onJoined, navigate }) {
           onClick={handleGuestJoin}
           disabled={!nickname.trim() || loading}
         >
-          {loading ? '참여 중...' : '게스트로 참여하기 🙋'}
+          {loading ? '참여 중...' : '게스트로 같이 먹기 🙋'}
         </button>
         <button style={gateStyles.loginLink} onClick={handleLogin} disabled={loading}>
           이미 계정이 있어요 · 로그인
@@ -668,17 +668,17 @@ export default function PotDetailPage() {
           <div style={S.expiredCard}>종료된 밥팟이에요</div>
         ) : isJoined ? (
           <button style={S.leaveBtn} onClick={handleJoinToggle} disabled={actionLoading}>
-            {actionLoading ? '처리 중...' : '참여 취소'}
+            {actionLoading ? '처리 중...' : '이번엔 패스'}
           </button>
         ) : (
           <button style={{ ...S.joinBtn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
-            {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '참여하기 🙋'}
+            {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '같이 먹기 🙋'}
           </button>
         )}
 
         {!isPotExpired && !user?.is_guest && (
           <button style={S.shareBtn} onClick={() => setShowShare(v => !v)}>
-            📣 {showShare ? '닫기' : '모집하기'}
+            📣 {showShare ? '닫기' : '같이 먹자고 하기'}
           </button>
         )}
 
@@ -790,9 +790,9 @@ export default function PotDetailPage() {
               <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}에 이미 참여하고 있어요.
             </p>
             <div style={S.dialogBtns}>
-              <button style={S.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>기존 밥팟 나가고 여기 참여</button>
-              <button style={S.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>중복 참여하기</button>
-              <button style={S.dialogBtnCancel} onClick={() => setConflict(null)}>참여 취소</button>
+              <button style={S.dialogBtnPrimary} onClick={handleConflictLeaveAndJoin} disabled={actionLoading}>기존 밥팟 나가고 여기서 같이 먹기</button>
+              <button style={S.dialogBtnSecondary} onClick={handleConflictJoinBoth} disabled={actionLoading}>중복으로 같이 먹기</button>
+              <button style={S.dialogBtnCancel} onClick={() => setConflict(null)}>이번엔 패스</button>
             </div>
           </div>
         </div>
