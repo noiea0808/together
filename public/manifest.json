@@ -4,7 +4,7 @@
   "description": "오늘 같이 먹을 사람, 묻지 말고 확인하기",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "background_color": "#FAF8F5",
   "theme_color": "#FF6B35",
   "orientation": "portrait",
   "lang": "ko",
