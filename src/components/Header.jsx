@@ -15,13 +15,22 @@ export default function Header({ hidden: hiddenProp }) {
   const { user } = useUser()
   const [unread, setUnread] = useState(0)
 
+  // 홈 화면 앱 아이콘 배지/푸시 구독 동기화는 BadgeSync(App.jsx, 페이지 전환과 무관하게 상시 마운트)가
+  // 전담한다. 여기선 이 화면에 있는 동안 벨 아이콘의 빨간 점만 표시하면 된다.
   useEffect(() => {
     if (!user) return
-    const refresh = () => getUnreadNotificationCount(user.id).then(setUnread).catch(() => {})
+
+    // 응답 순서가 보장되지 않으니, 가장 나중에 시작한 요청의 결과만 반영한다.
+    let requestId = 0
+    const refresh = () => {
+      const myRequestId = ++requestId
+      getUnreadNotificationCount(user.id).then(count => {
+        if (myRequestId !== requestId) return
+        setUnread(count)
+      }).catch(() => {})
+    }
     refresh()
 
-    // 실시간 구독 — 알림이 새로 쌓이거나(참여/나가기/수정/코멘트) 다른 화면에서
-    // 읽음 처리될 때(NotificationsPage 진입) 배지 숫자를 즉시 다시 계산한다.
     const channel = supabase
       .channel(`notifications_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, refresh)

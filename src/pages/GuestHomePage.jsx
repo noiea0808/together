@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getGuestHome } from '../lib/db'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
-import { isPotTimeExpired } from '../lib/potConstants'
+import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 
@@ -65,7 +65,7 @@ export default function GuestHomePage() {
             {SLOT_ORDER.map(slot => {
               const pot = potBySlot[slot]
               const isInPot = !!pot
-              const opt = isInPot && isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT
+              const opt = isInPot ? { ...(isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT), label: getJoinedStatusLabel(home.date, pot.meal_time, pot.end_time) } : null
               return (
                 <div
                   key={slot}

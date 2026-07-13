@@ -5,7 +5,7 @@ import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatu
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
-import { isPotTimeExpired } from '../lib/potConstants'
+import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
 import Header from '../components/Header'
@@ -542,14 +542,15 @@ export default function TodayPage() {
     const earliestPot = myPotsInSlot[0]
     const isInPot = potCount > 0
     const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
-    const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')) : null
+    const lockedLabel = isInPot ? getJoinedStatusLabel(dateStr, earliestPot?.meal_time, earliestPot?.end_time) : null
+    const lockedOpt = isInPot ? { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: lockedLabel } : null
     const displayOpt = lockedOpt ?? opt
 
     let timeStr = null, desc = null
     if (isInPot) {
       timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
       const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
-      desc = groupName ? `${groupName}에서 같이 먹는 중` : earliestPot.title
+      desc = groupName ? `${groupName}에서 ${lockedLabel}` : earliestPot.title
     } else if (data?.time) {
       timeStr = `${data.time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
       desc = data?.menu ?? null
@@ -836,7 +837,7 @@ export default function TodayPage() {
               .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
             if (myPotsInSlot.length === 0) return null
             const inPotExpired = isPotTimeExpired(dateStr, myPotsInSlot[0].end_time)
-            const lockedOpt = SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중'))
+            const lockedOpt = { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: getJoinedStatusLabel(dateStr, myPotsInSlot[0].meal_time, myPotsInSlot[0].end_time) }
             return (
               <>
                 <div style={styles.potInfoBanner}>
@@ -1504,7 +1505,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? '✅ 참여완료' : <><RiceBowlIcon size={14} /> 같이 먹기로 함</>}</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}</>}</span>
           ) : (
             <button
               style={{
@@ -1946,7 +1947,7 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
           <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
         </div>
         <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
-          {isJoined ? '같이 먹기로 함' : isFull ? '마감' : '같이 먹기'}
+          {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : isFull ? '마감' : '같이 먹기'}
         </button>
       </div>
     </div>

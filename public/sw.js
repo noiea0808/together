@@ -29,13 +29,21 @@ self.addEventListener('push', (e) => {
     if (e.data) payload.body = e.data.text()
   }
 
+  // 서버(send-push)가 발송 시점의 실제 안읽음 개수를 payload.badge로 실어 보낸다.
+  // iOS는 인자 없이 setAppBadge()를 부르면 배지를 0으로 지워버리므로(포그라운드에서
+  // BadgeSync가 세팅해둔 값까지 덮어써 지워지는 원인이었다), 반드시 숫자를 넘겨야 한다.
   e.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      data: { url: payload.url || '/' },
-    })
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { url: payload.url || '/' },
+      }),
+      self.navigator.setAppBadge
+        ? self.navigator.setAppBadge(typeof payload.badge === 'number' ? payload.badge : 1).catch(() => {})
+        : Promise.resolve(),
+    ])
   )
 })
 

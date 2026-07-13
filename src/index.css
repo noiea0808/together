@@ -91,6 +91,10 @@ body {
 .view-mode-content {
   animation: viewModeFadeIn 0.18s ease;
 }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
 /* ===== 공통 유틸 ===== */
 .page {

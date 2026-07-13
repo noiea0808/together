@@ -566,10 +566,11 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
       if (retry.error) console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error)
     }
 
-    const { error: pushError } = await supabase.functions.invoke('send-push', {
+    const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
       body: { userIds, title, body, url },
     })
     if (pushError) console.warn('notifyPotMembers send-push 실패:', pushError)
+    else if (pushResult?.failed > 0) console.warn('notifyPotMembers send-push 일부 실패:', pushResult.failures)
   } catch (e) {
     console.warn('notifyPotMembers:', e)
   }
@@ -591,10 +592,11 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
   })
   if (error) throw error
 
-  const { error: pushError } = await supabase.functions.invoke('send-push', {
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
   if (pushError) console.warn('invitePotFriend send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('invitePotFriend send-push 일부 실패:', pushResult.failures)
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -620,10 +622,11 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
   })
   if (notifError) console.error('proposeMealTogether 알림 insert 실패:', notifError)
 
-  const { error: pushError } = await supabase.functions.invoke('send-push', {
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
   if (pushError) console.warn('proposeMealTogether send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('proposeMealTogether send-push 일부 실패:', pushResult.failures)
 
   return inv
 }

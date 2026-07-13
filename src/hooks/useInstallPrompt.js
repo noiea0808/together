@@ -9,7 +9,10 @@ export function useInstallPrompt() {
 
   useEffect(() => {
     const ua = navigator.userAgent
-    const ios = /iphone|ipad|ipod/i.test(ua)
+    // iPadOS 13+는 Safari 기본 UA가 데스크톱 macOS Safari로 위장돼 있어 "iPad" 문자열이 안 잡힌다.
+    // 터치를 지원하는 "MacIntel"이면 실제로는 아이패드인 경우로 간주한다.
+    const isIPadOS = navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1
+    const ios = /iphone|ipad|ipod/i.test(ua) || isIPadOS
     const android = /android/i.test(ua)
     setIsIOS(ios)
     setIsAndroid(android)

@@ -23,3 +23,17 @@ export function isPotTimeExpired(date, end_time) {
   const expiry = new Date(`${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
   return new Date() > expiry
 }
+
+export function isPotTimeStarted(date, meal_time) {
+  if (!date || !meal_time) return false
+  const [h, m] = meal_time.slice(0, 5).split(':').map(Number)
+  const start = new Date(`${date}T${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`)
+  return new Date() >= start
+}
+
+// 참여 확정된 밥팟의 표시용 라벨 — 시작 전엔 '먹기로 함', 진행 중엔 '먹는 중', 종료 후엔 '먹었음'
+export function getJoinedStatusLabel(date, meal_time, end_time) {
+  if (isPotTimeExpired(date, end_time)) return '같이 먹었음'
+  if (isPotTimeStarted(date, meal_time)) return '같이 먹는 중'
+  return '같이 먹기로 함'
+}

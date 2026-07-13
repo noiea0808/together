@@ -9,8 +9,9 @@ const assetsDir = join(__dirname, '../src/assets')
 async function generate() {
   const bowl = await Jimp.read(join(assetsDir, 'rice-bowl.png'))
 
+  // 앱 메인 배경색(--color-bg)과 동일한 베이지 계열
   for (const size of [192, 512]) {
-    const img = new Jimp({ width: size, height: size, color: 0xFF6B35FF })
+    const img = new Jimp({ width: size, height: size, color: 0xFAF8F5FF })
 
     // 밥공기 아이콘을 세이프존(마스커블 아이콘 대비 여백)을 두고 중앙에 배치
     const bowlResized = bowl.clone()
