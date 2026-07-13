@@ -60,20 +60,35 @@ Deno.serve(async (req) => {
   const admin = createClient(url, serviceKey)
   const { data: subs, error: subsErr } = await admin
     .from('push_subscriptions')
-    .select('endpoint, p256dh, auth')
+    .select('endpoint, p256dh, auth, user_id')
     .in('user_id', userIds)
 
   if (subsErr) return json({ error: subsErr.message }, 500)
 
-  const payload = JSON.stringify({ title, body: body ?? '', url: targetUrl ?? '/' })
+  // iOS는 서비스워커에서 setAppBadge()를 인자 없이 호출하면 배지를 0으로 지워버린다.
+  // 그래서 발송 시점에 수신자별 실제 안읽음 개수를 계산해 페이로드에 실어 보내고,
+  // 서비스워커는 그 숫자로만 배지를 세팅한다 (foreground 쪽 BadgeSync가 세팅한 값을 덮어쓰지 않도록).
+  const { data: unreadRows } = await admin
+    .from('notifications')
+    .select('user_id')
+    .in('user_id', userIds)
+    .eq('is_read', false)
+  const unreadCountByUser = new Map<string, number>()
+  for (const row of unreadRows ?? []) {
+    unreadCountByUser.set(row.user_id, (unreadCountByUser.get(row.user_id) ?? 0) + 1)
+  }
 
   const results = await Promise.allSettled(
-    (subs ?? []).map((s) =>
-      webpush.sendNotification(
+    (subs ?? []).map((s) => {
+      const payload = JSON.stringify({
+        title, body: body ?? '', url: targetUrl ?? '/',
+        badge: unreadCountByUser.get(s.user_id) ?? 1,
+      })
+      return webpush.sendNotification(
         { endpoint: s.endpoint, keys: { p256dh: s.p256dh, auth: s.auth } },
         payload,
       )
-    )
+    })
   )
 
   const staleEndpoints: string[] = []

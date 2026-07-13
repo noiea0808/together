@@ -29,8 +29,9 @@ self.addEventListener('push', (e) => {
     if (e.data) payload.body = e.data.text()
   }
 
-  // 정확한 안읽음 수는 앱이 켜졌을 때 Header.jsx가 realtime으로 보정한다.
-  // 여기서는 새 알림이 왔다는 것만 즉시 표시(뱃지 dot).
+  // 서버(send-push)가 발송 시점의 실제 안읽음 개수를 payload.badge로 실어 보낸다.
+  // iOS는 인자 없이 setAppBadge()를 부르면 배지를 0으로 지워버리므로(포그라운드에서
+  // BadgeSync가 세팅해둔 값까지 덮어써 지워지는 원인이었다), 반드시 숫자를 넘겨야 한다.
   e.waitUntil(
     Promise.all([
       self.registration.showNotification(payload.title, {
@@ -39,7 +40,9 @@ self.addEventListener('push', (e) => {
         badge: '/icon-192.png',
         data: { url: payload.url || '/' },
       }),
-      self.navigator.setAppBadge ? self.navigator.setAppBadge().catch(() => {}) : Promise.resolve(),
+      self.navigator.setAppBadge
+        ? self.navigator.setAppBadge(typeof payload.badge === 'number' ? payload.badge : 1).catch(() => {})
+        : Promise.resolve(),
     ])
   )
 })
