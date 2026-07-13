@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, getPotComments, addPotComment, deletePotComment } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, getPotComments, addPotComment, deletePotComment, getGroupMembers, invitePotFriend } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
@@ -124,6 +124,11 @@ export default function PotDetailPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [conflict, setConflict] = useState(null)
   const [showShare, setShowShare] = useState(false)
+  const [shareTab, setShareTab] = useState('friend')
+  const [shareFriends, setShareFriends] = useState([])
+  const [shareFriendsLoading, setShareFriendsLoading] = useState(false)
+  const [invitingFriendId, setInvitingFriendId] = useState(null)
+  const [invitedFriendIds, setInvitedFriendIds] = useState(new Set())
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmKick, setConfirmKick] = useState(null)
@@ -134,7 +139,7 @@ export default function PotDetailPage() {
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
 
-  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker))
+  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker || showShare))
   useEscKey(useCallback(() => {
     if (timePicker) { cancelDetailTimePicker(); return }
     if (confirmKick) { setConfirmKick(null); return }
@@ -382,6 +387,28 @@ export default function PotDetailPage() {
       await loadPot()
     } catch (e) { console.error(e) }
     finally { setActionLoading(false) }
+  }
+
+  useEffect(() => {
+    if (!showShare || !pot) return
+    setShareFriendsLoading(true)
+    getGroupMembers(pot.group_id)
+      .then(members => {
+        const participantIds = new Set((pot.pot_members ?? []).map(pm => pm.user_id))
+        setShareFriends(members.filter(m => !m.is_guest && !participantIds.has(m.id) && m.id !== user.id))
+      })
+      .catch(e => console.error(e))
+      .finally(() => setShareFriendsLoading(false))
+  }, [showShare, pot?.group_id])
+
+  const handleInviteFriend = async (friendId) => {
+    if (invitingFriendId) return
+    setInvitingFriendId(friendId)
+    try {
+      await invitePotFriend(pot.id, user.id, friendId)
+      setInvitedFriendIds(prev => new Set(prev).add(friendId))
+    } catch (e) { console.error(e) }
+    finally { setInvitingFriendId(null) }
   }
 
   const potLink = `${window.location.origin}/pot/${pot?.id}`
@@ -668,7 +695,7 @@ export default function PotDetailPage() {
           <div style={S.expiredCard}>종료된 밥팟이에요</div>
         ) : isJoined ? (
           <button style={S.leaveBtn} onClick={handleJoinToggle} disabled={actionLoading}>
-            {actionLoading ? '처리 중...' : '이번엔 패스'}
+            {actionLoading ? '처리 중...' : '밥팟 나가기'}
           </button>
         ) : (
           <button style={{ ...S.joinBtn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
@@ -677,8 +704,8 @@ export default function PotDetailPage() {
         )}
 
         {!isPotExpired && !user?.is_guest && (
-          <button style={S.shareBtn} onClick={() => setShowShare(v => !v)}>
-            📣 {showShare ? '닫기' : '같이 먹자고 하기'}
+          <button style={S.shareBtn} onClick={() => { setShowShare(true); setShareTab('friend') }}>
+            📣 같이 먹자고 하기
           </button>
         )}
 
@@ -687,38 +714,83 @@ export default function PotDetailPage() {
             🗑️ 밥팟 삭제
           </button>
         )}
-
-        {showShare && (
-          <div style={S.sharePanel}>
-            <div style={S.shareLabel}>초대 코드</div>
-            {pot.invite_code ? (
-              <div style={S.shareRow}>
-                <span style={{ ...S.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
-                <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(pot.invite_code, 'code')}>
-                  {copied === 'code' ? '✓' : '복사'}
-                </button>
-              </div>
-            ) : (
-              <button
-                style={{ ...S.shareCopyBtn, background: '#FF6B35', padding: '8px 16px', fontSize: 13 }}
-                onClick={async () => {
-                  const code = await generatePotInviteCode(pot.id)
-                  setPot(prev => ({ ...prev, invite_code: code }))
-                }}
-              >
-                코드 생성하기
-              </button>
-            )}
-            <div style={{ ...S.shareLabel, marginTop: 6 }}>밥팟 링크</div>
-            <div style={S.shareRow}>
-              <span style={S.shareText}>{potLink}</span>
-              <button style={{ ...S.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(potLink, 'link')}>
-                {copied === 'link' ? '✓' : '복사'}
-              </button>
-            </div>
-          </div>
-        )}
       </div>
+
+      {showShare && (
+        <div style={S.overlay} onClick={() => setShowShare(false)}>
+          <div style={S.shareDialog} onClick={e => e.stopPropagation()}>
+            <div style={S.dialogTitle}>📣 같이 먹자고 하기</div>
+
+            <div style={S.shareTabs}>
+              <button style={{ ...S.shareTabBtn, ...(shareTab === 'friend' ? S.shareTabBtnActive : {}) }} onClick={() => setShareTab('friend')}>친구 선택</button>
+              <button style={{ ...S.shareTabBtn, ...(shareTab === 'code' ? S.shareTabBtnActive : {}) }} onClick={() => setShareTab('code')}>초대 코드</button>
+              <button style={{ ...S.shareTabBtn, ...(shareTab === 'link' ? S.shareTabBtnActive : {}) }} onClick={() => setShareTab('link')}>링크</button>
+            </div>
+
+            {shareTab === 'friend' && (
+              <div style={S.shareFriendList}>
+                {shareFriendsLoading ? (
+                  <div style={S.shareFriendEmpty}>불러오는 중...</div>
+                ) : shareFriends.length === 0 ? (
+                  <div style={S.shareFriendEmpty}>초대할 수 있는 친구가 없어요.</div>
+                ) : shareFriends.map(f => {
+                  const invited = invitedFriendIds.has(f.id)
+                  return (
+                    <div key={f.id} style={S.shareFriendRow}>
+                      <span style={S.shareFriendName}>{f.nickname}</span>
+                      <button
+                        style={{ ...S.shareCopyBtn, background: invited ? '#4CAF50' : '#FF6B35', opacity: invitingFriendId === f.id ? 0.6 : 1 }}
+                        onClick={() => handleInviteFriend(f.id)}
+                        disabled={invited || invitingFriendId === f.id}
+                      >
+                        {invited ? '보냈어요 ✓' : invitingFriendId === f.id ? '보내는 중...' : '초대'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {shareTab === 'code' && (
+              <div style={S.sharePanel}>
+                <div style={S.shareLabel}>초대 코드</div>
+                {pot.invite_code ? (
+                  <div style={S.shareRow}>
+                    <span style={{ ...S.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
+                    <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(pot.invite_code, 'code')}>
+                      {copied === 'code' ? '✓' : '복사'}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    style={{ ...S.shareCopyBtn, background: '#FF6B35', padding: '8px 16px', fontSize: 13 }}
+                    onClick={async () => {
+                      const code = await generatePotInviteCode(pot.id)
+                      setPot(prev => ({ ...prev, invite_code: code }))
+                    }}
+                  >
+                    코드 생성하기
+                  </button>
+                )}
+              </div>
+            )}
+
+            {shareTab === 'link' && (
+              <div style={S.sharePanel}>
+                <div style={S.shareLabel}>밥팟 링크</div>
+                <div style={S.shareRow}>
+                  <span style={S.shareText}>{potLink}</span>
+                  <button style={{ ...S.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(potLink, 'link')}>
+                    {copied === 'link' ? '✓' : '복사'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button style={S.dialogBtnCancel} onClick={() => setShowShare(false)}>닫기</button>
+          </div>
+        </div>
+      )}
 
       {/* 시간 캐러셀 팝업 */}
       {timePicker && draft && (() => {
@@ -915,6 +987,15 @@ const S = {
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
   shareText: { flex: 1, fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
   shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
+
+  shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
+  shareTabs: { display: 'flex', width: '100%', gap: 6 },
+  shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+  shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60 },
+  shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  shareFriendEmpty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px 0' },
 
   /* Carousel popup */
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },

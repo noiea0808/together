@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation } from '../lib/db'
 import { SLOT_KEYS, SLOT_EMOJI } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
@@ -42,9 +42,17 @@ export default function GroupPage() {
   const [statusLoading, setStatusLoading] = useState(false)
   const [currentDate, setCurrentDate] = useState(TODAY)
   const [selectedFriendId, setSelectedFriendId] = useState(null)
+  const [proposeSlot, setProposeSlot] = useState(null)
+  const [proposeGroupId, setProposeGroupId] = useState(null)
+  const [proposeMenu, setProposeMenu] = useState('')
+  const [proposeSending, setProposeSending] = useState(false)
+  const [proposeError, setProposeError] = useState(null)
+  const [pendingInvitations, setPendingInvitations] = useState([])
+  const [sentInviteKeys, setSentInviteKeys] = useState(new Set())
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
+  const isPastDate = currentDate.getTime() < TODAY.getTime()
 
   useEffect(() => {
     getMyGroups(user.id).then(async gs => {
@@ -64,6 +72,74 @@ export default function GroupPage() {
         setStatusLoading(false)
       })
   }, [groups, dateStr])
+
+  useEffect(() => {
+    getMyPendingInvitationsForDate(user.id, dateStr)
+      .then(setPendingInvitations)
+      .catch(e => console.error(e))
+  }, [user.id, dateStr])
+
+  const findPendingInvitation = (friendId, slot) =>
+    pendingInvitations.find(inv => inv.to_user_id === friendId && inv.slot === slot)
+
+  const hasPendingInvitation = (friendId, slot) =>
+    sentInviteKeys.has(`${friendId}:${slot}`) || !!findPendingInvitation(friendId, slot)
+
+  const handleCancelInvitation = async (e, invitationId) => {
+    e.stopPropagation()
+    try {
+      await cancelPotInvitation(invitationId, user.id)
+      const updated = await getMyPendingInvitationsForDate(user.id, dateStr)
+      setPendingInvitations(updated)
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  // 친구 시트를 열거나 바꿀 때마다 슬롯 선택 상태 초기화
+  useEffect(() => {
+    setProposeSlot(null)
+    setProposeMenu('')
+    setProposeError(null)
+    setProposeGroupId(null)
+  }, [selectedFriendId])
+
+  const selectProposeSlot = (friend, slot) => {
+    if (hasPendingInvitation(friend.id, slot)) return
+    setProposeSlot(prev => {
+      const next = prev === slot ? null : slot
+      if (next && friend.groups.length === 1) setProposeGroupId(friend.groups[0].id)
+      return next
+    })
+    setProposeError(null)
+  }
+
+  const sendPropose = async () => {
+    if (!selectedFriend || !proposeSlot || !proposeGroupId || proposeSending) return
+    setProposeSending(true)
+    setProposeError(null)
+    try {
+      const existing = await getMyPotsForSlot(user.id, proposeGroupId, dateStr, proposeSlot)
+      if (existing.length > 0) {
+        await invitePotFriend(existing[0].pot_id, user.id, selectedFriend.id)
+      } else {
+        await proposeMealTogether({
+          groupId: proposeGroupId, fromUserId: user.id, toUserId: selectedFriend.id,
+          date: dateStr, slot: proposeSlot, meal_time: null, menu: proposeMenu.trim() || null,
+        })
+        const updated = await getMyPendingInvitationsForDate(user.id, dateStr)
+        setPendingInvitations(updated)
+      }
+      setSentInviteKeys(prev => new Set(prev).add(`${selectedFriend.id}:${proposeSlot}`))
+      setProposeSlot(null)
+      setProposeMenu('')
+    } catch (e) {
+      console.error(e)
+      setProposeError('제안을 보내지 못했어요.')
+    } finally {
+      setProposeSending(false)
+    }
+  }
 
   // 친구가 속한 그룹들의 상태를 슬롯별로 병합 (참여중/참여완료 우선)
   const mergeFriendStatuses = (friendId, friendGroups) => {
@@ -204,8 +280,21 @@ export default function GroupPage() {
               {SLOT_KEYS.map(slot => {
                 const s = selectedFriend.statusMap[slot]
                 const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
+                const pendingInv = findPendingInvitation(selectedFriend.id, slot)
+                const invited = hasPendingInvitation(selectedFriend.id, slot)
+                const isSelected = proposeSlot === slot
+                const selectable = !isPastDate && !invited
                 return (
-                  <div key={slot} style={styles.statusCell}>
+                  <div
+                    key={slot}
+                    style={{
+                      ...styles.statusCell,
+                      ...(isSelected ? styles.statusCellSelected : {}),
+                      cursor: selectable ? 'pointer' : 'default',
+                      opacity: invited && !isSelected ? 0.55 : 1,
+                    }}
+                    onClick={() => selectable && selectProposeSlot(selectedFriend, slot)}
+                  >
                     <span style={styles.statusSlotName}>{SLOT_EMOJI[slot]} {slot}</span>
                     {opt ? (
                       <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
@@ -214,11 +303,53 @@ export default function GroupPage() {
                     ) : (
                       <span style={styles.statusDash}>미설정</span>
                     )}
+                    {pendingInv ? (
+                      <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
+                        제안함 ✓ · 취소
+                      </button>
+                    ) : invited ? (
+                      <span style={styles.statusInvitedTag}>초대함 ✓</span>
+                    ) : null}
                   </div>
                 )
               })}
             </div>
 
+            {proposeSlot && (
+              <div style={styles.proposePanel}>
+                {selectedFriend.groups.length > 1 && (
+                  <div style={styles.friendGroups}>
+                    {selectedFriend.groups.map(g => (
+                      <button
+                        key={g.id}
+                        style={{ ...styles.groupPickTag, ...(proposeGroupId === g.id ? styles.groupPickTagActive : {}) }}
+                        onClick={() => setProposeGroupId(g.id)}
+                      >
+                        {g.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+                <input
+                  style={styles.proposeInput}
+                  placeholder="메뉴나 한마디 (선택)"
+                  value={proposeMenu}
+                  onChange={e => setProposeMenu(e.target.value)}
+                  maxLength={40}
+                />
+                {proposeError && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{proposeError}</p>}
+              </div>
+            )}
+
+            {!isPastDate && (
+              <button
+                style={{ ...styles.proposeMainBtn, opacity: proposeSlot && proposeGroupId && !proposeSending ? 1 : 0.4 }}
+                onClick={sendPropose}
+                disabled={!proposeSlot || !proposeGroupId || proposeSending}
+              >
+                {proposeSending ? '보내는 중...' : proposeSlot ? `🍚 ${proposeSlot} 같이 먹자` : '🍚 슬롯을 선택해주세요'}
+              </button>
+            )}
             <button style={styles.sheetCloseBtn} onClick={() => setSelectedFriendId(null)}>닫기</button>
           </div>
         </div>
@@ -273,9 +404,18 @@ const styles = {
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
   sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
+  statusCellSelected: { background: 'var(--color-primary)18', border: '1.5px solid var(--color-primary)' },
   statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '2px 8px', width: 'fit-content' },
   statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
+  statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50' },
+  statusCancelBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
   sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+
+  proposeMainBtn: { marginTop: 12, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  proposeInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 }

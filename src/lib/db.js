@@ -575,12 +575,151 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
   }
 }
 
+// 특정 유저 한 명에게만 초대 알림 발송. 대상이 아직 팟 멤버가 아니어도 되며,
+// 발신자 본인이 이 팟의 멤버이기만 하면 notifications_insert_sharedpot RLS를 통과한다.
+export async function invitePotFriend(potId, fromUserId, toUserId) {
+  const [{ data: pot }, { data: from }] = await Promise.all([
+    supabase.from('meal_pots').select('title, slot').eq('id', potId).single(),
+    supabase.from('users').select('nickname').eq('id', fromUserId).single(),
+  ])
+  const title = '같이 먹자고 초대했어요'
+  const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.`
+  const url = `/pot/${potId}`
+
+  const { error } = await supabase.from('notifications').insert({
+    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite',
+  })
+  if (error) throw error
+
+  const { error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [toUserId], title, body, url },
+  })
+  if (pushError) console.warn('invitePotFriend send-push 실패:', pushError)
+}
+
+// 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
+export async function proposeMealTogether({ groupId, fromUserId, toUserId, date, slot, meal_time, menu }) {
+  const { data: inv, error } = await supabase
+    .from('pot_invitations')
+    .insert({
+      group_id: groupId, from_user_id: fromUserId, to_user_id: toUserId,
+      date, slot, meal_time: meal_time || null, menu: menu || null,
+      status: 'pending',
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  const title = '같이 먹자는 제안이 왔어요'
+  const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.`
+  const url = '/notifications'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: toUserId, invitation_id: inv.id, title, body, url, event_type: 'invite_new',
+  })
+  if (notifError) console.error('proposeMealTogether 알림 insert 실패:', notifError)
+
+  const { error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [toUserId], title, body, url },
+  })
+  if (pushError) console.warn('proposeMealTogether send-push 실패:', pushError)
+
+  return inv
+}
+
+// 내가 보낸, 아직 응답 없는 제안 목록 (같은 슬롯 중복 제안 방지용)
+export async function getMyPendingInvitationsForDate(userId, date) {
+  const { data, error } = await supabase
+    .from('pot_invitations')
+    .select('*')
+    .eq('from_user_id', userId)
+    .eq('date', date)
+    .eq('status', 'pending')
+  if (error) throw error
+  return data
+}
+
+// 제안 수락: 밥팟 생성 + 양쪽 참여 처리. createPot/joinPot을 그대로 재사용한다
+// (두 번째 joinPot이 notifyPotMembers를 통해 발신자에게 "참여했어요" 알림을 자동으로 보내준다).
+export async function acceptPotInvitation(invitationId, userId) {
+  const { data: inv, error } = await supabase
+    .from('pot_invitations')
+    .select('*')
+    .eq('id', invitationId)
+    .single()
+  if (error) throw error
+  if (inv.status !== 'pending') throw new Error('이미 처리된 제안이에요.')
+  if (inv.to_user_id !== userId) throw new Error('내게 온 제안이 아니에요.')
+
+  const pot = await createPot({
+    groupId: inv.group_id,
+    date: inv.date,
+    slot: inv.slot,
+    meal_time: inv.meal_time,
+    end_time: null,
+    title: inv.title || '같이 먹어요',
+    menu: inv.menu,
+    memo: null,
+    max_people: inv.max_people || 2,
+    is_public: false,
+    is_default: false,
+    createdBy: inv.from_user_id,
+  })
+  await joinPot(pot.id, inv.from_user_id)
+  await joinPot(pot.id, userId)
+
+  const { error: updateError } = await supabase
+    .from('pot_invitations')
+    .update({ status: 'accepted', pot_id: pot.id, responded_at: new Date().toISOString() })
+    .eq('id', invitationId)
+  if (updateError) throw updateError
+
+  return pot
+}
+
+// 제안 거절: 상태만 변경, 발신자에게 별도 알림은 보내지 않는다.
+export async function declinePotInvitation(invitationId, userId) {
+  const { data: inv, error: fetchError } = await supabase
+    .from('pot_invitations')
+    .select('to_user_id, status')
+    .eq('id', invitationId)
+    .single()
+  if (fetchError) throw fetchError
+  if (inv.to_user_id !== userId) throw new Error('내게 온 제안이 아니에요.')
+  if (inv.status !== 'pending') return
+
+  const { error } = await supabase
+    .from('pot_invitations')
+    .update({ status: 'declined', responded_at: new Date().toISOString() })
+    .eq('id', invitationId)
+  if (error) throw error
+}
+
+// 제안 취소: 발신자가 아직 상대가 응답하지 않은 제안을 거둬들인다.
+export async function cancelPotInvitation(invitationId, userId) {
+  const { data: inv, error: fetchError } = await supabase
+    .from('pot_invitations')
+    .select('from_user_id, status')
+    .eq('id', invitationId)
+    .single()
+  if (fetchError) throw fetchError
+  if (inv.from_user_id !== userId) throw new Error('내가 보낸 제안이 아니에요.')
+  if (inv.status !== 'pending') return
+
+  const { error } = await supabase
+    .from('pot_invitations')
+    .update({ status: 'cancelled', responded_at: new Date().toISOString() })
+    .eq('id', invitationId)
+  if (error) throw error
+}
+
 // ── 알림함 ──────────────────────────────────────────
 // 날짜/그룹/밥팟 제목을 함께 보여주기 위해 밥팟·그룹 정보를 조인해서 가져온다.
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*, meal_pots(title, date, slot, is_default, groups(name))')
+    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, groups(name))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit)

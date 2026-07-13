@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyNotifications, markAllNotificationsRead } from '../lib/db'
+import { getMyNotifications, markAllNotificationsRead, getMyPotsForSlotAllGroups, leavePotWithCleanup, acceptPotInvitation, declinePotInvitation } from '../lib/db'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function timeAgo(iso) {
@@ -24,6 +24,8 @@ const EVENT_META = {
   leave: { label: '나가기', color: '#f44336', bg: '#FFEBEE', border: '#FFCDD2' },
   update: { label: '수정', color: '#1E88E5', bg: '#E3F2FD', border: '#BBDEFB' },
   comment: { label: '코멘트', color: '#857B72', bg: '#F5F0EB', border: '#EDE8E3' },
+  invite: { label: '초대', color: '#8E24AA', bg: '#F3E5F5', border: '#E1BEE7' },
+  invite_new: { label: '제안', color: '#8E24AA', bg: '#F3E5F5', border: '#E1BEE7' },
 }
 
 export default function NotificationsPage() {
@@ -32,6 +34,9 @@ export default function NotificationsPage() {
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
   const [newIds, setNewIds] = useState(new Set())
+  const [actingId, setActingId] = useState(null)
+  const [localOverrides, setLocalOverrides] = useState({}) // invitationId -> { status, pot_id }
+  const [conflict, setConflict] = useState(null) // { notification, otherPot }
 
   useEffect(() => {
     if (!user) return
@@ -49,6 +54,66 @@ export default function NotificationsPage() {
       .finally(() => { if (!cancelled) setLoading(false) })
     return () => { cancelled = true }
   }, [user])
+
+  const doAccept = async (n) => {
+    const inv = n.pot_invitations
+    setActingId(inv.id)
+    try {
+      const pot = await acceptPotInvitation(inv.id, user.id)
+      setLocalOverrides(prev => ({ ...prev, [inv.id]: { status: 'accepted', pot_id: pot.id } }))
+      setConflict(null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  const handleAccept = async (e, n) => {
+    e.stopPropagation()
+    const inv = n.pot_invitations
+    if (!inv || actingId) return
+    setActingId(inv.id)
+    try {
+      const conflicts = await getMyPotsForSlotAllGroups(user.id, inv.date, inv.slot)
+      if (conflicts.length > 0) {
+        setConflict({ notification: n, otherPot: conflicts[0].meal_pots })
+        setActingId(null)
+        return
+      }
+      await doAccept(n)
+    } catch (e2) {
+      console.error(e2)
+      setActingId(null)
+    }
+  }
+
+  const handleDecline = async (e, n) => {
+    e.stopPropagation()
+    const inv = n.pot_invitations
+    if (!inv || actingId) return
+    setActingId(inv.id)
+    try {
+      await declinePotInvitation(inv.id, user.id)
+      setLocalOverrides(prev => ({ ...prev, [inv.id]: { status: 'declined' } }))
+    } catch (e2) {
+      console.error(e2)
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  const handleConflictLeaveAndAccept = async () => {
+    if (!conflict) return
+    const { notification, otherPot } = conflict
+    await leavePotWithCleanup(otherPot.id, user.id)
+    await doAccept(notification)
+  }
+
+  const handleConflictAcceptBoth = async () => {
+    if (!conflict) return
+    await doAccept(conflict.notification)
+  }
 
   return (
     <div style={S.page}>
@@ -70,14 +135,27 @@ export default function NotificationsPage() {
           notifications.map(n => {
             const meta = EVENT_META[n.event_type]
             const pot = n.meal_pots
-            const dateLabel = formatDate(pot?.date)
-            const metaLine = [pot?.groups?.name, dateLabel, pot?.title].filter(Boolean).join(' · ')
+            const inv = n.pot_invitations
+            const invStatus = inv ? (localOverrides[inv.id]?.status ?? inv.status) : null
+            const dateLabel = formatDate(pot?.date || inv?.date)
+            const metaLine = [pot?.groups?.name || inv?.groups?.name, dateLabel, pot?.title || inv?.title].filter(Boolean).join(' · ')
             const isNew = newIds.has(n.id)
+            const isPending = n.event_type === 'invite_new' && invStatus === 'pending'
+            const isBusy = actingId === inv?.id
+            const handleItemClick = () => {
+              if (isPending) return
+              if (invStatus === 'accepted') {
+                const potId = localOverrides[inv.id]?.pot_id ?? inv.pot_id
+                if (potId) navigate(`/pot/${potId}`)
+                return
+              }
+              if (n.url) navigate(n.url)
+            }
             return (
               <div
                 key={n.id}
                 style={{ ...S.item, ...(isNew ? S.itemUnread : {}) }}
-                onClick={() => n.url && navigate(n.url)}
+                onClick={handleItemClick}
               >
                 <div style={S.itemBody}>
                   <div style={S.itemTopRow}>
@@ -94,12 +172,47 @@ export default function NotificationsPage() {
                   </div>
                   {metaLine && <div style={S.itemMeta}>{metaLine}</div>}
                   {n.body && <div style={S.itemText}>{n.body}</div>}
+                  {isPending && (
+                    <div style={S.inviteBtnRow}>
+                      <button style={S.inviteAcceptBtn} onClick={e => handleAccept(e, n)} disabled={isBusy}>
+                        {isBusy ? '처리 중...' : '수락'}
+                      </button>
+                      <button style={S.inviteDeclineBtn} onClick={e => handleDecline(e, n)} disabled={isBusy}>거절</button>
+                    </div>
+                  )}
+                  {n.event_type === 'invite_new' && invStatus === 'accepted' && (
+                    <div style={S.inviteStatusDone}>✓ 수락했어요 · 밥팟으로 이동</div>
+                  )}
+                  {n.event_type === 'invite_new' && invStatus === 'declined' && (
+                    <div style={S.inviteStatusDeclined}>거절한 제안이에요</div>
+                  )}
+                  {n.event_type === 'invite_new' && invStatus === 'cancelled' && (
+                    <div style={S.inviteStatusDeclined}>상대가 제안을 취소했어요</div>
+                  )}
                 </div>
               </div>
             )
           })
         )}
       </div>
+
+      {conflict && (
+        <div style={S.overlay}>
+          <div style={S.dialog}>
+            <div style={{ fontSize: 40 }}>⚠️</div>
+            <div style={S.dialogTitle}>이미 참여 중인 밥팟이 있어요</div>
+            <p style={S.dialogDesc}>
+              <strong>{conflict.notification.pot_invitations?.slot}</strong> 슬롯에{'\n'}
+              <strong>{conflict.otherPot.meal_time?.slice(0, 5)} {conflict.otherPot.title}</strong>{'\n'}에 이미 참여하고 있어요.
+            </p>
+            <div style={S.dialogBtns}>
+              <button style={S.dialogBtnPrimary} onClick={handleConflictLeaveAndAccept} disabled={actingId !== null}>기존 밥팟 나가고 여기서 같이 먹기</button>
+              <button style={S.dialogBtnSecondary} onClick={handleConflictAcceptBoth} disabled={actingId !== null}>중복으로 같이 먹기</button>
+              <button style={S.dialogBtnCancel} onClick={() => setConflict(null)}>이번엔 패스</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -137,4 +250,19 @@ const S = {
   itemTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' },
   itemMeta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', marginTop: 3, fontWeight: 600 },
   itemText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: 3, wordBreak: 'break-word', lineHeight: 1.5 },
+
+  inviteBtnRow: { display: 'flex', gap: 8, marginTop: 8 },
+  inviteAcceptBtn: { flex: 1, padding: '9px 0', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  inviteDeclineBtn: { flex: 1, padding: '9px 0', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
+  inviteStatusDone: { marginTop: 8, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#4CAF50' },
+  inviteStatusDeclined: { marginTop: 8, fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
+
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer' },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }
