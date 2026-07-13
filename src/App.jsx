@@ -16,6 +16,7 @@ import JoinPage from './pages/JoinPage'
 import NotificationsPage from './pages/NotificationsPage'
 import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
+import NotificationToast from './components/NotificationToast'
 
 function ConsumerRoutes() {
   const { user } = useUser()
@@ -59,6 +60,7 @@ function ConsumerRoutes() {
 function ConsumerApp() {
   return (
     <UserProvider>
+      <NotificationToast />
       <ConsumerRoutes />
     </UserProvider>
   )
