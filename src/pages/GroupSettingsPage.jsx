@@ -8,6 +8,7 @@ import { useEscKey } from '../lib/useEscKey'
 import { SLOT_KEYS, SLOT_EMOJI, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function nextFullHour() {
   const h = (new Date().getHours() + 1) % 24
@@ -190,7 +191,7 @@ export default function GroupSettingsPage() {
     finally { setSaving(false) }
   }
 
-  if (loading) return <div style={S.loadingPage}>🍚</div>
+  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={40} /></div>
 
   const presets = SLOT_TIME_PRESETS[form.slot] ?? []
   const isCustomTime = !presets.includes(form.meal_time)
@@ -207,7 +208,7 @@ export default function GroupSettingsPage() {
       </div>
 
       <div style={S.body}>
-        <div style={S.hero}>매일 자동으로 열리는 밥팟이에요 🍚</div>
+        <div style={S.hero}>매일 자동으로 열리는 밥팟이에요 <RiceBowlIcon size={18} /></div>
 
         <div style={S.sections}>
           {/* 그룹 고정 표시 */}
@@ -330,7 +331,7 @@ export default function GroupSettingsPage() {
             onClick={handleSave}
             disabled={!form.title.trim() || saving}
           >
-            {saving ? '저장 중...' : isFutureEdit ? '수정 완료' : '기본 밥팟 추가 🍚'}
+            {saving ? '저장 중...' : isFutureEdit ? '수정 완료' : <>기본 밥팟 추가 <RiceBowlIcon size={18} /></>}
           </button>
 
           {editingConfigId && (

@@ -6,7 +6,7 @@ export const SLOT_STATUS_OPTIONS = [
   { key: 'open',   label: '같이 가능', emoji: '✋', color: '#2E9E4F', bg: '#E8F5E9', border: '#A5D6A7', selectable: true },
   { key: 'skip',   label: '패스',      emoji: '🙅', color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', selectable: true },
   { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', selectable: true },
-  { key: '참여중', label: '참여중',    emoji: '🍚', color: '#FF6B35', bg: '#FFF4EF', border: '#FFD6C0', selectable: false },
+  { key: '참여중', label: '같이 먹기로 함', emoji: '🍚', color: '#FF6B35', bg: '#FFF4EF', border: '#FFD6C0', selectable: false },
   { key: '참여완료', label: '참여완료', emoji: '✅', color: '#8F877D', bg: '#F5F0EB', border: '#E8E3DE', selectable: false },
 ]
 

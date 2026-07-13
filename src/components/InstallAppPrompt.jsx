@@ -1,0 +1,134 @@
+import { useState } from 'react'
+import { useInstallPrompt } from '../hooks/useInstallPrompt'
+
+// 홈 화면 추가 / 즐겨찾기 추가 CTA — MyAccountPage와 OnboardingPage에서 공용으로 사용
+// variant: 'default'(주 버튼 스타일) | 'subtle'(로그인 버튼들 옆에서 튀지 않는 보조 스타일)
+export default function InstallAppPrompt({ style, variant = 'default' }) {
+  const { installPrompt, triggerInstall, isInstalled, isIOS, isPC } = useInstallPrompt()
+  const [showIOSGuide, setShowIOSGuide] = useState(false)
+  const [showAndroidGuide, setShowAndroidGuide] = useState(false)
+  const [showPCGuide, setShowPCGuide] = useState(false)
+  const iconColor = variant === 'subtle' ? 'currentColor' : '#fff'
+
+  return (
+    <div style={{ ...styles.wrap, ...style }}>
+      {!isInstalled && (
+        <>
+          <button
+            style={{ ...styles.installBtn, ...(variant === 'subtle' ? styles.installBtnSubtle : {}) }}
+            onClick={() => {
+              if (isPC) setShowPCGuide(true)
+              else if (isIOS) setShowIOSGuide(true)
+              else if (installPrompt) triggerInstall()
+              else setShowAndroidGuide(true)
+            }}
+          >
+            {isPC ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill={iconColor}><path d="M6 3a1 1 0 0 0-1 1v17l7-4.5 7 4.5V4a1 1 0 0 0-1-1H6Z" /></svg>
+            ) : (
+              <span>📲</span>
+            )}
+            <span>{isPC ? '즐겨찾기에 추가' : '홈 화면에 앱 추가'}</span>
+          </button>
+          {!isPC && <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>}
+        </>
+      )}
+      {isInstalled && (
+        <div style={styles.installedBadge}>✓ 홈 화면에 설치됨</div>
+      )}
+
+      {/* PC 즐겨찾기 안내 모달 */}
+      {showPCGuide && (
+        <div style={styles.modalOverlay} onClick={() => setShowPCGuide(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalTitle}>즐겨찾기에 추가하기</div>
+            <div style={styles.guideSteps}>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>1</span>
+                <span>주소창 오른쪽 <strong>별표(☆)</strong> 아이콘을 클릭하세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>또는</span>
+                <span>키보드에서 <strong>Ctrl+D</strong> (Mac: ⌘+D) 를 누르세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>2</span>
+                <span><strong>완료</strong>를 클릭하면 즐겨찾기에 저장돼요.</span>
+              </div>
+            </div>
+            <button style={styles.modalClose} onClick={() => setShowPCGuide(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Android 수동 안내 모달 */}
+      {showAndroidGuide && (
+        <div style={styles.modalOverlay} onClick={() => setShowAndroidGuide(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalTitle}>홈 화면에 추가하기</div>
+            <div style={styles.guideSteps}>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>1</span>
+                <span>Chrome 주소창 오른쪽 <strong>⋮ 메뉴</strong>를 탭하세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>2</span>
+                <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>3</span>
+                <span><strong>추가</strong>를 탭하면 완료!</span>
+              </div>
+            </div>
+            <button style={styles.modalClose} onClick={() => setShowAndroidGuide(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* iOS 안내 모달 */}
+      {showIOSGuide && (
+        <div style={styles.modalOverlay} onClick={() => setShowIOSGuide(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalTitle}>홈 화면에 추가하기</div>
+            <div style={styles.guideSteps}>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>1</span>
+                <span>Safari 하단의 <strong>공유 버튼(□↑)</strong>을 탭하세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>2</span>
+                <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>3</span>
+                <span>우측 상단 <strong>추가</strong>를 탭하면 완료!</span>
+              </div>
+            </div>
+            <button style={styles.modalClose} onClick={() => setShowIOSGuide(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+const styles = {
+  wrap: { display: 'flex', flexDirection: 'column', gap: 6 },
+  installBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  installBtnSubtle: { padding: '9px 14px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600 },
+  installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
+  installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-xs)', color: '#4CAF50', fontWeight: 700, padding: 8 },
+  modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
+  modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
+  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-lg)', textAlign: 'center' },
+  guideSteps: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' },
+  guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
+  guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 'var(--font-size-2xs)' },
+  modalClose: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+}

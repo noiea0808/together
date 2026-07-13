@@ -5,6 +5,7 @@ import { updateNickname, uploadAvatar, deleteAccount } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
+import InstallAppPrompt from '../components/InstallAppPrompt'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
@@ -12,10 +13,7 @@ export default function MyAccountPage() {
   const navigate = useNavigate()
   const { user, logout, login } = useUser()
   const [nickname, setNickname] = useState(user?.nickname ?? '')
-  const { installPrompt, triggerInstall, isInstalled, isIOS, isAndroid, isPC } = useInstallPrompt()
-  const [showIOSGuide, setShowIOSGuide] = useState(false)
-  const [showAndroidGuide, setShowAndroidGuide] = useState(false)
-  const [showPCGuide, setShowPCGuide] = useState(false)
+  const { isInstalled, isIOS } = useInstallPrompt()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -201,30 +199,9 @@ export default function MyAccountPage() {
         </div>
 
         {/* 홈 화면 설치 */}
-        {!isInstalled && (
-          <div style={styles.section}>
-            <button
-              style={styles.installBtn}
-              onClick={() => {
-                if (isPC) setShowPCGuide(true)
-                else if (isIOS) setShowIOSGuide(true)
-                else if (installPrompt) triggerInstall()
-                else setShowAndroidGuide(true)
-              }}
-            >
-              {isPC ? (
-                <svg width="17" height="17" viewBox="0 0 24 24" fill="#fff"><path d="M6 3a1 1 0 0 0-1 1v17l7-4.5 7 4.5V4a1 1 0 0 0-1-1H6Z" /></svg>
-              ) : (
-                <span>📲</span>
-              )}
-              <span>{isPC ? '즐겨찾기에 추가' : '홈 화면에 앱 추가'}</span>
-            </button>
-            {!isPC && <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>}
-          </div>
-        )}
-        {isInstalled && (
-          <div style={styles.installedBadge}>✓ 홈 화면에 설치됨</div>
-        )}
+        <div style={styles.section}>
+          <InstallAppPrompt />
+        </div>
 
         {/* 알림 받기 */}
         {isPushSupported() && (
@@ -304,83 +281,6 @@ export default function MyAccountPage() {
           </div>
         )}
 
-        {/* PC 즐겨찾기 안내 모달 */}
-        {showPCGuide && (
-          <div style={styles.modalOverlay} onClick={() => setShowPCGuide(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={styles.modalTitle}>즐겨찾기에 추가하기</div>
-              <div style={styles.guideSteps}>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>1</span>
-                  <span>주소창 오른쪽 <strong>별표(☆)</strong> 아이콘을 클릭하세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>또는</span>
-                  <span>키보드에서 <strong>Ctrl+D</strong> (Mac: ⌘+D) 를 누르세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>2</span>
-                  <span><strong>완료</strong>를 클릭하면 즐겨찾기에 저장돼요.</span>
-                </div>
-              </div>
-              <button style={styles.modalClose} onClick={() => setShowPCGuide(false)}>
-                확인
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Android 수동 안내 모달 */}
-        {showAndroidGuide && (
-          <div style={styles.modalOverlay} onClick={() => setShowAndroidGuide(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={styles.modalTitle}>홈 화면에 추가하기</div>
-              <div style={styles.guideSteps}>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>1</span>
-                  <span>Chrome 주소창 오른쪽 <strong>⋮ 메뉴</strong>를 탭하세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>2</span>
-                  <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>3</span>
-                  <span><strong>추가</strong>를 탭하면 완료!</span>
-                </div>
-              </div>
-              <button style={styles.modalClose} onClick={() => setShowAndroidGuide(false)}>
-                확인
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* iOS 안내 모달 */}
-        {showIOSGuide && (
-          <div style={styles.modalOverlay} onClick={() => setShowIOSGuide(false)}>
-            <div style={styles.modal} onClick={e => e.stopPropagation()}>
-              <div style={styles.modalTitle}>홈 화면에 추가하기</div>
-              <div style={styles.guideSteps}>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>1</span>
-                  <span>Safari 하단의 <strong>공유 버튼(□↑)</strong>을 탭하세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>2</span>
-                  <span><strong>홈 화면에 추가</strong>를 선택하세요.</span>
-                </div>
-                <div style={styles.guideStep}>
-                  <span style={styles.guideNum}>3</span>
-                  <span>우측 상단 <strong>추가</strong>를 탭하면 완료!</span>
-                </div>
-              </div>
-              <button style={styles.modalClose} onClick={() => setShowIOSGuide(false)}>
-                확인
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <BottomNav />
@@ -422,16 +322,9 @@ const styles = {
 
 
   logoutBtn: { width: '100%', padding: 13, background: 'none', border: '1.5px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
-  installBtn: { width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
-  installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-xs)', color: '#4CAF50', fontWeight: 700, padding: 8 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
   modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
-  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-lg)', textAlign: 'center' },
-  guideSteps: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' },
-  guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
-  guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 'var(--font-size-2xs)' },
-  modalClose: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
 
   withdrawWrap: { textAlign: 'center', marginTop: 14 },
   withdrawLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.6 },

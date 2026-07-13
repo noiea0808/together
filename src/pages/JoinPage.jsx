@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getGroupByInviteCode, joinGroup } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 export default function JoinPage() {
   const { code } = useParams()
@@ -44,7 +45,7 @@ export default function JoinPage() {
     <div style={styles.page}>
       {status === 'loading' && (
         <>
-          <div style={styles.emoji}>🍚</div>
+          <div style={styles.emoji}><RiceBowlIcon size={56} /></div>
           <div style={styles.title}>초대 코드 확인 중...</div>
         </>
       )}

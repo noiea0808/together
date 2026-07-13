@@ -1,20 +1,20 @@
 import { useEffect } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { NavLink, Outlet, useNavigate } from 'react-router-dom'
+import RiceBowlIcon from '../../components/RiceBowlIcon'
+import { useAdminAuth } from '../../lib/AdminAuthContext'
 
 const NAV_SECTIONS = [
   {
     title: '가이드',
     items: [
       { to: '/admin/guide/status',   label: '사용자 상태', icon: '🟢' },
-      { to: '/admin/guide/slots',    label: '식사 슬롯',   icon: '🍽️', disabled: true },
-      { to: '/admin/guide/pots',     label: '밥팟 규칙',   icon: '🍲', disabled: true },
     ],
   },
   {
     title: '서비스 관리',
     items: [
       { to: '/admin/terms',    label: '약관',     icon: '📜' },
-      { to: '/admin/users',    label: '사용자',   icon: '👤', disabled: true },
+      { to: '/admin/users',    label: '사용자',   icon: '👤' },
       { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
       { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },
     ],
@@ -22,18 +22,26 @@ const NAV_SECTIONS = [
 ]
 
 export default function AdminLayout() {
+  const navigate = useNavigate()
+  const { adminUser, logout } = useAdminAuth()
+
   useEffect(() => {
     const prev = document.title
-    document.title = '같이먹자_Admin'
+    document.title = 'Admin'
     return () => { document.title = prev }
   }, [])
+
+  const handleLogout = async () => {
+    await logout()
+    navigate('/admin/login', { replace: true })
+  }
 
   return (
     <div style={s.root}>
       {/* Sidebar */}
       <aside style={s.sidebar}>
         <div style={s.brand}>
-          <span style={s.brandIcon}>🍚</span>
+          <RiceBowlIcon size={28} />
           <div>
             <div style={s.brandName}>같이먹자</div>
             <div style={s.brandSub}>Admin</div>
@@ -69,6 +77,8 @@ export default function AdminLayout() {
         </nav>
 
         <div style={s.sidebarFooter}>
+          {adminUser?.email && <div style={s.adminEmail}>{adminUser.email}</div>}
+          <button style={s.logoutBtn} onClick={handleLogout}>로그아웃</button>
           <a href="/today" style={s.backLink}>← 서비스로 돌아가기</a>
         </div>
       </aside>
@@ -155,6 +165,25 @@ const s = {
   sidebarFooter: {
     padding: '14px 20px',
     borderTop: '1px solid #2E2E42',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: 8,
+  },
+  adminEmail: {
+    fontSize: 11,
+    color: '#5A5A7A',
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  logoutBtn: {
+    fontSize: 12,
+    color: '#9090A8',
+    background: 'none',
+    border: 'none',
+    padding: 0,
+    textAlign: 'left',
+    cursor: 'pointer',
   },
   backLink: {
     fontSize: 12,

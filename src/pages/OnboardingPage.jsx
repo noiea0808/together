@@ -2,6 +2,8 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signUp, signIn, signInWithGoogle, signInWithKakao } from '../lib/db'
 import { useUser } from '../lib/UserContext'
+import RiceBowlIcon from '../components/RiceBowlIcon'
+import InstallAppPrompt from '../components/InstallAppPrompt'
 
 const ERROR_MESSAGES = {
   'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
@@ -17,13 +19,12 @@ function parseError(e) {
 // 진입 화면: 소셜 / 이메일 선택
 function LoginSelect({ onEmail, hasPendingInvite }) {
   return (
-    <div style={styles.card}>
+    <div style={styles.selectGroup}>
       {hasPendingInvite && (
         <div style={styles.inviteBanner}>
           🎉 초대 링크로 오셨군요! 로그인하면 바로 입장됩니다.
         </div>
       )}
-      <p style={styles.selectTitle}>로그인 / 회원가입</p>
       <button style={{ ...styles.socialBtn, ...styles.googleBtn }} onClick={async () => { try { await signInWithGoogle() } catch (e) { alert('구글 로그인 실패: ' + e.message) } }}>
         <GoogleIcon />
         <span>Google로 계속하기</span>
@@ -32,11 +33,6 @@ function LoginSelect({ onEmail, hasPendingInvite }) {
         <KakaoIcon />
         <span>카카오로 계속하기</span>
       </button>
-      <div style={styles.divider}>
-        <span style={styles.dividerLine} />
-        <span style={styles.dividerText}>또는</span>
-        <span style={styles.dividerLine} />
-      </div>
       <button style={{ ...styles.socialBtn, ...styles.emailBtn }} onClick={onEmail}>
         <span style={styles.emailIcon}>✉️</span>
         <span>이메일로 계속하기</span>
@@ -192,7 +188,7 @@ export default function OnboardingPage() {
   return (
     <div style={styles.page}>
       <div style={styles.top}>
-        <div style={styles.logo}>🍚</div>
+        <div style={styles.logo}><RiceBowlIcon size={112} /></div>
         <h1 style={styles.title}>같이 먹자</h1>
         <p style={styles.sub}>오늘 같이 먹을 사람,{'\n'}묻지 말고 확인하기</p>
       </div>
@@ -202,7 +198,10 @@ export default function OnboardingPage() {
         : <EmailForm hasPendingInvite={hasPendingInvite} onBack={() => setView('select')} />
       }
 
-      <p style={styles.footer}>설치 불필요 · 링크로 바로 참여</p>
+      <div style={styles.installSection}>
+        <InstallAppPrompt variant="subtle" />
+        <p style={styles.footer}>설치 불필요 · 링크로 바로 참여</p>
+      </div>
     </div>
   )
 }
@@ -242,7 +241,9 @@ const styles = {
     padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)',
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
-  selectTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)', textAlign: 'center', marginBottom: 4 },
+  selectGroup: {
+    width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)',
+  },
   socialBtn: {
     width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
     gap: 10, padding: '13px var(--spacing-md)',
@@ -251,11 +252,8 @@ const styles = {
   },
   googleBtn: { background: '#fff', color: '#3c4043' },
   kakaoBtn: { background: '#FEE500', color: '#3C1E1E', border: '1.5px solid #FEE500' },
-  emailBtn: { background: 'var(--color-surface-2)', color: 'var(--color-text)', marginTop: -4 },
+  emailBtn: { background: 'var(--color-surface-2)', color: 'var(--color-text)' },
   emailIcon: { fontSize: 18, lineHeight: 1 },
-  divider: { display: 'flex', alignItems: 'center', gap: 8 },
-  dividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
-  dividerText: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', flexShrink: 0 },
   emailFormHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   backBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 4px', flexShrink: 0 },
   tabs: { display: 'flex', gap: 8, flex: 1 },
@@ -284,6 +282,10 @@ const styles = {
     border: 'none', borderRadius: 'var(--radius-full)',
     fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer',
     marginTop: 4,
+  },
+  installSection: {
+    width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+    paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',
   },
   footer: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   inviteBanner: { background: 'var(--color-primary)12', border: '1px solid var(--color-primary)33', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },

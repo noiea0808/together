@@ -8,6 +8,7 @@ import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_KEYS, SLOT_EMOJI, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import RiceBowlIcon from '../components/RiceBowlIcon'
 
 const MIN_PEOPLE = 2
 const MAX_PEOPLE = 8
@@ -170,7 +171,7 @@ export default function CreatePotPage() {
       </div>
 
       <div style={S.body}>
-        <div style={S.hero}>오늘 같이 밥 먹어요 🍚</div>
+        <div style={S.hero}>오늘 같이 밥 먹어요 <RiceBowlIcon size={18} /></div>
 
         <div style={S.sections}>
           {/* 그룹 선택 */}
@@ -312,7 +313,7 @@ export default function CreatePotPage() {
             onClick={handleCreate}
             disabled={loading}
           >
-            {loading ? '생성 중...' : '밥팟 열기 🍚'}
+            {loading ? '생성 중...' : <>밥팟 열기 <RiceBowlIcon size={18} /></>}
           </button>
         </div>
       </div>
