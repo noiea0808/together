@@ -17,6 +17,7 @@ import NotificationsPage from './pages/NotificationsPage'
 import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
+import BadgeSync from './components/BadgeSync'
 
 function ConsumerRoutes() {
   const { user } = useUser()
@@ -61,6 +62,7 @@ function ConsumerApp() {
   return (
     <UserProvider>
       <NotificationToast />
+      <BadgeSync />
       <ConsumerRoutes />
     </UserProvider>
   )
