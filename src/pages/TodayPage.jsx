@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
@@ -1322,8 +1322,66 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
 
+  // 참여자 선택 → 같이 먹자 제안
+  const [proposeTarget, setProposeTarget] = useState(null) // { id, nickname }
+  const [proposeMenu, setProposeMenu] = useState('')
+  const [proposeSending, setProposeSending] = useState(false)
+  const [proposeError, setProposeError] = useState(null)
+  const [pendingProposals, setPendingProposals] = useState([]) // pot_invitations rows (이 그룹+슬롯)
+  const [sentInviteIds, setSentInviteIds] = useState(new Set()) // 기존 밥팟에 즉시 초대한 유저 (취소 불가)
+  const isPastDate = dateStr < toDateStr(new Date())
+
+  const reloadPendingProposals = () =>
+    getMyPendingInvitationsForDate(myUserId, dateStr)
+      .then(list => setPendingProposals(list.filter(inv => inv.group_id === group.id && inv.slot === slot)))
+      .catch(() => {})
+
+  useEffect(() => { reloadPendingProposals() }, [myUserId, dateStr, slot, group.id])
+
+  const openPropose = (member) => {
+    setProposeTarget(member)
+    setProposeMenu('')
+    setProposeError(null)
+  }
+  const closePropose = () => setProposeTarget(null)
+
+  const handleCancelProposal = async (e, invitationId) => {
+    e.stopPropagation()
+    try {
+      await cancelPotInvitation(invitationId, myUserId)
+      await reloadPendingProposals()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const sendPropose = async () => {
+    if (!proposeTarget || proposeSending) return
+    setProposeSending(true)
+    setProposeError(null)
+    try {
+      const existing = await getMyPotsForSlot(myUserId, group.id, dateStr, slot)
+      if (existing.length > 0) {
+        await invitePotFriend(existing[0].pot_id, myUserId, proposeTarget.id)
+        setSentInviteIds(prev => new Set(prev).add(proposeTarget.id))
+      } else {
+        await proposeMealTogether({
+          groupId: group.id, fromUserId: myUserId, toUserId: proposeTarget.id,
+          date: dateStr, slot, meal_time: null, menu: proposeMenu.trim() || null,
+        })
+        await reloadPendingProposals()
+      }
+      setProposeTarget(null)
+    } catch (e) {
+      console.error(e)
+      setProposeError('제안을 보내지 못했어요.')
+    } finally {
+      setProposeSending(false)
+    }
+  }
+
   // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(showSettings || confirmRemoveMember))
+  useScrollLock(!!(showSettings || confirmRemoveMember || proposeTarget))
 
   const handleToggleSharing = () => onToggleShare(!isShared)
 
@@ -1373,6 +1431,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const isInThisGroupPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId)) // 이 그룹 팟 참여 여부 (헤더 색상용)
   const myGroupPot = isInThisGroupPot ? pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId)) : null
   const isMyGroupPotExpired = isInThisGroupPot && isPotTimeExpired(dateStr, myGroupPot?.end_time)
+  const myPotMemberIds = new Set((myGroupPot?.pot_members ?? []).map(pm => pm.user_id))
 
   const getMemberData = (userId) => {
     if (userId === myUserId) {
@@ -1664,6 +1723,29 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
       )}
 
+      {proposeTarget && (
+        <div style={styles.overlay} onClick={closePropose}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>🍚</div>
+            <div style={styles.dialogTitle}>{proposeTarget.nickname}님에게{'\n'}{slot} 같이 먹자고 제안할까요?</div>
+            <input
+              style={styles.proposeMenuInput}
+              placeholder="메뉴나 한마디 (선택)"
+              value={proposeMenu}
+              onChange={e => setProposeMenu(e.target.value)}
+              maxLength={40}
+              autoFocus
+            />
+            {proposeError && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{proposeError}</p>}
+            <div style={styles.dialogBtns}>
+              <button style={{ ...styles.memberProposeSendBtn, opacity: proposeSending ? 0.6 : 1 }} onClick={sendPropose} disabled={proposeSending}>
+                {proposeSending ? '보내는 중...' : '제안 보내기'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={closePropose}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {!collapsed && (
@@ -1740,6 +1822,20 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>{opt.label}</span>
                 )}
+                {!isMe && !isPastDate && !myPotMemberIds.has(member.id) && (() => {
+                  const pendingInv = pendingProposals.find(inv => inv.to_user_id === member.id)
+                  if (pendingInv) {
+                    return (
+                      <button style={styles.memberCancelBtn} onClick={e => handleCancelProposal(e, pendingInv.id)}>
+                        제안함 ✓ · 취소
+                      </button>
+                    )
+                  }
+                  if (sentInviteIds.has(member.id)) {
+                    return <span style={styles.memberProposeDone}>초대함</span>
+                  }
+                  return <button style={styles.memberProposeBtn} onClick={() => openPropose(member)}>🍚 같이 먹자</button>
+                })()}
               </div>
             )
           })}
@@ -1977,6 +2073,11 @@ const styles = {
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
   groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '3px 9px', whiteSpace: 'nowrap' },
   memberSection: { padding: '0 0 8px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
+  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 99, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
+  memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', whiteSpace: 'nowrap' },
+  memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
+  memberProposeSendBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  proposeMenuInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
   groupMealList: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 },
   groupCreateBtn: { width: '100%', textAlign: 'center', padding: '9px 0', marginTop: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
