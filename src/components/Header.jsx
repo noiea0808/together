@@ -17,7 +17,14 @@ export default function Header({ hidden: hiddenProp }) {
 
   useEffect(() => {
     if (!user) return
-    const refresh = () => getUnreadNotificationCount(user.id).then(setUnread).catch(() => {})
+    const refresh = () => getUnreadNotificationCount(user.id).then(count => {
+      setUnread(count)
+      // OS/홈 화면 앱 아이콘 뱃지 — 지원 브라우저(설치된 PWA)에서만 동작
+      if ('setAppBadge' in navigator) {
+        if (count > 0) navigator.setAppBadge(count).catch(() => {})
+        else navigator.clearAppBadge?.().catch(() => {})
+      }
+    }).catch(() => {})
     refresh()
 
     // 실시간 구독 — 알림이 새로 쌓이거나(참여/나가기/수정/코멘트) 다른 화면에서

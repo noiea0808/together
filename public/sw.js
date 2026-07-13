@@ -29,13 +29,18 @@ self.addEventListener('push', (e) => {
     if (e.data) payload.body = e.data.text()
   }
 
+  // 정확한 안읽음 수는 앱이 켜졌을 때 Header.jsx가 realtime으로 보정한다.
+  // 여기서는 새 알림이 왔다는 것만 즉시 표시(뱃지 dot).
   e.waitUntil(
-    self.registration.showNotification(payload.title, {
-      body: payload.body,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
-      data: { url: payload.url || '/' },
-    })
+    Promise.all([
+      self.registration.showNotification(payload.title, {
+        body: payload.body,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { url: payload.url || '/' },
+      }),
+      self.registration.setAppBadge ? self.registration.setAppBadge().catch(() => {}) : Promise.resolve(),
+    ])
   )
 })
 
