@@ -190,7 +190,7 @@ export default function OnboardingPage() {
       <div style={styles.top}>
         <div style={styles.logo}><RiceBowlIcon size={112} /></div>
         <h1 style={styles.title}>같이 먹자</h1>
-        <p style={styles.sub}>오늘 같이 먹을 사람,{'\n'}묻지 말고 확인하기</p>
+        <p style={styles.sub}>'점약있어?' 묻지 않아도,{'\n'}오늘 밥자리가 보여요</p>
       </div>
 
       {view === 'select'
@@ -199,8 +199,7 @@ export default function OnboardingPage() {
       }
 
       <div style={styles.installSection}>
-        <InstallAppPrompt variant="subtle" />
-        <p style={styles.footer}>설치 불필요 · 링크로 바로 참여</p>
+        <InstallAppPrompt variant="subtle" hideDesc />
       </div>
     </div>
   )
@@ -287,6 +286,5 @@ const styles = {
     width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',
   },
-  footer: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   inviteBanner: { background: 'var(--color-primary)12', border: '1px solid var(--color-primary)33', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },
 }

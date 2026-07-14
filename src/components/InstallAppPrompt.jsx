@@ -16,7 +16,7 @@ function openInChromeAndroid() {
 
 // 홈 화면 추가 / 즐겨찾기 추가 CTA — MyAccountPage와 OnboardingPage에서 공용으로 사용
 // variant: 'default'(주 버튼 스타일) | 'subtle'(로그인 버튼들 옆에서 튀지 않는 보조 스타일)
-export default function InstallAppPrompt({ style, variant = 'default' }) {
+export default function InstallAppPrompt({ style, variant = 'default', hideDesc = false }) {
   const { installPrompt, triggerInstall, isInstalled, isIOS, isAndroid, isPC, isInAppBrowser } = useInstallPrompt()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [showAndroidGuide, setShowAndroidGuide] = useState(false)
@@ -54,7 +54,7 @@ export default function InstallAppPrompt({ style, variant = 'default' }) {
             )}
             <span>{isPC ? '즐겨찾기에 추가' : '홈 화면에 앱 추가'}</span>
           </button>
-          {!isPC && <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>}
+          {!isPC && !hideDesc && <p style={styles.installDesc}>아이콘을 탭하면 앱처럼 바로 열려요.</p>}
         </>
       )}
       {isInstalled && (
@@ -199,7 +199,7 @@ export default function InstallAppPrompt({ style, variant = 'default' }) {
 const styles = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 6 },
   installBtn: { ...PRIMARY_ACTION_BUTTON, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  installBtnSubtle: { padding: '9px 14px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600 },
+  installBtnSubtle: { padding: '9px 14px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600, boxShadow: 'none' },
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-success)', fontWeight: 700, padding: 8 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
