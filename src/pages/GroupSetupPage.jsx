@@ -156,7 +156,7 @@ const styles = {
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
-  error: { fontSize: 'var(--font-size-xs)', color: '#f44336' },
+  error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)' },
   btn: {
     width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
     border: 'none', borderRadius: 'var(--radius-full)',

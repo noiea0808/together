@@ -43,10 +43,10 @@ function getRelativeLabel(date) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
   if (diff === 0)  return { label: '오늘',   color: 'var(--color-primary)' }
-  if (diff === -1) return { label: '어제',   color: '#2196F3' }
-  if (diff === -2) return { label: '엊그제', color: '#2196F3' }
-  if (diff === 1)  return { label: '내일',   color: '#4CAF50' }
-  if (diff === 2)  return { label: '모레',   color: '#4CAF50' }
+  if (diff === -1) return { label: '어제',   color: 'var(--color-info)' }
+  if (diff === -2) return { label: '엊그제', color: 'var(--color-info)' }
+  if (diff === 1)  return { label: '내일',   color: 'var(--color-success)' }
+  if (diff === 2)  return { label: '모레',   color: 'var(--color-success)' }
   if (diff < 0)   return { label: `${Math.abs(diff)}일 전`, color: '#9E9E9E' }
   return { label: `${diff}일 뒤`, color: '#9E9E9E' }
 }
@@ -1021,7 +1021,7 @@ export default function TodayPage() {
                           style={{
                             padding: '6px 11px',
                             border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                            borderRadius: 99,
+                            borderRadius: 'var(--radius-full)',
                             background: isActive ? 'rgba(255,107,53,0.09)' : 'transparent',
                             color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
                             fontSize: 12,
@@ -1047,7 +1047,7 @@ export default function TodayPage() {
                           style={{
                             padding: '6px 11px',
                             border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                            borderRadius: 99,
+                            borderRadius: 'var(--radius-full)',
                             background: isCustom ? 'rgba(255,107,53,0.09)' : 'transparent',
                             color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
                             fontSize: 12,
@@ -1067,7 +1067,7 @@ export default function TodayPage() {
                       style={{
                         padding: '6px 11px',
                         border: `1.5px solid ${!timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`,
-                        borderRadius: 99,
+                        borderRadius: 'var(--radius-full)',
                         background: !timeOn && !fieldDisabled ? 'rgba(255,107,53,0.09)' : 'transparent',
                         color: !timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-text-muted)',
                         fontSize: 12,
@@ -1205,7 +1205,7 @@ export default function TodayPage() {
           <div style={styles.dialogTitle}>밥팟 같이 먹기</div>
           <p style={styles.dialogDesc}>초대 코드를 입력하거나{'\n'}밥팟 링크를 붙여넣으세요</p>
           <input
-            style={{ width: '100%', padding: '11px 14px', border: `1.5px solid ${joinPotError ? '#f44336' : 'var(--color-border)'}`, borderRadius: 'var(--radius-md)', fontSize: 16, fontWeight: 700, letterSpacing: 2, textAlign: 'center', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
+            style={{ width: '100%', padding: '11px 14px', border: `1.5px solid ${joinPotError ? 'var(--color-danger)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-md)', fontSize: 16, fontWeight: 700, letterSpacing: 2, textAlign: 'center', outline: 'none', boxSizing: 'border-box', textTransform: 'uppercase' }}
             placeholder="ABC123"
             value={joinPotInput}
             onChange={e => { setJoinPotInput(e.target.value); setJoinPotError('') }}
@@ -1213,9 +1213,9 @@ export default function TodayPage() {
             maxLength={60}
             autoFocus
           />
-          {joinPotError && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{joinPotError}</p>}
+          {joinPotError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{joinPotError}</p>}
           <div style={styles.dialogBtns}>
-            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-primary)' }} onClick={handleJoinPotByCode}>
+            <button style={styles.dialogBtnPrimary} onClick={handleJoinPotByCode}>
               같이 먹기
             </button>
             <button style={styles.dialogBtnCancel} onClick={() => { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError('') }}>취소</button>
@@ -1257,7 +1257,7 @@ export default function TodayPage() {
             ))}
           </div>
           <div style={{ ...styles.dialogBtns, marginTop: 4 }}>
-            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-primary)' }} onClick={saveGroupOrder}>저장</button>
+            <button style={styles.dialogBtnPrimary} onClick={saveGroupOrder}>저장</button>
             <button style={styles.dialogBtnCancel} onClick={cancelEditingOrder}>취소</button>
           </div>
         </div>
@@ -1275,7 +1275,7 @@ export default function TodayPage() {
             계속하시겠어요?
           </p>
           <div style={styles.dialogBtns}>
-            <button style={styles.dialogBtnPrimary} onClick={resetAll}>초기화하기</button>
+            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={resetAll}>초기화하기</button>
             <button style={styles.dialogBtnCancel} onClick={() => setShowResetConfirm(false)}>취소</button>
           </div>
         </div>
@@ -1292,7 +1292,7 @@ export default function TodayPage() {
             다시 참여하려면 새로 들어와야 해요.
           </p>
           <div style={styles.dialogBtns}>
-            <button style={{ ...styles.dialogBtnPrimary, opacity: leavingPot ? 0.6 : 1 }} onClick={handleLeavePot} disabled={leavingPot}>
+            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)', opacity: leavingPot ? 0.6 : 1 }} onClick={handleLeavePot} disabled={leavingPot}>
               {leavingPot ? '나가는 중...' : '나가기'}
             </button>
             <button style={styles.dialogBtnCancel} onClick={() => setLeavePotConfirm(null)} disabled={leavingPot}>취소</button>
@@ -1486,7 +1486,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const FILTER_TAB_ORDER = ['open', '참여중', '참여완료', 'closed', 'skip']
   const filterTabs = [
     ...FILTER_TAB_ORDER.map(key => ({ ...SLOT_STATUS_OPTIONS.find(o => o.key === key), count: statusCounts[key] ?? 0 })),
-    { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6', count: unsetMembers.length },
+    { key: 'unset', label: '미설정', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#C7BFB6', count: unsetMembers.length },
   ]
 
   // 태그 미선택 시 전체 멤버(미설정 포함)를 한 목록으로, 태그 선택 시 해당 상태만 표시
@@ -1509,26 +1509,25 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
           ) : (
             <button
               style={{
-                fontSize: 'var(--font-size-2xs)', fontWeight: 700,
+                ...styles.groupHeaderPillBtn,
                 color: isShared ? '#FF6B35' : '#8F877D',
                 background: isShared ? '#FFF4EF' : '#F5F0EB',
                 border: `1px solid ${isShared ? '#FFD6C0' : '#E8E3DE'}`,
-                borderRadius: 99, padding: '3px 9px', cursor: 'pointer',
               }}
               onClick={handleToggleSharing}
             >{isShared ? '공유중' : '비공유'}</button>
           )}
-          <button style={styles.groupSettingsBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
-          <button style={styles.groupCollapseBtn} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
+          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
+          <button style={{ ...styles.groupHeaderIconBtn, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
         </div>
       </div>
 
       {/* 그룹 상태 요약 — 펼친 상태에선 아래 상태 필터 탭과 내용이 겹쳐 접혀 있을 때만 한눈에 보기 칩으로 표시 */}
       {collapsed && (
         <div style={styles.groupStatusSummary}>
-          <span style={{ ...styles.groupStatusChip, color: '#2E9E4F', background: '#E8F5E9' }}>같이가능 {statusCounts['open'] ?? 0}</span>
+          <span style={{ ...styles.groupStatusChip, color: 'var(--color-success)', background: 'var(--color-success-bg)' }}>같이가능 {statusCounts['open'] ?? 0}</span>
           <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>같이 먹기로 함 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
-          <span style={{ ...styles.groupStatusChip, color: '#857B72', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
+          <span style={{ ...styles.groupStatusChip, color: 'var(--color-text-muted)', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
         </div>
       )}
 
@@ -1670,7 +1669,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   <div style={styles.sheetInviteLabel}>초대 코드</div>
                   <div style={styles.sheetInviteCodeBox}>
                     <span style={styles.sheetInviteCode}>{group.invite_code}</span>
-                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'code' ? '#4CAF50' : 'var(--color-primary)' }}
+                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'code' ? 'var(--color-success)' : 'var(--color-primary)' }}
                       onClick={() => copyText(group.invite_code, 'code')}>
                       {copied === 'code' ? '✓' : '복사'}
                     </button>
@@ -1678,7 +1677,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   <div style={{ ...styles.sheetInviteLabel, marginTop: 6 }}>초대 링크</div>
                   <div style={styles.sheetInviteCodeBox}>
                     <span style={{ ...styles.sheetInviteCode, fontSize: 11 }}>{`${window.location.origin}/join/${group.invite_code}`}</span>
-                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'link' ? '#4CAF50' : 'var(--color-primary)' }}
+                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }}
                       onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}>
                       {copied === 'link' ? '✓' : '복사'}
                     </button>
@@ -1703,7 +1702,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             <div style={styles.dialogTitle}>{group.name} 나가기</div>
             <p style={styles.dialogDesc}>정말 이 그룹을 나가시겠어요?{'\n'}나가면 그룹의 일정 현황을 볼 수 없게 돼요.</p>
             <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleLeave}>나가기</button>
+              <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={handleLeave}>나가기</button>
               <button style={styles.dialogBtnCancel} onClick={() => setConfirmLeave(false)}>취소</button>
             </div>
           </div>
@@ -1717,7 +1716,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             <div style={styles.dialogTitle}>{confirmRemoveMember.nickname}님을{'\n'}내보낼까요?</div>
             <p style={styles.dialogDesc}>그룹에서 제외되면{'\n'}다시 초대코드로 참여해야 해요.</p>
             <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleRemoveMember}>내보내기</button>
+              <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={handleRemoveMember}>내보내기</button>
               <button style={styles.dialogBtnCancel} onClick={() => setConfirmRemoveMember(null)}>취소</button>
             </div>
           </div>
@@ -1737,7 +1736,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               maxLength={40}
               autoFocus
             />
-            {proposeError && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{proposeError}</p>}
+            {proposeError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{proposeError}</p>}
             <div style={styles.dialogBtns}>
               <button style={{ ...styles.memberProposeSendBtn, opacity: proposeSending ? 0.6 : 1 }} onClick={sendPropose} disabled={proposeSending}>
                 {proposeSending ? '보내는 중...' : '제안 보내기'}
@@ -1761,10 +1760,10 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   onClick={() => setStatusFilter(isActive ? null : tab.key)}
                   style={{
                     fontSize: 'var(--font-size-2xs)', fontWeight: 700,
-                    color: isActive ? tab.color : '#857B72',
+                    color: isActive ? tab.color : 'var(--color-text-muted)',
                     background: isActive ? (tab.bg ?? tab.color + '18') : '#F5F0EB',
                     border: `1px solid ${isActive ? (tab.border ?? tab.color + '44') : '#E8E3DE'}`,
-                    borderRadius: 99, padding: '3px 9px',
+                    borderRadius: 'var(--radius-full)', padding: '3px 9px',
                     cursor: 'pointer', fontFamily: 'inherit',
                     opacity: (tab.count === 0 && tab.key !== 'open') ? 0.4 : 1,
                     whiteSpace: 'nowrap', flexShrink: 0,
@@ -1781,7 +1780,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             const data = getMemberData(member.id)
             const opt = data?.status
               ? SLOT_STATUS_OPTIONS.find(o => o.key === data.status)
-              : { key: 'unset', label: '미설정', color: '#857B72', bg: '#F5F0EB', border: '#C7BFB6' }
+              : { key: 'unset', label: '미설정', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#C7BFB6' }
             const isMe = member.id === myUserId
             const timeStr = data?.meal_time
               ? `${data.meal_time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
@@ -1798,7 +1797,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 ) : (
                   <div style={{
                     width: 30, height: 30, borderRadius: '50%',
-                    background: isMe ? 'var(--color-primary)' : '#857B72',
+                    background: isMe ? 'var(--color-primary)' : 'var(--color-text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                   }}>{member.nickname[0]}</div>
@@ -1806,21 +1805,21 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
                   {member.nickname}{isMe ? ' (나)' : ''}
                 </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: '#857B72', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                   {timeStr}
                 </span>
-                {opt && (isOpen || !statusFilter) && (
+                {opt && !statusFilter && (
                   <span style={isOpen ? {
                     fontSize: 'var(--font-size-2xs)', fontWeight: 800,
                     color: '#fff', background: opt.color,
                     border: `1px solid ${opt.color}`,
-                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
+                    borderRadius: 'var(--radius-full)', padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
                   } : {
                     fontSize: 'var(--font-size-2xs)', fontWeight: 700,
                     color: opt.color,
                     background: opt.bg ?? opt.color + '18',
                     border: `1px solid ${opt.border ?? opt.color + '44'}`,
-                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
+                    borderRadius: 'var(--radius-full)', padding: '2px 9px', whiteSpace: 'nowrap', flexShrink: 0,
                   }}>{opt.label}</span>
                 )}
                 {!isMe && !isPastDate && !myPotMemberIds.has(member.id) && (() => {
@@ -1835,7 +1834,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   if (sentInviteIds.has(member.id)) {
                     return <span style={styles.memberProposeDone}>초대함</span>
                   }
-                  return <button style={styles.memberProposeBtn} onClick={() => openPropose(member)}>🍚 같이 먹자</button>
+                  return <button style={styles.memberProposeBtn} onClick={() => openPropose(member)}>같이 먹자</button>
                 })()}
               </div>
             )
@@ -1981,15 +1980,15 @@ const potListStyles = {
   count: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: 8, flexShrink: 0 },
   joinBtn: {
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff',
-    background: 'var(--color-primary)', border: 'none', borderRadius: 99,
+    background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)',
     padding: '6px 14px', cursor: 'pointer', flexShrink: 0, fontFamily: 'inherit',
   },
   joinBtnFull: { background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
-  joinBtnJoined: { background: '#E8F5E9', color: '#4CAF50', border: '1px solid #A5D6A7' },
+  joinBtnJoined: { background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)' },
   metaRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 },
   metaBadge: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#857B72',
-    background: 'var(--color-surface-2)', borderRadius: 99,
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
+    background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)',
     padding: '2px 8px', whiteSpace: 'nowrap',
   },
 }
@@ -2027,16 +2026,16 @@ const styles = {
   slotPopupDisabledBanner: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#9E9E9E', background: '#F5F5F5', border: '1px dashed #BDBDBD', borderRadius: 'var(--radius-sm)', padding: '6px 10px', textAlign: 'center' },
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '4px 0' },
   timeCarouselSep: { width: 1, height: 40, background: 'var(--color-border)', flexShrink: 0, margin: '0 4px' },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)', lineHeight: 1, paddingBottom: 2 },
-  potInfoBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: '#E8F5E9', borderRadius: 'var(--radius-md)', border: '1.5px solid #A5D6A7' },
+  potInfoBanner: { display: 'flex', alignItems: 'center', gap: 12, padding: '12px 14px', background: 'var(--color-success-bg)', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-success-border)' },
   potInfoCard: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 14px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
   potInfoRow: { display: 'flex', alignItems: 'center', gap: 8 },
   potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
   potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
-  potLeaveBtn: { alignSelf: 'flex-start', marginTop: 2, padding: '4px 10px', background: 'none', border: '1px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
+  potLeaveBtn: { alignSelf: 'flex-start', marginTop: 2, padding: '4px 10px', background: 'none', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-full)', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
   slotPopupBtns: { display: 'flex', gap: 8 },
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
@@ -2045,7 +2044,7 @@ const styles = {
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '5px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-text)' },
   mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
@@ -2055,7 +2054,7 @@ const styles = {
   mainStatusIconWrap: { width: 40, height: 40, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 64 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
-  mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: '#857B72', fontWeight: 600 },
+  mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
@@ -2072,18 +2071,18 @@ const styles = {
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.3px', color: 'var(--color-text)' },
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
-  groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 99, padding: '3px 9px', whiteSpace: 'nowrap' },
+  groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '3px 9px', whiteSpace: 'nowrap' },
   memberSection: { padding: '0 0 8px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
-  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 99, padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
-  memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', whiteSpace: 'nowrap' },
-  memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
-  memberProposeSendBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)14', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
+  memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', whiteSpace: 'nowrap' },
+  memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
+  memberProposeSendBtn: { ...PRIMARY_ACTION_BUTTON },
   proposeMenuInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
   groupMealList: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 },
   groupCreateBtn: { width: '100%', textAlign: 'center', padding: '9px 0', marginTop: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
-  groupSettingsBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '0 2px' },
-  groupCollapseBtn: { background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px', color: 'var(--color-text-muted)' },
+  groupHeaderIconBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F0EB', border: '1px solid #E8E3DE', borderRadius: '50%', fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
+  groupHeaderPillBtn: { height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '0 10px', cursor: 'pointer', boxSizing: 'border-box', whiteSpace: 'nowrap' },
   collapseAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
   viewModeTabs: { display: 'flex', gap: 6 },
   viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s, border-color 0.15s' },
@@ -2095,7 +2094,7 @@ const styles = {
   orderBtns: { display: 'flex', gap: 4, flexShrink: 0 },
   orderBtn: { width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   toggleWrap: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
-  toggleLocked: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#4CAF50', background: '#E8F5E9', border: '1px solid #A5D6A7', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
+  toggleLocked: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', border: '1px solid var(--color-success-border)', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
   toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
   toggleLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap' },
@@ -2118,7 +2117,7 @@ const styles = {
   sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
   sheetMemberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' },
   sheetMemberName: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
-  sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid #FFCDD2', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: '#f44336', cursor: 'pointer' },
+  sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-danger)', cursor: 'pointer' },
   sheetResetNicknameBtn: { padding: '6px 0', background: 'none', border: 'none', fontSize: 'var(--font-size-sm)', color: '#9E9E9E', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' },
   sheetInviteLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   sheetInviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' },

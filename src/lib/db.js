@@ -681,22 +681,41 @@ export async function acceptPotInvitation(invitationId, userId) {
   return pot
 }
 
-// 제안 거절: 상태만 변경, 발신자에게 별도 알림은 보내지 않는다.
-export async function declinePotInvitation(invitationId, userId) {
+// 제안 거절: 상태 변경 + (선택) 거절 사유 저장. 발신자에게 거절 사유를 알림으로 보낸다.
+export async function declinePotInvitation(invitationId, userId, reason) {
   const { data: inv, error: fetchError } = await supabase
     .from('pot_invitations')
-    .select('to_user_id, status')
+    .select('from_user_id, to_user_id, status, slot')
     .eq('id', invitationId)
     .single()
   if (fetchError) throw fetchError
   if (inv.to_user_id !== userId) throw new Error('내게 온 제안이 아니에요.')
   if (inv.status !== 'pending') return
 
+  const declineReason = reason?.trim() || null
   const { error } = await supabase
     .from('pot_invitations')
-    .update({ status: 'declined', responded_at: new Date().toISOString() })
+    .update({ status: 'declined', responded_at: new Date().toISOString(), decline_reason: declineReason })
     .eq('id', invitationId)
   if (error) throw error
+
+  const { data: me } = await supabase.from('users').select('nickname').eq('id', userId).single()
+  const title = '제안이 거절됐어요'
+  const body = declineReason
+    ? `${me?.nickname ?? '상대'}님이 ${inv.slot} 제안을 거절했어요: "${declineReason}"`
+    : `${me?.nickname ?? '상대'}님이 ${inv.slot} 제안을 거절했어요.`
+  const url = '/notifications'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: inv.from_user_id, invitation_id: invitationId, title, body, url, event_type: 'invite_declined',
+  })
+  if (notifError) console.error('declinePotInvitation 알림 insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [inv.from_user_id], title, body, url },
+  })
+  if (pushError) console.warn('declinePotInvitation send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('declinePotInvitation send-push 일부 실패:', pushResult.failures)
 }
 
 // 제안 취소: 발신자가 아직 상대가 응답하지 않은 제안을 거둬들인다.
@@ -722,7 +741,7 @@ export async function cancelPotInvitation(invitationId, userId) {
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, groups(name))')
+    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name))')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .limit(limit)

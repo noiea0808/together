@@ -6,7 +6,7 @@ import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
-import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 
@@ -106,12 +106,12 @@ const gateStyles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, textAlign: 'center' },
   logo: { fontSize: 52, marginBottom: 8 },
   title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
-  sub: { color: '#857B72', fontSize: 'var(--font-size-base)', margin: '4px 0 16px' },
+  sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', margin: '4px 0 16px' },
   card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: '#fff', border: '1.5px solid #EDE8E3', borderRadius: 20, padding: 24 },
   input: { width: '100%', padding: '13px 16px', border: '1.5px solid #EDE8E3', borderRadius: 12, fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
-  error: { fontSize: 'var(--font-size-sm)', color: '#f44336', margin: 0 },
+  error: { fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', margin: 0 },
   guestBtn: { ...PRIMARY_ACTION_BUTTON },
-  loginLink: { background: 'none', border: 'none', color: '#857B72', fontSize: 'var(--font-size-base)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
+  loginLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
 }
 
 export default function PotDetailPage() {
@@ -133,20 +133,23 @@ export default function PotDetailPage() {
   const [confirmDelete, setConfirmDelete] = useState(false)
   const [confirmKick, setConfirmKick] = useState(null)
   const [draft, setDraft] = useState(null)
+  const [draftScope, setDraftScope] = useState('all') // 'all' | 'time' | 'menu' | 'max_people' | 'memo'
   const [timePicker, setTimePicker] = useState(null)
   const [pickerSnapshot, setPickerSnapshot] = useState(null)
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
 
-  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker || showShare))
+  const isQuickEdit = !!draft && draftScope !== 'all'
+  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker || showShare || isQuickEdit))
   useEscKey(useCallback(() => {
     if (timePicker) { cancelDetailTimePicker(); return }
     if (confirmKick) { setConfirmKick(null); return }
     if (confirmDelete) { setConfirmDelete(false); return }
     if (conflict) { setConflict(null); return }
     if (showShare) { setShowShare(false); return }
-  }, [timePicker, confirmKick, confirmDelete, conflict, showShare]))
+    if (isQuickEdit) { cancelDraft(); return }
+  }, [timePicker, confirmKick, confirmDelete, conflict, showShare, isQuickEdit]))
 
   const invalidateBoard = () => {
     if (user) invalidateCache(`board:${user.id}:`, { prefix: true })
@@ -157,6 +160,7 @@ export default function PotDetailPage() {
       const data = await getPot(id)
       setPot(data)
       setDraft(null)
+      setDraftScope('all')
     } catch (e) { console.error(e) }
     finally { setLoading(false) }
   }
@@ -238,7 +242,8 @@ export default function PotDetailPage() {
     }
   }
 
-  const initDraft = () => {
+  const initDraft = (scope = 'all') => {
+    setDraftScope(scope)
     if (draft) return
     setDraft(buildDraft())
   }
@@ -273,7 +278,7 @@ export default function PotDetailPage() {
     }))
   }
   const setD = (key, val) => setDraft(d => ({ ...d, [key]: val }))
-  const cancelDraft = () => setDraft(null)
+  const cancelDraft = () => { setDraft(null); setDraftScope('all') }
 
   const saveDraft = async () => {
     if (!draft || actionLoading) return
@@ -282,16 +287,21 @@ export default function PotDetailPage() {
       const newMealTime = draft.time_enabled ? draft.meal_time : null
       const newEndTime = draft.time_enabled ? (draft.end_time || null) : null
       const newTitle = draft.title || pot.title
+      const newMenu = draft.menu.trim() || null
+      const newMemo = draft.memo.trim() || null
       const changes = []
       if (newTitle !== pot.title) changes.push('제목')
       if (newMealTime !== pot.meal_time || newEndTime !== pot.end_time) changes.push('시각')
+      if (newMenu !== (pot.menu ?? null)) changes.push('메뉴')
+      if (draft.max_people !== pot.max_people) changes.push('인원')
+      if (newMemo !== (pot.memo ?? null)) changes.push('메모')
 
       await updatePot(pot.id, {
         meal_time: newMealTime,
         end_time: newEndTime,
         title: newTitle,
-        menu: draft.menu.trim() || null,
-        memo: draft.memo.trim() || null,
+        menu: newMenu,
+        memo: newMemo,
         max_people: draft.max_people,
         is_public: draft.is_public,
       }, pot.is_default ? user.id : null)
@@ -424,7 +434,7 @@ export default function PotDetailPage() {
     <div style={S.page}>
       {/* ── Header ── */}
       <div style={S.header}>
-        {draft
+        {draft && draftScope === 'all'
           ? <button style={S.headerTextBtn} onClick={cancelDraft}>취소</button>
           : <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
         }
@@ -432,14 +442,14 @@ export default function PotDetailPage() {
           <div style={S.headerTitle}>밥팟 상세</div>
           <div style={S.headerSub}>{pot.is_default ? pot.slot : `${pot.date} · ${pot.slot}`}</div>
         </div>
-        {draft
-          ? <button style={{ ...S.headerTextBtn, color: '#FF6B35', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>
+        {draft && draftScope === 'all'
+          ? <button style={{ ...S.headerTextBtn, color: 'var(--color-primary)', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>
               {actionLoading ? '...' : '완료'}
             </button>
           : pot.is_default
             ? <button style={S.headerEditPill} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>향후 수정</button>
             : canEdit
-            ? <button style={S.headerEditPill} onClick={initDraft}>수정</button>
+            ? <button style={S.headerEditPill} onClick={() => initDraft('all')}>수정</button>
             : <div style={{ width: 60 }} />
         }
       </div>
@@ -456,7 +466,7 @@ export default function PotDetailPage() {
               <span style={S.slotTag}>{pot.slot}</span>
               {isMaster ? (
                 <button
-                  style={{ ...S.publicToggle, background: pot.is_public ? '#E3F2FD' : '#F5F0EB', color: pot.is_public ? '#2563EB' : '#857B72', borderColor: pot.is_public ? '#2563EB' : '#EDE8E3' }}
+                  style={{ ...S.publicToggle, background: pot.is_public ? 'var(--color-info-bg)' : '#F5F0EB', color: pot.is_public ? 'var(--color-info)' : 'var(--color-text-muted)', borderColor: pot.is_public ? 'var(--color-info)' : '#EDE8E3' }}
                   onClick={togglePublic}
                 >
                   {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
@@ -473,15 +483,27 @@ export default function PotDetailPage() {
                 <div style={S.heroSlot}>{pot.slot}</div>
               </div>
             </div>
-            {/* 2x2 info grid */}
+            {/* 2x2 info grid — 각 항목을 탭하면 그 항목만 따로 수정할 수 있어요 */}
             <div style={S.infoGrid}>
               {[
-                { label: '시간', value: timeStr },
-                { label: '메뉴', value: pot.menu || '미정' },
-                { label: '최대 인원', value: `${pot.max_people}명` },
-                { label: '메모', value: pot.memo || '없음' },
-              ].map(({ label, value }) => (
-                <div key={label} style={S.infoPanel}>
+                { key: 'time', label: '시간', value: timeStr },
+                { key: 'menu', label: '메뉴', value: pot.menu || '미정' },
+                { key: 'max_people', label: '최대 인원', value: `${pot.max_people}명` },
+                { key: 'memo', label: '메모', value: pot.memo || '없음' },
+              ].map(({ key, label, value }) => (
+                <div
+                  key={key}
+                  style={{ ...S.infoPanel, ...(canEdit ? S.infoPanelEditable : {}) }}
+                  onClick={canEdit ? () => initDraft(key) : undefined}
+                >
+                  {canEdit && (
+                    <span style={S.infoPanelEditBadge}>
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M12 20h9" />
+                        <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                      </svg>
+                    </span>
+                  )}
                   <div style={S.infoPanelLabel}>{label}</div>
                   <div style={S.infoPanelValue}>{value}</div>
                 </div>
@@ -491,7 +513,7 @@ export default function PotDetailPage() {
         )}
 
         {/* EDIT MODE: section cards, matching '밥팟 열기' style */}
-        {draft && (() => {
+        {draft && draftScope === 'all' && (() => {
           const presets = SLOT_TIME_PRESETS[pot.slot] ?? []
           const isCustomTime = draft.time_enabled && !presets.includes(draft.meal_time)
           return (
@@ -593,11 +615,119 @@ export default function PotDetailPage() {
                   <button style={{ ...S.editGroupBtn, ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
                   <button style={{ ...S.editGroupBtn, ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
                 </div>
-                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: '#2563EB', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
               </div>
             </div>
           )
         })()}
+
+        {/* QUICK EDIT: 시간/메뉴/최대 인원/메모 개별 수정 팝업 — 기본팟이어도 이 팟(오늘)에만 적용되고 향후 설정에는 영향 없음 */}
+        {draft && draftScope !== 'all' && (
+          <div style={S.overlay} onClick={cancelDraft}>
+            <div style={S.dialog} onClick={e => e.stopPropagation()}>
+              <div style={S.dialogTitle}>
+                {{ time: '🕒 시간 수정', menu: '🍽️ 메뉴 수정', max_people: '👥 최대 인원 수정', memo: '📝 메모 수정' }[draftScope]}
+              </div>
+              {pot.is_default && (
+                <p style={S.dialogDesc}>이 밥팟에만 적용돼요.{'\n'}향후 기본 밥팟 설정은 그대로 유지돼요.</p>
+              )}
+
+              {draftScope === 'time' && (() => {
+                const presets = SLOT_TIME_PRESETS[pot.slot] ?? []
+                const isCustomTime = draft.time_enabled && !presets.includes(draft.meal_time)
+                return (
+                  <div style={{ width: '100%' }}>
+                    <div style={S.editChipRow}>
+                      {presets.map(t => {
+                        const active = draft.time_enabled && draft.meal_time === t
+                        return (
+                          <button
+                            key={t}
+                            style={{ ...S.editChip, ...(active ? S.editChipActive : {}) }}
+                            onClick={() => { setD('time_enabled', true); applyDetailPickerTime('start', t) }}
+                          >
+                            {t}
+                          </button>
+                        )
+                      })}
+                      <button
+                        style={{ ...S.editChip, ...(isCustomTime ? S.editChipActive : {}) }}
+                        onClick={() => { setD('time_enabled', true); openDetailTimePicker('start') }}
+                      >
+                        {isCustomTime ? draft.meal_time : '직접 설정'}
+                      </button>
+                      <button
+                        style={{ ...S.editChip, ...(!draft.time_enabled ? S.editChipActive : {}) }}
+                        onClick={() => setD('time_enabled', false)}
+                      >
+                        미정
+                      </button>
+                    </div>
+                    {draft.time_enabled && (
+                      <div style={{ marginTop: 8 }}>
+                        <div style={S.editSectionLabel}>~ 종료 {draft.end_time || ''}</div>
+                        <div style={S.editChipRow}>
+                          {DURATION_OPTIONS.map(o => (
+                            <button
+                              key={o.min}
+                              style={{ ...S.editChip, ...(draft.duration_minutes === o.min ? S.editChipActive : {}) }}
+                              onClick={() => setDetailDuration(o.min)}
+                            >
+                              {o.label}
+                            </button>
+                          ))}
+                          <button
+                            style={{ ...S.editChip, ...(draft.duration_minutes === 0 ? S.editChipActive : {}) }}
+                            onClick={() => { setDetailDuration(0); openDetailTimePicker('end') }}
+                          >
+                            {draft.duration_minutes === 0 && draft.end_time ? draft.end_time : '직접 설정'}
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )
+              })()}
+
+              {draftScope === 'menu' && (
+                <input
+                  style={S.editSectionInput}
+                  placeholder="메뉴 (선택)"
+                  value={draft.menu}
+                  onChange={e => setD('menu', e.target.value)}
+                  maxLength={20}
+                  autoFocus
+                />
+              )}
+
+              {draftScope === 'max_people' && (
+                <div style={S.editStepper}>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                  <span style={S.editStepperNum}>{draft.max_people}명</span>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
+                </div>
+              )}
+
+              {draftScope === 'memo' && (
+                <input
+                  style={S.editSectionInput}
+                  placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
+                  value={draft.memo}
+                  onChange={e => setD('memo', e.target.value)}
+                  maxLength={50}
+                  autoFocus
+                />
+              )}
+
+              <div style={S.dialogBtns}>
+                <button style={{ ...S.dialogBtnPrimary, opacity: actionLoading ? 0.6 : 1 }} onClick={saveDraft} disabled={actionLoading}>
+                  {actionLoading ? '저장 중...' : '저장'}
+                </button>
+                <button style={S.dialogBtnCancel} onClick={cancelDraft}>취소</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Creator / modifier line */}
         {!pot.is_default && pot.users && (
@@ -623,7 +753,7 @@ export default function PotDetailPage() {
                   <div style={{ position: 'relative' }}>
                     <div style={{
                       ...S.memberCircle,
-                      background: member ? (isMe ? '#FF6B35' : avBg(member.nickname)) : '#F5F0EB',
+                      background: member ? (isMe ? 'var(--color-primary)' : avBg(member.nickname)) : '#F5F0EB',
                       border: member ? 'none' : '2px dashed #C7BFB6',
                     }}>
                       {member ? member.nickname[0] : ''}
@@ -739,7 +869,7 @@ export default function PotDetailPage() {
                     <div key={f.id} style={S.shareFriendRow}>
                       <span style={S.shareFriendName}>{f.nickname}</span>
                       <button
-                        style={{ ...S.shareCopyBtn, background: invited ? '#4CAF50' : '#FF6B35', opacity: invitingFriendId === f.id ? 0.6 : 1 }}
+                        style={{ ...S.shareCopyBtn, background: invited ? 'var(--color-success)' : 'var(--color-primary)', opacity: invitingFriendId === f.id ? 0.6 : 1 }}
                         onClick={() => handleInviteFriend(f.id)}
                         disabled={invited || invitingFriendId === f.id}
                       >
@@ -757,13 +887,13 @@ export default function PotDetailPage() {
                 {pot.invite_code ? (
                   <div style={S.shareRow}>
                     <span style={{ ...S.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
-                    <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(pot.invite_code, 'code')}>
+                    <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(pot.invite_code, 'code')}>
                       {copied === 'code' ? '✓' : '복사'}
                     </button>
                   </div>
                 ) : (
                   <button
-                    style={{ ...S.shareCopyBtn, background: '#FF6B35', padding: '8px 16px', fontSize: 13 }}
+                    style={{ ...S.shareCopyBtn, background: 'var(--color-primary)', padding: '8px 16px', fontSize: 13 }}
                     onClick={async () => {
                       const code = await generatePotInviteCode(pot.id)
                       setPot(prev => ({ ...prev, invite_code: code }))
@@ -780,7 +910,7 @@ export default function PotDetailPage() {
                 <div style={S.shareLabel}>밥팟 링크</div>
                 <div style={S.shareRow}>
                   <span style={S.shareText}>{potLink}</span>
-                  <button style={{ ...S.shareCopyBtn, background: copied === 'link' ? '#4CAF50' : '#FF6B35' }} onClick={() => copyText(potLink, 'link')}>
+                  <button style={{ ...S.shareCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(potLink, 'link')}>
                     {copied === 'link' ? '✓' : '복사'}
                   </button>
                 </div>
@@ -821,7 +951,7 @@ export default function PotDetailPage() {
             <div style={S.dialogTitle}>{confirmKick.nickname}님을{'\n'}퇴장시킬까요?</div>
             <p style={S.dialogDesc}>퇴장하면 밥팟에서 제외돼요.</p>
             <div style={S.dialogBtns}>
-              <button style={{ ...S.dialogBtnPrimary, background: '#f44336' }} onClick={handleKickMember} disabled={actionLoading}>
+              <button style={{ ...S.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={handleKickMember} disabled={actionLoading}>
                 {actionLoading ? '처리 중...' : '퇴장시키기'}
               </button>
               <button style={S.dialogBtnCancel} onClick={() => setConfirmKick(null)}>취소</button>
@@ -842,7 +972,7 @@ export default function PotDetailPage() {
                 : '팟과 참여 기록이 모두 삭제돼요.'}
             </p>
             <div style={S.dialogBtns}>
-              <button style={{ ...S.dialogBtnPrimary, background: '#f44336' }} onClick={handleDeletePot} disabled={actionLoading}>
+              <button style={{ ...S.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={handleDeletePot} disabled={actionLoading}>
                 {actionLoading ? '삭제 중...' : '삭제하기'}
               </button>
               <button style={S.dialogBtnCancel} onClick={() => setConfirmDelete(false)}>취소</button>
@@ -898,16 +1028,22 @@ const S = {
   /* Hero card (view mode) */
   heroCard: { background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
-  defaultTag: { fontSize: 'var(--font-size-xs)', background: '#E8F5E9', borderRadius: 6, padding: '2px 8px', color: '#4CAF50', fontWeight: 700 },
-  slotTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#857B72' },
-  publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: '#857B72' },
-  publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 99, padding: '3px 10px', cursor: 'pointer' },
+  defaultTag: { fontSize: 'var(--font-size-xs)', background: 'var(--color-success-bg)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-success)', fontWeight: 700 },
+  slotTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
+  publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
+  publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
   heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
-  infoPanel: { background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', padding: '10px 12px' },
+  infoPanel: { position: 'relative', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', padding: '10px 12px' },
+  infoPanelEditable: { cursor: 'pointer' },
+  infoPanelEditBadge: {
+    position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
   infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 3, fontWeight: 600 },
   infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
@@ -942,7 +1078,7 @@ const S = {
     letterSpacing: '-0.2px',
   },
   editGroupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
-  editPublicActive: { background: '#E3F2FD', border: '1.5px solid #2563EB', fontWeight: 700, color: '#2563EB' },
+  editPublicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', margin: '-6px 0 0' },
 
@@ -955,7 +1091,7 @@ const S = {
   memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
   memberCircle: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-base)', position: 'relative' },
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
-  kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#f44336', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--color-danger)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   memberName: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 
   /* Comments card */
@@ -979,7 +1115,7 @@ const S = {
   leaveBtn: { width: '100%', padding: 16, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   expiredCard: { background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 15, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
   shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  deleteBtn: { ...DESTRUCTIVE_ACTION_BUTTON, padding: 14 },
 
   /* Share panel */
   sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
@@ -1003,14 +1139,14 @@ const S = {
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-sm)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 
   /* Dialogs */
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer' },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }
