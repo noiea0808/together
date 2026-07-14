@@ -18,6 +18,7 @@ import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import BadgeSync from './components/BadgeSync'
+import PendingInviteRedirect from './components/PendingInviteRedirect'
 
 function ConsumerRoutes() {
   const { user } = useUser()
@@ -63,6 +64,7 @@ function ConsumerApp() {
     <UserProvider>
       <NotificationToast />
       <BadgeSync />
+      <PendingInviteRedirect />
       <ConsumerRoutes />
     </UserProvider>
   )

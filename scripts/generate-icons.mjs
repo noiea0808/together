@@ -1,4 +1,5 @@
 import { Jimp } from 'jimp'
+import { writeFile } from 'fs/promises'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -6,12 +7,21 @@ const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '../public')
 const assetsDir = join(__dirname, '../src/assets')
 
+// Vercel이 빌드 시점에 심어주는 브랜치명으로 스테이징 배포를 구분한다. 로컬 빌드(npm run build)나
+// 프로덕션 브랜치에서는 undefined/'main'이라 자연히 운영용 색으로 떨어진다.
+const isStaging = process.env.VERCEL_GIT_COMMIT_REF === 'staging'
+
+// 운영과 스테이징을 홈 화면에서 한눈에 구분하기 위한 아이콘 배경색.
+// 브랜드 주황(--color-primary, #FF6B35)을 그대로 쓰면 밥공기 자체도 비슷한 주황이라
+// 배경에 묻혀버려서, 톤이 더 진한 --color-primary-dark(#E05520)를 스테이징 배경으로 쓴다.
+const ICON_BG = isStaging ? 0xe05520ff : 0xfaf8f5ff
+const MANIFEST_BG = isStaging ? '#E05520' : '#FAF8F5'
+
 async function generate() {
   const bowl = await Jimp.read(join(assetsDir, 'rice-bowl.png'))
 
-  // 앱 메인 배경색(--color-bg)과 동일한 베이지 계열
   for (const size of [192, 512]) {
-    const img = new Jimp({ width: size, height: size, color: 0xFAF8F5FF })
+    const img = new Jimp({ width: size, height: size, color: ICON_BG })
 
     // 밥공기 아이콘을 세이프존(마스커블 아이콘 대비 여백)을 두고 중앙에 배치
     const bowlResized = bowl.clone()
@@ -78,6 +88,27 @@ async function generate() {
 
   await badge.write(join(publicDir, 'badge-monochrome.png'))
   console.log('✓ badge-monochrome.png 생성됨')
+
+  // 스테이징에선 아이콘 배경색뿐 아니라 홈 화면에 뜨는 이름도 (STG)를 붙여서,
+  // 아이콘 색만으로 구분이 안 갈 때(작은 위젯, 흑백 모드 등)도 확실히 구분되게 한다.
+  const manifest = {
+    name: isStaging ? '같이 먹자 (STG)' : '같이 먹자',
+    short_name: isStaging ? '같이먹자 STG' : '같이먹자',
+    description: '오늘 같이 먹을 사람, 묻지 말고 확인하기',
+    start_url: '/',
+    display: 'standalone',
+    background_color: MANIFEST_BG,
+    theme_color: '#FF6B35',
+    orientation: 'portrait',
+    lang: 'ko',
+    icons: [
+      { src: '/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+      { src: '/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+    ],
+  }
+  await writeFile(join(publicDir, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n')
+  console.log(`✓ manifest.json 생성됨 (${isStaging ? 'staging' : 'production'})`)
 }
 
 generate().catch(console.error)
