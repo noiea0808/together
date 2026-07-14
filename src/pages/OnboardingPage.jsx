@@ -276,7 +276,7 @@ const styles = {
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
   hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
-  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', margin: 0 },
+  error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 },
   btn: {
     width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
     border: 'none', borderRadius: 'var(--radius-full)',

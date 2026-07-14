@@ -6,6 +6,7 @@ import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
+import { DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
@@ -246,7 +247,7 @@ export default function MyAccountPage() {
               <div style={styles.withdrawTitle}>정말 탈퇴하시겠어요?</div>
               <div style={styles.withdrawDesc}>
                 탈퇴하면 <strong>되돌릴 수 없습니다.</strong><br />
-                아래 데이터가 <strong style={{ color: '#f44336' }}>영구적으로 삭제</strong>돼요.
+                아래 데이터가 <strong style={{ color: 'var(--color-danger)' }}>영구적으로 삭제</strong>돼요.
               </div>
               <ul style={styles.withdrawList}>
                 <li>프로필 · 닉네임 정보</li>
@@ -303,7 +304,7 @@ const styles = {
     background: '#5C5650', color: '#fff', fontSize: 11, display: 'flex',
     alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface-2)',
   },
-  avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: '#f44336', margin: 0 },
+  avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-danger)', margin: 0 },
   profileInfo: { display: 'flex', flexDirection: 'column', gap: 4 },
   profileName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
@@ -317,11 +318,9 @@ const styles = {
   input: { flex: 1, padding: '10px var(--spacing-md)', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none' },
   saveBtn: { padding: '10px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   cancelBtn: { padding: '10px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
-  savedMsg: { fontSize: 'var(--font-size-2xs)', color: '#4CAF50', fontWeight: 600 },
+  savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600 },
 
-
-
-  logoutBtn: { width: '100%', padding: 13, background: 'none', border: '1.5px solid #f44336', borderRadius: 'var(--radius-full)', color: '#f44336', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  logoutBtn: { ...DESTRUCTIVE_ACTION_BUTTON, width: '100%' },
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
   modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
@@ -334,8 +333,8 @@ const styles = {
   withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: '#FFF0F0', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#c62828', lineHeight: 1.8 },
   withdrawConfirmLabel: { fontSize: 'var(--font-size-sm)', textAlign: 'center', marginBottom: 8, color: 'var(--color-text)' },
   withdrawInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 'var(--spacing-md)' },
-  withdrawInput: { flex: 1, padding: '12px var(--spacing-md)', border: '1.5px solid #f44336', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
-  withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: '#f44336', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
-  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: '#f44336', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
+  withdrawInput: { flex: 1, padding: '12px var(--spacing-md)', border: '1.5px solid var(--color-danger)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
+  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
   withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 }

@@ -7,7 +7,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { SLOT_KEYS, SLOT_EMOJI, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
-import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 
 function nextFullHour() {
@@ -308,7 +308,7 @@ export default function GroupSettingsPage() {
               <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
               <button style={{ ...S.groupBtn, ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
             </div>
-            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: '#2563EB', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
           </div>
 
           {/* 적용 시작일 */}
@@ -324,7 +324,7 @@ export default function GroupSettingsPage() {
             <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', margin: '6px 0 0' }}>이 날짜 이후 매일 자동으로 열려요</p>
           </div>
 
-          {error && <p style={{ color: '#f44336', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
 
           <button
             style={{ ...S.submitBtn, opacity: form.title.trim() && !saving ? 1 : 0.4 }}
@@ -371,7 +371,7 @@ export default function GroupSettingsPage() {
             <div style={S.dialogTitle}>기본 밥팟 설정을{'\n'}삭제할까요?</div>
             <p style={S.dialogDesc}>오늘 포함 이후 날짜의 기본 밥팟이 모두 사라져요.{'\n'}과거 기록은 유지돼요.</p>
             <div style={S.dialogBtns}>
-              <button style={{ ...S.dialogBtnPrimary, background: '#f44336' }} onClick={() => handleDelete(confirmDelete)} disabled={saving}>
+              <button style={{ ...S.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }} onClick={() => handleDelete(confirmDelete)} disabled={saving}>
                 {saving ? '삭제 중...' : '삭제하기'}
               </button>
               <button style={S.dialogBtnCancel} onClick={() => setConfirmDelete(null)}>취소</button>
@@ -435,22 +435,22 @@ const S = {
     letterSpacing: '-0.2px',
   },
   groupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
-  publicActive: { background: '#E3F2FD', border: '1.5px solid #2563EB', fontWeight: 700, color: '#2563EB' },
+  publicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
 
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
-  deleteBtn: { width: '100%', padding: 14, background: 'none', color: '#f44336', border: '1px solid #f4433640', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
+  deleteBtn: { ...DESTRUCTIVE_ACTION_BUTTON, padding: 14 },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   timeDialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }

@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 export default function GroupSetupModal({ userId, onClose, onDone }) {
   const [tab, setTab] = useState('create') // 'create' | 'join'
@@ -89,7 +90,7 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
           </>
         )}
 
-        {error && <p style={{ fontSize: 12, color: '#f44336', margin: 0 }}>{error}</p>}
+        {error && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{error}</p>}
 
         <div style={styles.dialogBtns}>
           <button
@@ -112,7 +113,7 @@ const styles = {
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-  dialogBtnPrimary: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
   tabs: { display: 'flex', width: '100%', gap: 6 },

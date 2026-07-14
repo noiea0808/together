@@ -303,10 +303,10 @@ export default function CreatePotPage() {
               <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
               <button style={{ ...S.groupBtn, ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
             </div>
-            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: '#2563EB', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
           </div>
 
-          {error && <p style={{ color: '#f44336', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
+          {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
 
           <button
             style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1 }}
@@ -374,7 +374,7 @@ const S = {
   },
   groupBtnActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
   groupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
-  publicActive: { background: '#E3F2FD', border: '1.5px solid #2563EB', fontWeight: 700, color: '#2563EB' },
+  publicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
 
   chipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   chip: {
@@ -401,5 +401,5 @@ const S = {
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
   timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
-  timeDoneBtn: { width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer' },
+  timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 }

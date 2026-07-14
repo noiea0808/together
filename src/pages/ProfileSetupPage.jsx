@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getActiveTerms, completeOnboarding } from '../lib/db'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const LIFESTYLE_OPTIONS = ['학생', '주부', '직장인', '자영업', '프리랜서', '기타']
 
@@ -250,7 +251,7 @@ const styles = {
     fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)',
     textDecoration: 'underline', padding: 4,
   },
-  error: { fontSize: 'var(--font-size-xs)', color: '#f44336', margin: 0 },
+  error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 },
   btn: {
     width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
     border: 'none', borderRadius: 'var(--radius-full)',
@@ -273,9 +274,5 @@ const styles = {
     flex: 1, overflowY: 'auto', fontSize: 'var(--font-size-sm)',
     color: 'var(--color-text)', lineHeight: 1.7, whiteSpace: 'pre-wrap',
   },
-  modalAgree: {
-    width: '100%', padding: 13, background: 'var(--color-primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer',
-  },
+  modalAgree: { ...PRIMARY_ACTION_BUTTON },
 }

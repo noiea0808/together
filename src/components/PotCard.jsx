@@ -34,7 +34,7 @@ export default function PotCard({ pot }) {
       <div style={styles.row1}>
         <span style={{ ...styles.time, color: expired
           ? (pot.is_default ? '#A5C8A5' : '#9DBEDC')
-          : (pot.is_default ? '#4CAF50' : '#1E88E5') }}>
+          : (pot.is_default ? 'var(--color-success)' : '#1E88E5') }}>
           {timeStr}{endStr}
         </span>
         {pot.is_public && <span style={styles.publicTag}>공개</span>}
@@ -58,7 +58,7 @@ export default function PotCard({ pot }) {
             <span key={`empty-${i}`} style={styles.emptyTag}>+</span>
           ))}
         </div>
-        <span style={{ ...styles.count, color: isFull ? '#4CAF50' : 'var(--color-text-muted)', flexShrink: 0 }}>
+        <span style={{ ...styles.count, color: isFull ? 'var(--color-success)' : 'var(--color-text-muted)', flexShrink: 0 }}>
           {filled}/{pot.max_people}명
         </span>
       </div>
@@ -80,13 +80,13 @@ const styles = {
   row2: { display: 'flex', alignItems: 'center', gap: 6 },
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 6 },
   time: { fontSize: 13, fontWeight: 700, flexShrink: 0 },
-  defaultBadge: { position: 'absolute', top: 8, right: 10, fontSize: 10, background: '#E8F5E9', borderRadius: 4, padding: '2px 7px', color: '#4CAF50', fontWeight: 700 },
+  defaultBadge: { position: 'absolute', top: 8, right: 10, fontSize: 10, background: 'var(--color-success-bg)', borderRadius: 4, padding: '2px 7px', color: 'var(--color-success)', fontWeight: 700 },
   publicTag: { fontSize: 10, background: '#eee', borderRadius: 4, padding: '1px 6px', color: 'var(--color-text-muted)', flexShrink: 0 },
   title: { fontSize: 13, fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   menu: { fontSize: 12, color: 'var(--color-text-muted)', flexShrink: 0 },
   tags: { display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 4, flex: 1, minWidth: 0 },
-  tag: { fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 99, padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
-  emptyTag: { fontSize: 11, color: 'var(--color-border)', background: 'transparent', border: '1px dashed var(--color-border)', borderRadius: 99, padding: '2px 8px' },
+  tag: { fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: 2 },
+  emptyTag: { fontSize: 11, color: 'var(--color-border)', background: 'transparent', border: '1px dashed var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   guestMark: { fontSize: 9, color: '#FF9800', fontWeight: 800, marginLeft: 1 },
   count: { fontSize: 12, fontWeight: 600, flexShrink: 0 },
 }

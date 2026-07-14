@@ -24,6 +24,18 @@
   --color-status-coffee: #FB8C00;
   --color-status-pass: #A8A29B;
 
+  --color-success: #4CAF50;
+  --color-success-bg: #E8F5E9;
+  --color-success-border: #A5D6A7;
+
+  --color-danger: #f44336;
+  --color-danger-bg: #FFEBEE;
+  --color-danger-border: #FFCDD2;
+
+  --color-info: #2563EB;
+  --color-info-bg: #E3F2FD;
+  --color-info-border: #BBDEFB;
+
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 20px;
