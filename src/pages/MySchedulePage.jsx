@@ -213,7 +213,7 @@ const S = {
 
   expanded: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #EDE8E3' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 5 },
-  slotCell: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 2px' },
+  slotCell: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' },
   slotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', minWidth: 44 },
   slotBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 7px' },
   slotDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
