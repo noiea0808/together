@@ -5,10 +5,11 @@ import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 // 홈 화면 추가 / 즐겨찾기 추가 CTA — MyAccountPage와 OnboardingPage에서 공용으로 사용
 // variant: 'default'(주 버튼 스타일) | 'subtle'(로그인 버튼들 옆에서 튀지 않는 보조 스타일)
 export default function InstallAppPrompt({ style, variant = 'default' }) {
-  const { installPrompt, triggerInstall, isInstalled, isIOS, isPC } = useInstallPrompt()
+  const { installPrompt, triggerInstall, isInstalled, isIOS, isPC, isInAppBrowser } = useInstallPrompt()
   const [showIOSGuide, setShowIOSGuide] = useState(false)
   const [showAndroidGuide, setShowAndroidGuide] = useState(false)
   const [showPCGuide, setShowPCGuide] = useState(false)
+  const [showInAppGuide, setShowInAppGuide] = useState(false)
   const iconColor = variant === 'subtle' ? 'currentColor' : '#fff'
 
   return (
@@ -18,7 +19,10 @@ export default function InstallAppPrompt({ style, variant = 'default' }) {
           <button
             style={{ ...styles.installBtn, ...(variant === 'subtle' ? styles.installBtnSubtle : {}) }}
             onClick={() => {
-              if (isPC) setShowPCGuide(true)
+              // 카톡 등 인앱 브라우저는 beforeinstallprompt도, 크롬의 ⋮ 메뉴도 없어서
+              // 다른 안내 분기보다 먼저 걸러야 한다.
+              if (isInAppBrowser) setShowInAppGuide(true)
+              else if (isPC) setShowPCGuide(true)
               else if (isIOS) setShowIOSGuide(true)
               else if (installPrompt) triggerInstall()
               else setShowAndroidGuide(true)
@@ -36,6 +40,42 @@ export default function InstallAppPrompt({ style, variant = 'default' }) {
       )}
       {isInstalled && (
         <div style={styles.installedBadge}>✓ 홈 화면에 설치됨</div>
+      )}
+
+      {/* 카톡 등 인앱 브라우저 안내 모달 — 여기선 설치 자체가 불가능해서 외부 브라우저로 나가라고 안내 */}
+      {showInAppGuide && (
+        <div style={styles.modalOverlay} onClick={() => setShowInAppGuide(false)}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.modalTitle}>브라우저에서 열어야 설치할 수 있어요</div>
+            <div style={styles.guideSteps}>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>1</span>
+                <span>
+                  {isIOS
+                    ? <>화면 하단(또는 우측 상단)의 <strong>··· 더보기</strong> 버튼을 탭하세요.</>
+                    : <>화면 우측 상단의 <strong>⋮ 메뉴</strong> 또는 <strong>공유 아이콘</strong>을 탭하세요.</>
+                  }
+                </span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>2</span>
+                <span>
+                  {isIOS
+                    ? <><strong>Safari로 열기</strong>를 선택하세요.</>
+                    : <><strong>다른 브라우저로 열기</strong>(또는 Chrome으로 열기)를 선택하세요.</>
+                  }
+                </span>
+              </div>
+              <div style={styles.guideStep}>
+                <span style={styles.guideNum}>3</span>
+                <span>새로 열린 브라우저에서 다시 <strong>홈 화면에 추가</strong>를 눌러주세요.</span>
+              </div>
+            </div>
+            <button style={styles.modalClose} onClick={() => setShowInAppGuide(false)}>
+              확인
+            </button>
+          </div>
+        </div>
       )}
 
       {/* PC 즐겨찾기 안내 모달 */}
