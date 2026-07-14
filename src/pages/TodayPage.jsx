@@ -14,8 +14,20 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import SlotIcon from '../components/SlotIcon'
+import StatusIcon from '../components/StatusIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+
+// 상태값별 내 상태 카드 보조 문구
+const STATUS_SUBTEXT = {
+  open: (slot) => `오늘 ${slot} 같이 먹을 수 있어요`,
+  '참여중': () => '지금 밥팟에 함께하고 있어요',
+  '참여완료': (slot) => `오늘 ${slot}을 함께 했어요`,
+  closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
+  skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
+}
+const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot} 상태를 정해보세요`
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
@@ -548,15 +560,16 @@ export default function TodayPage() {
 
     let timeStr = null, desc = null
     if (isInPot) {
-      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
+      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}${potCount ? ` · ${potCount}타임` : ''}`
       const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
-      desc = groupName ? `${groupName}에서 ${lockedLabel}` : earliestPot.title
+      desc = groupName ? `${groupName}에서 ${lockedLabel}` : `${earliestPot.title} 밥팟에 ${inPotExpired ? '참여 완료' : '참여 중'}`
     } else if (data?.time) {
-      timeStr = `${data.time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
+      timeStr = `${data.time.slice(0, 5)}${data.end_time ? ` ~ ${data.end_time.slice(0, 5)}` : ''}`
       desc = data?.menu ?? null
     }
 
     return {
+      key: displayOpt?.key ?? null,
       emoji: displayOpt?.emoji ?? SLOT_EMOJI[slot],
       label: displayOpt?.label ?? null,
       color: displayOpt?.color ?? '#ADA59B',
@@ -609,23 +622,23 @@ export default function TodayPage() {
                 )}
               </div>
               <div style={styles.mainStatusBody}>
-                <div style={styles.mainStatusIconWrap}>
-                  <span style={{ fontSize: 20 }}>{SLOT_EMOJI[selectedSlot]}</span>
+                <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
+                  <StatusIcon statusKey={info.key} size={48} />
                 </div>
                 <div style={styles.mainStatusTextCol}>
                   {info.label ? (
                     <>
                       <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                      <span style={styles.mainStatusSub}>{(STATUS_SUBTEXT[info.key] ?? (() => ''))(selectedSlot)}</span>
                       {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
                       {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
                     </>
                   ) : (
                     <span style={styles.mainStatusEmpty}>
-                      {info.isPastDate ? '기록 없음' : '탭해서 상태를 설정해보세요'}
+                      {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
                     </span>
                   )}
                 </div>
-                {info.isInPot && <RiceBowlIcon size={30} style={{ flexShrink: 0, opacity: 0.8 }} />}
               </div>
             </div>
           )
@@ -654,7 +667,9 @@ export default function TodayPage() {
                     localStorage.setItem('lastSelectedSlot', slot)
                   }}
                 >
-                  <span style={styles.subSlotEmojiWrap}>{SLOT_EMOJI[slot]}</span>
+                  <span style={styles.subSlotEmojiWrap}>
+                    <SlotIcon slot={slot} size={28} muted={!isSelected} />
+                  </span>
                   <span style={styles.subSlotTextCol}>
                     <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
                     <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
@@ -1918,36 +1933,44 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
         </div>
       )}
 
-      {/* 1순위: 타임명  2순위: 시간 */}
-      <div style={potListStyles.row1}>
-        <span style={potListStyles.icon}>{pot.is_default ? <RiceBowlIcon size={26} /> : <span style={{ fontSize: 26 }}>🎉</span>}</span>
-        <span style={potListStyles.title}>{pot.title}</span>
-        {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
-      </div>
-
-      {/* 메뉴 · 메모 */}
-      {(pot.menu || pot.memo) && (
-        <div style={potListStyles.detailCol}>
-          {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
-          {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+      <div style={potListStyles.mainRow}>
+        {/* 밥공기 썸네일 — 밥팟 카드의 시작점 역할 */}
+        <div style={pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
+          {pot.is_default ? <SlotIcon slot="점심" size={38} /> : <span style={{ fontSize: 20 }}>🎉</span>}
         </div>
-      )}
 
-      {/* 3순위: 참여 인원 · 참여자 아바타 */}
-      <div style={potListStyles.row3}>
-        <div style={potListStyles.avatarStack}>
-          {visibleAvatars.map((m, i) => (
-            <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i }}>
-              {m.nickname[0]}
-              {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
-            </span>
-          ))}
-          {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
-          <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
+        <div style={potListStyles.contentCol}>
+          {/* 1순위: 타임명  2순위: 시간 */}
+          <div style={potListStyles.row1}>
+            <span style={potListStyles.title}>{pot.title}</span>
+            {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
+          </div>
+
+          {/* 메뉴 · 메모 */}
+          {(pot.menu || pot.memo) && (
+            <div style={potListStyles.detailCol}>
+              {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
+              {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+            </div>
+          )}
+
+          {/* 3순위: 참여 인원 · 참여자 아바타 */}
+          <div style={potListStyles.row3}>
+            <div style={potListStyles.avatarStack}>
+              {visibleAvatars.map((m, i) => (
+                <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i }}>
+                  {m.nickname[0]}
+                  {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
+                </span>
+              ))}
+              {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
+              <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
+            </div>
+            <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
+              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : isFull ? '마감' : '같이 먹기'}
+            </button>
+          </div>
         </div>
-        <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
-          {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : isFull ? '마감' : '같이 먹기'}
-        </button>
       </div>
     </div>
   )
@@ -1961,11 +1984,13 @@ const potListStyles = {
     display: 'flex', flexDirection: 'column', gap: 5,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
+  mainRow: { display: 'flex', alignItems: 'flex-start', gap: 10 },
+  iconThumb: { width: 38, height: 38, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 },
   row1: { display: 'flex', alignItems: 'center', gap: 8 },
-  icon: { width: 26, height: 26, fontSize: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   time: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0 },
-  detailCol: { display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 34 },
+  detailCol: { display: 'flex', flexDirection: 'column', gap: 1 },
   menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   memoText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
@@ -2047,21 +2072,22 @@ const styles = {
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '5px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-text)' },
-  mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
+  mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
-  mainStatusBody: { display: 'flex', alignItems: 'center', gap: 10 },
-  mainStatusIconWrap: { width: 40, height: 40, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 64 },
+  mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
+  mainStatusIconWrap: { width: 50, height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
-  mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },
+  mainStatusMeta: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
   subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minWidth: 0 },
-  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, boxSizing: 'border-box', padding: '0 9px', border: '1.5px solid', borderRadius: 11, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
-  subSlotEmojiWrap: { width: 24, height: 24, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 },
+  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
+  subSlotEmojiWrap: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
   subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
