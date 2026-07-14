@@ -22,7 +22,6 @@ import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 // 상태값별 내 상태 카드 보조 문구
 const STATUS_SUBTEXT = {
   open: (slot) => `오늘 ${slot} 같이 먹을 수 있어요`,
-  '참여중': () => '지금 밥팟에 함께하고 있어요',
   '참여완료': (slot) => `오늘 ${slot}을 함께 했어요`,
   closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
   skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
@@ -629,7 +628,7 @@ export default function TodayPage() {
                   {info.label ? (
                     <>
                       <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
-                      <span style={styles.mainStatusSub}>{(STATUS_SUBTEXT[info.key] ?? (() => ''))(selectedSlot)}</span>
+                      {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](selectedSlot)}</span>}
                       {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
                       {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
                     </>
