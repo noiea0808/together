@@ -753,7 +753,7 @@ export default function PotDetailPage() {
                   <div style={{ position: 'relative' }}>
                     <div style={{
                       ...S.memberCircle,
-                      background: member ? (isMe ? 'var(--color-primary)' : avBg(member.nickname)) : '#F5F0EB',
+                      background: member ? (isMe ? 'var(--color-primary)' : '#C7BFB6') : '#F5F0EB',
                       border: member ? 'none' : '2px dashed #C7BFB6',
                     }}>
                       {member ? member.nickname[0] : ''}

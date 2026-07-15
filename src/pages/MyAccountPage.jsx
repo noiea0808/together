@@ -1,11 +1,12 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { updateNickname, uploadAvatar, deleteAccount } from '../lib/db'
+import { updateNickname, uploadAvatar, deleteAccount, setDiscoverable } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
+import AvatarCropModal from '../components/AvatarCropModal'
 import { DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
@@ -24,10 +25,13 @@ export default function MyAccountPage() {
   const [withdrawError, setWithdrawError] = useState(null)
   const [avatarUploading, setAvatarUploading] = useState(false)
   const [avatarError, setAvatarError] = useState(null)
+  const [cropFile, setCropFile] = useState(null)
   const avatarInputRef = useRef(null)
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushError, setPushError] = useState(null)
+  const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
+  const [discoverableLoading, setDiscoverableLoading] = useState(false)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -54,7 +58,7 @@ export default function MyAccountPage() {
     }
   }
 
-  const handleAvatarChange = async (e) => {
+  const handleAvatarChange = (e) => {
     const file = e.target.files?.[0]
     e.target.value = ''
     if (!file) return
@@ -67,13 +71,21 @@ export default function MyAccountPage() {
       setAvatarError('5MB 이하의 이미지만 업로드할 수 있어요.')
       return
     }
+    setCropFile(file) // 바로 올리지 않고 편집 팝업에서 위치/확대를 고른 뒤 등록한다
+  }
+
+  const handleCropConfirm = async (blob) => {
     setAvatarUploading(true)
     try {
-      const avatar_url = await uploadAvatar(user.id, file)
+      // 원본 포맷(HEIC 등)과 무관하게 JPEG로 다시 인코딩해서 올린다
+      const croppedFile = new File([blob], 'avatar.jpg', { type: 'image/jpeg' })
+      const avatar_url = await uploadAvatar(user.id, croppedFile)
       login({ ...user, avatar_url })
+      setCropFile(null)
     } catch (e) {
       console.error(e)
       setAvatarError('사진 업로드에 실패했어요. 잠시 후 다시 시도해주세요.')
+      setCropFile(null)
     } finally {
       setAvatarUploading(false)
     }
@@ -92,6 +104,21 @@ export default function MyAccountPage() {
       console.error(e)
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleToggleDiscoverable = async () => {
+    if (discoverableLoading) return
+    setDiscoverableLoading(true)
+    try {
+      const next = !discoverable
+      await setDiscoverable(user.id, next)
+      setDiscoverableState(next)
+      login({ ...user, is_discoverable: next })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setDiscoverableLoading(false)
     }
   }
 
@@ -199,15 +226,24 @@ export default function MyAccountPage() {
           </div>
         </div>
 
-        {/* 홈 화면 설치 */}
+        {/* 친구 검색 노출 */}
         <div style={styles.section}>
-          <InstallAppPrompt />
+          <div style={styles.infoRow}>
+            <span style={styles.infoValue}>이메일/닉네임 검색에 노출</span>
+            <button
+              style={{ ...styles.editBtn, opacity: discoverableLoading ? 0.5 : 1 }}
+              onClick={handleToggleDiscoverable}
+              disabled={discoverableLoading}
+            >
+              {discoverableLoading ? '처리 중...' : discoverable ? '노출 끄기' : '노출 켜기'}
+            </button>
+          </div>
+          <p style={styles.installDesc}>꺼두면 다른 사람이 검색해서 나를 찾거나 친구 요청을 보낼 수 없어요.</p>
         </div>
 
         {/* 알림 받기 */}
         {isPushSupported() && (
           <div style={styles.section}>
-            <div style={styles.sectionTitle}>알림</div>
             {isIOS && !isInstalled ? (
               <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
             ) : (
@@ -225,6 +261,11 @@ export default function MyAccountPage() {
             {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
           </div>
         )}
+
+        {/* 홈 화면 설치 */}
+        <div style={styles.section}>
+          <InstallAppPrompt />
+        </div>
 
         {/* 로그아웃 */}
         <div style={{ marginTop: 'auto' }}>
@@ -284,6 +325,15 @@ export default function MyAccountPage() {
 
       </div>
 
+      {cropFile && (
+        <AvatarCropModal
+          file={cropFile}
+          uploading={avatarUploading}
+          onCancel={() => setCropFile(null)}
+          onConfirm={handleCropConfirm}
+        />
+      )}
+
       <BottomNav />
     </div>
   )
@@ -320,7 +370,7 @@ const styles = {
   cancelBtn: { padding: '10px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600 },
 
-  logoutBtn: { ...DESTRUCTIVE_ACTION_BUTTON, width: '100%' },
+  logoutBtn: { ...DESTRUCTIVE_ACTION_BUTTON, display: 'block', width: 'auto', margin: '0 auto', padding: '8px 22px', fontSize: 'var(--font-size-xs)' },
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
   modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },

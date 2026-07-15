@@ -1,4 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
+import { useUser } from '../lib/UserContext'
 
 function HomeIcon({ active }) {
   return active ? (
@@ -69,6 +70,7 @@ const TABS = [
 export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
+  const { user } = useUser()
 
   return (
     <nav style={styles.nav}>
@@ -81,7 +83,15 @@ export default function BottomNav() {
             onClick={() => navigate(path)}
             aria-label={label}
           >
-            <Icon active={active} />
+            {path === '/account' && user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt=""
+                style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-text)' : '2px solid transparent' }}
+              />
+            ) : (
+              <Icon active={active} />
+            )}
           </button>
         )
       })}
@@ -105,4 +115,5 @@ const styles = {
     background: 'none', border: 'none', cursor: 'pointer',
     WebkitTapHighlightColor: 'transparent',
   },
+  avatarIcon: { width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', boxSizing: 'border-box' },
 }
