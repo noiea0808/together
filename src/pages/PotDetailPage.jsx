@@ -436,7 +436,9 @@ export default function PotDetailPage() {
       <div style={S.header}>
         {draft && draftScope === 'all'
           ? <button style={S.headerTextBtn} onClick={cancelDraft}>취소</button>
-          : <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
+          // 게스트는 초대 링크로 바로 이 화면에 들어와 브라우저 히스토리가 없는 경우가
+          // 많아 navigate(-1)이 아무 반응이 없다. 뒤로가기 모양은 유지하되 홈으로 보낸다.
+          : <button style={S.backBtn} onClick={() => user?.is_guest ? navigate('/today') : navigate(-1)}>‹</button>
         }
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={S.headerTitle}>밥팟 상세</div>
