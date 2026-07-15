@@ -1578,15 +1578,14 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowInvite(false) }}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
 
-            {/* 타이틀 + 나가기 아이콘 */}
-            <div style={styles.sheetTitleRow}>
+            {/* 타이틀 */}
+            <div style={{ ...styles.sheetTitleRow, justifyContent: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <div style={styles.sheetTitle}>{group.name}</div>
                 <div style={styles.sheetMaster}>
                   👑 {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
                 </div>
               </div>
-              <button style={styles.sheetLeaveIcon} onClick={() => setConfirmLeave(true)} title="그룹 나가기">🚪</button>
             </div>
 
             <div style={styles.sheetDivider} />
@@ -1631,6 +1630,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               <span>📨</span>
               <span style={styles.sheetRowLabel}>그룹 초대하기</span>
               <span style={styles.sheetRowChevron}>›</span>
+            </button>
+
+            {/* 6. 그룹 나가기 */}
+            <button style={{ ...styles.sheetRow, color: 'var(--color-danger)' }} onClick={() => setConfirmLeave(true)}>
+              <span>🚪</span>
+              <span style={styles.sheetRowLabel}>그룹 나가기</span>
             </button>
 
             {/* 닫기 */}
@@ -2212,7 +2217,6 @@ const styles = {
   sheetTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   sheetMaster: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' },
-  sheetLeaveIcon: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 2px', opacity: 0.5, flexShrink: 0 },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '4px 0 8px' },
   sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
   sheetRowLabel: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
