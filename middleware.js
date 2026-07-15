@@ -45,8 +45,20 @@ async function callRpc(fn, params) {
   }
 }
 
+// pot.date는 "YYYY-MM-DD" 형태의 날짜만 있는 문자열이다. UTC 자정으로 파싱해 UTC 컴포넌트를
+// 그대로 읽으면 Edge 런타임의 기본 타임존이나 Intl 설정과 무관하게 항상 같은 날짜가 나온다.
+function formatPotDate(dateStr) {
+  if (!dateStr) return null
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return null
+  const weekday = ['일', '월', '화', '수', '목', '금', '토'][d.getUTCDay()]
+  return `${d.getUTCMonth() + 1}월 ${d.getUTCDate()}일(${weekday})`
+}
+
 function buildPotDescription(pot) {
   const parts = []
+  const dateLabel = formatPotDate(pot.date)
+  if (dateLabel) parts.push(dateLabel)
   if (pot.slot) parts.push(pot.slot)
   if (pot.meal_time) {
     const start = pot.meal_time.slice(0, 5)

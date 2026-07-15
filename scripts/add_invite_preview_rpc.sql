@@ -18,14 +18,18 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.get_group_invite_preview(TEXT) TO anon, authenticated;
 
--- meal_time/end_time 컬럼의 실제 타입(time/timetz 등)과 무관하게 동작하도록 text로 캐스팅해서 반환한다.
+-- meal_time/end_time/date 컬럼의 실제 타입(time/timetz/date 등)과 무관하게 동작하도록
+-- text로 캐스팅해서 반환한다.
+-- 리턴 타입(OUT 파라미터 구성)이 바뀌면 CREATE OR REPLACE로는 덮어쓸 수 없어서 먼저 지운다.
+DROP FUNCTION IF EXISTS public.get_pot_invite_preview(UUID);
+
 CREATE OR REPLACE FUNCTION public.get_pot_invite_preview(p_id UUID)
-RETURNS TABLE(title TEXT, slot TEXT, meal_time TEXT, end_time TEXT, menu TEXT, group_name TEXT)
+RETURNS TABLE(title TEXT, date TEXT, slot TEXT, meal_time TEXT, end_time TEXT, menu TEXT, group_name TEXT)
 LANGUAGE sql
 SECURITY DEFINER
 SET search_path = public
 AS $$
-  SELECT mp.title, mp.slot, mp.meal_time::text, mp.end_time::text, mp.menu, g.name AS group_name
+  SELECT mp.title, mp.date::text, mp.slot, mp.meal_time::text, mp.end_time::text, mp.menu, g.name AS group_name
   FROM meal_pots mp
   JOIN groups g ON g.id = mp.group_id
   WHERE mp.id = p_id
