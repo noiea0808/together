@@ -22,7 +22,6 @@ import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 // 상태값별 내 상태 카드 보조 문구
 const STATUS_SUBTEXT = {
   open: (slot) => `오늘 ${slot} 같이 먹을 수 있어요`,
-  '참여완료': (slot) => `오늘 ${slot}을 함께 했어요`,
   closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
   skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
 }
@@ -622,7 +621,7 @@ export default function TodayPage() {
               </div>
               <div style={styles.mainStatusBody}>
                 <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
-                  <SlotIcon slot={selectedSlot} size={48} />
+                  {info.key ? <StatusIcon statusKey={info.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
                 </div>
                 <div style={styles.mainStatusTextCol}>
                   {info.label ? (
@@ -2160,7 +2159,7 @@ const styles = {
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
-  mainStatusIconWrap: { width: 50, height: 50, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  mainStatusIconWrap: { width: 75, height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
   mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },

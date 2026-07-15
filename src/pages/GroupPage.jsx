@@ -225,7 +225,7 @@ export default function GroupPage() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <span style={styles.headerTitle}>친구 관리</span>
           <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-            🔍 친구 찾기
+            친구 찾기
           </button>
         </div>
         <div style={styles.summary}>
@@ -278,8 +278,8 @@ export default function GroupPage() {
                     <div style={styles.avatar}>{friend.nickname[0]}</div>
                   )}
                   <div style={styles.friendInfo}>
-                    <div style={styles.friendName}>{friend.nickname}</div>
-                    <div style={styles.friendGroups}>
+                    <div style={styles.friendNameRow}>
+                      <span style={styles.friendName}>{friend.nickname}</span>
                       {friend.groups.map(g => (
                         <span key={g.id} style={styles.groupTag}>{g.name}</span>
                       ))}
@@ -473,6 +473,7 @@ const styles = {
   avatar: { width: 36, height: 36, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
   avatarImg: { width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+  friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },

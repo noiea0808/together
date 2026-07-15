@@ -7,9 +7,27 @@ import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromP
 import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
-import { DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
+
+// 텍스트만 바뀌는 버튼("끄기"/"켜기")은 지금 켜져있는 상태인지 헷갈리기 쉬워서,
+// on/off가 색과 위치로 바로 보이는 스위치를 대신 쓴다.
+function ToggleSwitch({ on, onClick, disabled, label }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={on}
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      style={{ ...styles.toggleTrack, background: on ? 'var(--color-primary)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
+    >
+      <span style={{ ...styles.toggleThumb, transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
+    </button>
+  )
+}
 
 export default function MyAccountPage() {
   const navigate = useNavigate()
@@ -153,6 +171,7 @@ export default function MyAccountPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <span style={styles.headerTitle}>내 계정</span>
+        <button style={styles.headerLogoutBtn} onClick={handleLogout}>로그아웃</button>
       </div>
 
       <div style={styles.body}>
@@ -183,46 +202,13 @@ export default function MyAccountPage() {
             />
           </div>
           <div style={styles.profileInfo}>
-            <div style={styles.profileName}>{user?.nickname}</div>
-            <div style={styles.profileEmail}>{user?.email}</div>
-            {avatarError && <p style={styles.avatarErrorMsg}>{avatarError}</p>}
-          </div>
-        </div>
-
-        {/* 닉네임 변경 */}
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>닉네임</div>
-          {editing ? (
-            <div style={styles.editRow}>
-              <input
-                style={styles.input}
-                value={nickname}
-                onChange={e => setNickname(e.target.value)}
-                maxLength={8}
-                autoFocus
-                onKeyDown={e => e.key === 'Enter' && handleSave()}
-              />
-              <button style={styles.saveBtn} onClick={handleSave} disabled={saving}>
-                {saving ? '...' : '저장'}
-              </button>
-              <button style={styles.cancelBtn} onClick={() => { setEditing(false); setNickname(user?.nickname ?? '') }}>
-                취소
-              </button>
-            </div>
-          ) : (
-            <div style={styles.infoRow}>
-              <span style={styles.infoValue}>{user?.nickname}</span>
+            <div style={styles.profileNameRow}>
+              <span style={styles.profileName}>{user?.nickname}</span>
               <button style={styles.editBtn} onClick={() => setEditing(true)}>변경</button>
             </div>
-          )}
-          {saved && <p style={styles.savedMsg}>✓ 닉네임이 변경됐어요.</p>}
-        </div>
-
-        {/* 이메일 */}
-        <div style={styles.section}>
-          <div style={styles.sectionTitle}>이메일</div>
-          <div style={styles.infoRow}>
-            <span style={styles.infoValue}>{user?.email}</span>
+            <div style={styles.profileEmail}>{user?.email}</div>
+            {saved && <p style={styles.savedMsg}>✓ 닉네임이 변경됐어요.</p>}
+            {avatarError && <p style={styles.avatarErrorMsg}>{avatarError}</p>}
           </div>
         </div>
 
@@ -230,13 +216,7 @@ export default function MyAccountPage() {
         <div style={styles.section}>
           <div style={styles.infoRow}>
             <span style={styles.infoValue}>이메일/닉네임 검색에 노출</span>
-            <button
-              style={{ ...styles.editBtn, opacity: discoverableLoading ? 0.5 : 1 }}
-              onClick={handleToggleDiscoverable}
-              disabled={discoverableLoading}
-            >
-              {discoverableLoading ? '처리 중...' : discoverable ? '노출 끄기' : '노출 켜기'}
-            </button>
+            <ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="검색 노출" />
           </div>
           <p style={styles.installDesc}>꺼두면 다른 사람이 검색해서 나를 찾거나 친구 요청을 보낼 수 없어요.</p>
         </div>
@@ -249,13 +229,7 @@ export default function MyAccountPage() {
             ) : (
               <div style={styles.infoRow}>
                 <span style={styles.infoValue}>푸시 알림</span>
-                <button
-                  style={{ ...styles.editBtn, opacity: pushLoading ? 0.5 : 1 }}
-                  onClick={handleTogglePush}
-                  disabled={pushLoading}
-                >
-                  {pushLoading ? '처리 중...' : pushEnabled ? '알림 끄기' : '알림 받기'}
-                </button>
+                <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="푸시 알림" />
               </div>
             )}
             {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
@@ -267,12 +241,8 @@ export default function MyAccountPage() {
           <InstallAppPrompt />
         </div>
 
-        {/* 로그아웃 */}
+        {/* 회원 탈퇴 — 실수 방지를 위해 작고 눈에 띄지 않게. 로그아웃은 헤더로 이동 */}
         <div style={{ marginTop: 'auto' }}>
-          <button style={styles.logoutBtn} onClick={handleLogout}>
-            로그아웃
-          </button>
-          {/* 회원 탈퇴 — 실수 방지를 위해 작고 눈에 띄지 않게 */}
           <div style={styles.withdrawWrap}>
             <button style={styles.withdrawLink} onClick={() => setShowWithdraw(true)}>
               회원 탈퇴
@@ -334,6 +304,32 @@ export default function MyAccountPage() {
         />
       )}
 
+      {editing && (
+        <div style={styles.overlay} onClick={() => { setEditing(false); setNickname(user?.nickname ?? '') }}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 32 }}>✏️</div>
+            <div style={styles.dialogTitle}>닉네임 변경</div>
+            <input
+              style={styles.dialogInput}
+              value={nickname}
+              onChange={e => setNickname(e.target.value)}
+              maxLength={8}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleSave()}
+              placeholder="새 닉네임"
+            />
+            <div style={styles.dialogBtns}>
+              <button style={{ ...styles.dialogBtnPrimary, opacity: nickname.trim() && !saving ? 1 : 0.5 }} onClick={handleSave} disabled={!nickname.trim() || saving}>
+                {saving ? '저장 중...' : '저장'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => { setEditing(false); setNickname(user?.nickname ?? '') }} disabled={saving}>
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <BottomNav />
     </div>
   )
@@ -341,8 +337,9 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
+  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerLogoutBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
 
   profileCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
@@ -355,25 +352,31 @@ const styles = {
     alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface-2)',
   },
   avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-danger)', margin: 0 },
-  profileInfo: { display: 'flex', flexDirection: 'column', gap: 4 },
+  profileInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
+  profileNameRow: { display: 'flex', alignItems: 'center', gap: 8 },
   profileName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 
   section: { display: 'flex', flexDirection: 'column', gap: 8 },
-  sectionTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   editBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
-  editRow: { display: 'flex', gap: 8, alignItems: 'center' },
-  input: { flex: 1, padding: '10px var(--spacing-md)', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none' },
-  saveBtn: { padding: '10px 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
-  cancelBtn: { padding: '10px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600 },
 
-  logoutBtn: { ...DESTRUCTIVE_ACTION_BUTTON, display: 'block', width: 'auto', margin: '0 auto', padding: '8px 22px', fontSize: 'var(--font-size-xs)' },
+  toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
+  toggleThumb: { display: 'block', width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s' },
+
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
   modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
+
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
   withdrawWrap: { textAlign: 'center', marginTop: 14 },
   withdrawLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.6 },
