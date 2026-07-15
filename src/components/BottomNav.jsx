@@ -47,13 +47,14 @@ function PeopleIcon({ active }) {
 }
 
 function UserIcon({ active }) {
+  const borderStyle = { border: `2px solid ${active ? 'var(--color-text)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
   return active ? (
-    <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style={borderStyle}>
       <circle cx="12" cy="7.5" r="4.3" />
       <path d="M3.5 20.2c0-4.3 3.8-7.2 8.5-7.2s8.5 2.9 8.5 7.2a.9.9 0 0 1-.9.8H4.4a.9.9 0 0 1-.9-.8Z" />
     </svg>
   ) : (
-    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round" style={borderStyle}>
       <circle cx="12" cy="7.5" r="4.3" />
       <path d="M3.5 20.2c0-4.3 3.8-7.2 8.5-7.2s8.5 2.9 8.5 7.2" />
     </svg>

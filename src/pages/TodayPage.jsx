@@ -1896,13 +1896,14 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 borderBottom: `1px solid #F5F0EB`,
               }}>
                 {member.avatar_url ? (
-                  <img src={member.avatar_url} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  <img src={member.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--color-border)', boxSizing: 'border-box' }} />
                 ) : (
                   <div style={{
-                    width: 30, height: 30, borderRadius: '50%',
+                    width: 40, height: 40, borderRadius: '50%',
                     background: isMe ? 'var(--color-primary)' : 'var(--color-text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
+                    border: '2px solid var(--color-border)', boxSizing: 'border-box',
                   }}>{member.nickname[0]}</div>
                 )}
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>

@@ -203,7 +203,7 @@ export default function PotDetailPage() {
 
   const participants = pot?.pot_members?.map(pm => {
     const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
-    return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), is_guest: pm.users?.is_guest }
+    return { id: pm.user_id, nickname: groupNickname || (pm.users?.nickname ?? '?'), avatar_url: pm.users?.avatar_url, is_guest: pm.users?.is_guest }
   }) ?? []
   const isJoined = participants.some(m => m.id === user?.id)
   const isFull = participants.length >= (pot?.max_people ?? 0)
@@ -757,8 +757,11 @@ export default function PotDetailPage() {
                       ...S.memberCircle,
                       background: member ? (isMe ? 'var(--color-primary)' : '#C7BFB6') : '#F5F0EB',
                       border: member ? 'none' : '2px dashed #C7BFB6',
+                      padding: 0, overflow: 'hidden',
                     }}>
-                      {member ? member.nickname[0] : ''}
+                      {member?.avatar_url
+                        ? <img src={member.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                        : (member ? member.nickname[0] : '')}
                       {member?.is_guest && <span style={S.guestBadge}>G</span>}
                     </div>
                     {kickable && (

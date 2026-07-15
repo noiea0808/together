@@ -718,7 +718,7 @@ export async function getGroupPots(groupId, date) {
 export async function getPot(potId) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
     .eq('id', potId)
     .maybeSingle()
   if (error) throw error
