@@ -114,6 +114,12 @@ export default async function middleware(request) {
     .replace('</head>', `<meta property="og:url" content="${url.href}" />\n  </head>`)
 
   return new Response(html, {
-    headers: { 'content-type': 'text/html; charset=utf-8' },
+    // 카톡 등 인앱 웹뷰가 이 경로(초대 링크)를 한 번 열어본 뒤 디스크에 캐시해두고 재사용하는
+    // 경우가 있어, 배포가 반영돼도 예전 버전이 계속 보이는 원인이 된다. 명시적으로 캐시를
+    // 금지해 매번 최신 index.html을 받아가도록 한다.
+    headers: {
+      'content-type': 'text/html; charset=utf-8',
+      'cache-control': 'no-store',
+    },
   })
 }
