@@ -691,13 +691,13 @@ export default function TodayPage() {
       {groups.length > 0 && (
         <div style={styles.viewModeTabs}>
           <button
-            style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
-            onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
-          >그룹별 보기</button>
-          <button
             style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
             onClick={() => { setViewMode('pot'); localStorage.setItem('lastViewMode', 'pot') }}
           >밥팟별 보기</button>
+          <button
+            style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
+            onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
+          >그룹별 보기</button>
         </div>
       )}
 
