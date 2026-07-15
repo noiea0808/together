@@ -65,6 +65,10 @@
 html {
   font-size: var(--font-size-base);
   -webkit-text-size-adjust: 100%;
+  /* 헤더/dateNav의 height·top 애니메이션이 문서 레이아웃을 바꿀 때, 브라우저의 스크롤
+     앵커링이 시야를 유지하려 scrollY를 보정하면서 scroll 이벤트를 재발생시켜
+     useHideOnScroll과 서로를 되먹임(피드백 루프)시켜 헤더가 떨려 보이던 문제 방지. */
+  overflow-anchor: none;
 }
 
 body {

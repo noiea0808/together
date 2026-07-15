@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { getDeferredInstallPrompt, onInstallPromptReady, clearDeferredInstallPrompt } from '../lib/installPrompt'
+import { IN_APP_UA_PATTERN } from '../lib/inAppBrowser'
 
 export function useInstallPrompt() {
   const [installPrompt, setInstallPrompt] = useState(() => getDeferredInstallPrompt())
@@ -21,7 +22,7 @@ export function useInstallPrompt() {
     // 카카오톡·인스타그램·페이스북 등 인앱 브라우저는 자체 WebView라 beforeinstallprompt가
     // 아예 안 뜨고, 크롬처럼 "⋮ 메뉴 → 홈 화면에 추가"도 없다. 초대 링크를 카톡으로 공유하는
     // 이 앱 특성상 카톡 인앱 브라우저 진입이 흔하므로 별도로 감지해 안내를 다르게 보여준다.
-    const inApp = /kakaotalk|instagram|fban|fbav|line\/|naver\(inapp/i.test(ua)
+    const inApp = IN_APP_UA_PATTERN.test(ua)
     setIsInAppBrowser(inApp)
 
     const installed = window.matchMedia('(display-mode: standalone)').matches
