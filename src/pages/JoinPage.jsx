@@ -17,17 +17,19 @@ export default function JoinPage() {
   useEffect(() => {
     if (user === undefined) return // 로딩중
 
+    if (!user) {
+      // groups 테이블 조회 RLS가 authenticated 전용이라 비로그인 상태에선 그룹 정보를
+      // 조회할 수 없다. 조회를 시도하지 않고 바로 코드만 저장한 뒤 로그인/가입을 시키고,
+      // 실제 조회는 로그인 이후(아래 load())에 한다.
+      localStorage.setItem('pendingInviteCode', code)
+      navigate('/onboarding')
+      return
+    }
+
     const load = async () => {
       try {
         const g = await getGroupByInviteCode(code)
         setGroup(g)
-
-        if (!user) {
-          // 로그인 필요 → 온보딩으로, 이후 돌아올 수 있도록 코드 저장
-          localStorage.setItem('pendingInviteCode', code)
-          navigate('/onboarding')
-          return
-        }
 
         // 가입/로그인은 됐지만 아직 그룹에는 참여 전 — 초대를 확인하고 직접 수락하게 한다.
         // 예전엔 여기서 바로 자동 참여시켰는데, 특히 신규 가입 직후엔 방금 무슨 초대를
