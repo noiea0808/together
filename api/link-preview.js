@@ -1,7 +1,9 @@
 // 메모에 붙여넣은 링크의 미리보기(썸네일/제목/설명)를 가져오는 서버리스 함수.
 // 브라우저에서 바로 외부 사이트를 fetch하면 대부분 CORS로 막히기 때문에 서버를 거친다.
-const FETCH_TIMEOUT_MS = 5000
-const MAX_HTML_BYTES = 300_000 // head 태그만 필요하므로 앞부분만 읽는다
+const FETCH_TIMEOUT_MS = 6000
+const READ_BUDGET_MS = 8000 // </head> 검색용 스트림 읽기 전체에 허용하는 시간
+const MAX_HTML_BYTES = 3_000_000 // 유튜브처럼 <head> 안에 인라인 스크립트가 커서 og 태그가
+// 수백KB 뒤에 나오는 사이트가 있어, </head>를 찾을 때까지 읽되 이 값을 안전장치로 둔다.
 
 function isBlockedHost(hostname) {
   const h = hostname.toLowerCase()
@@ -72,8 +74,14 @@ export default async function handler(req, res) {
       signal: controller.signal,
       redirect: 'follow',
       headers: {
-        'User-Agent': 'Mozilla/5.0 (compatible; GachiMeokjaLinkPreview/1.0)',
+        // facebookexternalhit 같은 봇 UA는 위키피디아처럼 오히려 차단하는 사이트가 있어
+        // 실제 데스크톱 브라우저 UA를 쓴다. 커스텀/봇 UA로는 로그인·JS 렌더링을 요구하는
+        // 사이트가 글 상세 대신 홈/상위 페이지의 공용 og 태그만 내려주는 경우가 많았는데,
+        // 일반 브라우저처럼 요청하면 서버가 SEO용으로 이미 페이지별 og 태그를 원본 HTML에
+        // 담아 보내주는 경우가 대부분이라 더 안정적으로 해당 페이지 정보를 받아온다.
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36',
         Accept: 'text/html,application/xhtml+xml',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en;q=0.8',
       },
     })
     clearTimeout(timer)
@@ -85,18 +93,21 @@ export default async function handler(req, res) {
       return
     }
 
-    // head만 필요하니 스트림을 MAX_HTML_BYTES까지만 읽고 중단한다.
+    // </head>가 나올 때까지 읽는다 (멀티바이트 문자가 청크 경계에서 잘리지 않도록
+    // TextDecoder를 스트리밍 모드로 사용). MAX_HTML_BYTES/READ_BUDGET_MS는 안전장치.
     const reader = response.body.getReader()
-    const chunks = []
+    const decoder = new TextDecoder('utf-8')
+    const readStartedAt = Date.now()
+    let html = ''
     let received = 0
-    while (received < MAX_HTML_BYTES) {
+    while (received < MAX_HTML_BYTES && Date.now() - readStartedAt < READ_BUDGET_MS) {
       const { done, value } = await reader.read()
       if (done) break
-      chunks.push(value)
       received += value.length
+      html += decoder.decode(value, { stream: true })
+      if (html.includes('</head>')) break
     }
     reader.cancel().catch(() => {})
-    const html = Buffer.concat(chunks).toString('utf-8')
 
     const meta = extractMeta(html)
     let image = meta.image || null
