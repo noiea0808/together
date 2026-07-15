@@ -55,8 +55,9 @@ export default function ProfileSetupPage() {
       )
       login(profile)
       if (pendingCode) {
-        localStorage.removeItem('pendingInviteCode')
-        navigate(`/join/${pendingCode}`)
+        // 코드는 localStorage에 그대로 두고 메인으로 — 전역 초대 팝업(GroupInviteModal)이
+        // 메인 화면 위에서 이어받아 수락 여부를 묻는다.
+        navigate('/today')
       } else {
         navigate('/group-setup')
       }

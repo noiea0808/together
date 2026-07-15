@@ -18,7 +18,7 @@ import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import BadgeSync from './components/BadgeSync'
-import PendingInviteRedirect from './components/PendingInviteRedirect'
+import GroupInviteModal from './components/GroupInviteModal'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 
 function ConsumerRoutes() {
@@ -65,7 +65,7 @@ function ConsumerApp() {
     <UserProvider>
       <NotificationToast />
       <BadgeSync />
-      <PendingInviteRedirect />
+      <GroupInviteModal />
       <ConsumerRoutes />
     </UserProvider>
   )

@@ -45,24 +45,32 @@ export async function deleteAccount() {
   await supabase.auth.signOut()
 }
 
+// OAuth 왕복 후 돌아올 경로. 그룹 초대 코드는 localStorage 대신 URL(/join/:code)에
+// 실어 나른다 — 카톡 인앱 ↔ 외부 브라우저 전환이나 OAuth 리다이렉트 과정에서 저장소가
+// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 기존 returnTo 방식 유지.
+function oauthReturnPath() {
+  const invite = localStorage.getItem('pendingInviteCode')
+  if (invite) return `/join/${invite}`
+  const returnTo = sessionStorage.getItem('returnTo')
+  if (returnTo) {
+    sessionStorage.removeItem('returnTo')
+    return returnTo
+  }
+  return '/today'
+}
+
 export async function signInWithGoogle() {
-  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
-  const returnTo = sessionStorage.getItem('returnTo') || '/today'
-  sessionStorage.removeItem('returnTo')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin + returnTo },
+    options: { redirectTo: window.location.origin + oauthReturnPath() },
   })
   if (error) throw error
 }
 
 export async function signInWithKakao() {
-  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
-  const returnTo = sessionStorage.getItem('returnTo') || '/today'
-  sessionStorage.removeItem('returnTo')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
-    options: { redirectTo: window.location.origin + returnTo },
+    options: { redirectTo: window.location.origin + oauthReturnPath() },
   })
   if (error) throw error
 }
