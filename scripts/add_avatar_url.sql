@@ -1,5 +1,5 @@
 -- 사용자 프로필 아이콘(사진) 지원
--- Supabase SQL Editor에서 실행하세요.
+-- Supabase SQL Editor에서 실행하세요. (멱등 — 여러 번 실행해도 안전)
 
 -- 1) users 테이블에 avatar_url 컬럼 추가
 ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url text;
@@ -10,6 +10,11 @@ VALUES ('avatars', 'avatars', true)
 ON CONFLICT (id) DO NOTHING;
 
 -- 3) 스토리지 RLS 정책 — 파일 경로는 `{auth.uid()}/avatar.<ext>` 형식 사용
+DROP POLICY IF EXISTS "avatars_public_read" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_own_upload" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_own_update" ON storage.objects;
+DROP POLICY IF EXISTS "avatars_own_delete" ON storage.objects;
+
 -- 누구나 아바타 이미지를 읽을 수 있음 (public 버킷)
 CREATE POLICY "avatars_public_read" ON storage.objects
 FOR SELECT

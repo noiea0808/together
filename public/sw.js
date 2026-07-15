@@ -15,9 +15,13 @@ self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return
   if (new URL(e.request.url).origin !== self.location.origin) return
 
-  // 네트워크 우선, 실패 시 캐시
+  // 네트워크 우선, 실패 시 캐시. 캐시에도 없으면 respondWith가 undefined를 받아
+  // "Failed to convert value to 'Response'"로 죽으므로 마지막 안전망을 둔다.
   e.respondWith(
-    fetch(e.request).catch(() => caches.match(e.request))
+    fetch(e.request).catch(async () => {
+      const cached = await caches.match(e.request)
+      return cached || new Response('', { status: 503, statusText: 'Offline' })
+    })
   )
 })
 

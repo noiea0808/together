@@ -45,24 +45,32 @@ export async function deleteAccount() {
   await supabase.auth.signOut()
 }
 
+// OAuth 왕복 후 돌아올 경로. 그룹 초대 코드는 localStorage 대신 URL(/join/:code)에
+// 실어 나른다 — 카톡 인앱 ↔ 외부 브라우저 전환이나 OAuth 리다이렉트 과정에서 저장소가
+// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 기존 returnTo 방식 유지.
+function oauthReturnPath() {
+  const invite = localStorage.getItem('pendingInviteCode')
+  if (invite) return `/join/${invite}`
+  const returnTo = sessionStorage.getItem('returnTo')
+  if (returnTo) {
+    sessionStorage.removeItem('returnTo')
+    return returnTo
+  }
+  return '/today'
+}
+
 export async function signInWithGoogle() {
-  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
-  const returnTo = sessionStorage.getItem('returnTo') || '/today'
-  sessionStorage.removeItem('returnTo')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin + returnTo },
+    options: { redirectTo: window.location.origin + oauthReturnPath() },
   })
   if (error) throw error
 }
 
 export async function signInWithKakao() {
-  // 밥팟 링크 등에서 넘어온 경우 OAuth 후 원래 위치로 복귀
-  const returnTo = sessionStorage.getItem('returnTo') || '/today'
-  sessionStorage.removeItem('returnTo')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
-    options: { redirectTo: window.location.origin + returnTo },
+    options: { redirectTo: window.location.origin + oauthReturnPath() },
   })
   if (error) throw error
 }
@@ -284,6 +292,181 @@ export async function getGroupMembers(groupId) {
     group_nickname: d.nickname || null,
     default_nickname: d.users.nickname,
   }))
+}
+
+// ── 친구 ──────────────────────────────────────────
+// 이메일 완전일치 또는 닉네임 부분일치로 검색. search_users RPC가 비공개(is_discoverable=false)
+// 계정과 존재하지 않는 계정을 구분하지 않고 똑같이 빈 결과로 돌려주므로, 여기서도 그 결과를
+// 그대로 노출한다 — 검색으로 계정 존재 여부 자체를 알아낼 수 없게 하기 위함.
+export async function searchUsers(query) {
+  const { data, error } = await supabase.rpc('search_users', { p_query: query })
+  if (error) throw error
+  return data
+}
+
+export async function setDiscoverable(userId, value) {
+  const { error } = await supabase.from('users').update({ is_discoverable: value }).eq('id', userId)
+  if (error) throw error
+}
+
+// 친구 목록/요청은 users 테이블 RLS(같은 밥팟 참여자만 조회 가능)를 우회해야 해서
+// SECURITY DEFINER RPC를 거친다 — 친구가 반드시 같은 밥팟에 있으리란 보장이 없기 때문.
+export async function getMyFriends() {
+  const { data, error } = await supabase.rpc('get_my_friends')
+  if (error) throw error
+  return data.map(r => ({ requestId: r.request_id, id: r.id, nickname: r.nickname, avatar_url: r.avatar_url }))
+}
+
+// direction: 'sent' | 'received'
+export async function getMyFriendRequests() {
+  const { data, error } = await supabase.rpc('get_my_friend_requests')
+  if (error) throw error
+  return data
+}
+
+async function notifyFriendRequest(requestId, toUserId, fromUserId, { title, body, eventType }) {
+  const url = '/group?friend_requests=1'
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: toUserId, friend_request_id: requestId, title, body, url, event_type: eventType,
+  })
+  if (notifError) console.error('friend notification insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [toUserId], title, body, url },
+  })
+  if (pushError) console.warn('friend notification send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('friend notification send-push 일부 실패:', pushResult.failures)
+}
+
+// 상대가 이미 나에게 보낸 pending 요청이 있으면 맞요청으로 보고 바로 수락 처리한다.
+// 거절됐던 요청을 다시 보내는 경우엔 기존 행을 pending으로 되돌린다(unique 제약 때문에
+// 같은 두 사람 사이에 행이 여러 개 생길 수 없다).
+export async function sendFriendRequest(fromUserId, toUserId) {
+  const { data: existing, error: selErr } = await supabase
+    .from('friend_requests')
+    .select('*')
+    .or(`and(from_user_id.eq.${fromUserId},to_user_id.eq.${toUserId}),and(from_user_id.eq.${toUserId},to_user_id.eq.${fromUserId})`)
+    .maybeSingle()
+  if (selErr) throw selErr
+
+  if (existing?.status === 'accepted') return existing
+  if (existing?.status === 'pending' && existing.from_user_id === fromUserId) return existing
+  if (existing?.status === 'pending' && existing.to_user_id === fromUserId) {
+    return acceptFriendRequest(existing.id, fromUserId)
+  }
+
+  let request
+  if (existing) {
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .update({ from_user_id: fromUserId, to_user_id: toUserId, status: 'pending', responded_at: null })
+      .eq('id', existing.id)
+      .select().single()
+    if (error) throw error
+    request = data
+  } else {
+    const { data, error } = await supabase
+      .from('friend_requests')
+      .insert({ from_user_id: fromUserId, to_user_id: toUserId, status: 'pending' })
+      .select().single()
+    if (error) throw error
+    request = data
+  }
+
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  await notifyFriendRequest(request.id, toUserId, fromUserId, {
+    title: '친구 요청이 왔어요',
+    body: `${from?.nickname ?? '누군가'}님이 친구 요청을 보냈어요.`,
+    eventType: 'friend_request',
+  })
+
+  return request
+}
+
+export async function acceptFriendRequest(requestId, userId) {
+  const { data: reqRow, error: fetchError } = await supabase
+    .from('friend_requests').select('*').eq('id', requestId).single()
+  if (fetchError) throw fetchError
+  if (reqRow.to_user_id !== userId) throw new Error('내게 온 요청이 아니에요.')
+  if (reqRow.status !== 'pending') return reqRow
+
+  const { data, error } = await supabase
+    .from('friend_requests')
+    .update({ status: 'accepted', responded_at: new Date().toISOString() })
+    .eq('id', requestId)
+    .select().single()
+  if (error) throw error
+
+  const { data: me } = await supabase.from('users').select('nickname').eq('id', userId).single()
+  await notifyFriendRequest(requestId, reqRow.from_user_id, userId, {
+    title: '친구 요청을 수락했어요',
+    body: `${me?.nickname ?? '상대'}님과 친구가 됐어요.`,
+    eventType: 'friend_accepted',
+  })
+
+  return data
+}
+
+// 거절은 상대에게 따로 알리지 않는다 (수락/거절 통보가 사회적으로 부담스러울 수 있어서
+// 그룹 초대 등 다른 알림과 달리 조용히 처리).
+export async function declineFriendRequest(requestId, userId) {
+  const { data: reqRow, error: fetchError } = await supabase
+    .from('friend_requests').select('to_user_id, status').eq('id', requestId).single()
+  if (fetchError) throw fetchError
+  if (reqRow.to_user_id !== userId) throw new Error('내게 온 요청이 아니에요.')
+  if (reqRow.status !== 'pending') return
+
+  const { error } = await supabase
+    .from('friend_requests')
+    .update({ status: 'declined', responded_at: new Date().toISOString() })
+    .eq('id', requestId)
+  if (error) throw error
+}
+
+// 내가 보낸 pending 요청 취소
+export async function cancelFriendRequest(requestId, userId) {
+  const { data: reqRow, error: fetchError } = await supabase
+    .from('friend_requests').select('from_user_id, status').eq('id', requestId).single()
+  if (fetchError) throw fetchError
+  if (reqRow.from_user_id !== userId) throw new Error('내가 보낸 요청이 아니에요.')
+  if (reqRow.status !== 'pending') return
+
+  const { error } = await supabase.from('friend_requests').delete().eq('id', requestId)
+  if (error) throw error
+}
+
+// 친구 끊기 — 당사자 둘 중 누구든 가능
+export async function removeFriend(requestId, userId) {
+  const { data: reqRow, error: fetchError } = await supabase
+    .from('friend_requests').select('from_user_id, to_user_id').eq('id', requestId).single()
+  if (fetchError) throw fetchError
+  if (reqRow.from_user_id !== userId && reqRow.to_user_id !== userId) throw new Error('권한이 없어요.')
+
+  const { error } = await supabase.from('friend_requests').delete().eq('id', requestId)
+  if (error) throw error
+}
+
+// 특정 유저 한 명에게 그룹 초대 알림 발송. notifications 테이블에 group_id를 채워야
+// notifications_insert_sharedgroup RLS(내가 그 그룹 멤버일 것)를 통과한다.
+export async function inviteGroupFriend(groupId, fromUserId, toUserId) {
+  const [{ data: group }, { data: from }] = await Promise.all([
+    supabase.from('groups').select('name, invite_code').eq('id', groupId).single(),
+    supabase.from('users').select('nickname').eq('id', fromUserId).single(),
+  ])
+  const title = '그룹에 초대했어요'
+  const body = `${from?.nickname ?? '누군가'}님이 "${group?.name ?? '그룹'}"에 초대했어요.`
+  const url = `/join/${group?.invite_code}`
+
+  const { error } = await supabase.from('notifications').insert({
+    user_id: toUserId, group_id: groupId, title, body, url, event_type: 'invite',
+  })
+  if (error) throw error
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [toUserId], title, body, url },
+  })
+  if (pushError) console.warn('inviteGroupFriend send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('inviteGroupFriend send-push 일부 실패:', pushResult.failures)
 }
 
 // ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
@@ -535,7 +718,7 @@ export async function getGroupPots(groupId, date) {
 export async function getPot(potId) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
+    .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname)')
     .eq('id', potId)
     .maybeSingle()
   if (error) throw error

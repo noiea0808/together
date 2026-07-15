@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend } from '../lib/db'
 import { SLOT_KEYS, SLOT_EMOJI } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import FriendsSearchModal from '../components/FriendsSearchModal'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -36,6 +38,19 @@ const isActiveStatus = st => st === '참여중' || st === '참여완료'
 
 export default function GroupPage() {
   const { user } = useUser()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const [showFriendsModal, setShowFriendsModal] = useState(false)
+  const [friendsModalTab, setFriendsModalTab] = useState('search')
+
+  // 친구 요청 알림(/group?friend_requests=1)을 눌러 들어온 경우, 요청 탭이 열린 채로 바로 뜬다.
+  useEffect(() => {
+    if (searchParams.get('friend_requests') === '1') {
+      setFriendsModalTab('requests')
+      setShowFriendsModal(true)
+      setSearchParams(prev => { prev.delete('friend_requests'); return prev }, { replace: true })
+    }
+  }, [])
+
   const [groups, setGroups] = useState([])
   const [membersMap, setMembersMap] = useState({})
   const [statusesMap, setStatusesMap] = useState({})
@@ -50,6 +65,12 @@ export default function GroupPage() {
   const [proposeError, setProposeError] = useState(null)
   const [pendingInvitations, setPendingInvitations] = useState([])
   const [sentInviteKeys, setSentInviteKeys] = useState(new Set())
+  const [realFriends, setRealFriends] = useState([]) // [{ requestId, id, nickname, avatar_url }] — 친구찾기로 맺어진 실제 친구
+  const [confirmUnfriend, setConfirmUnfriend] = useState(false)
+  const [unfriending, setUnfriending] = useState(false)
+
+  const reloadRealFriends = () => getMyFriends().then(setRealFriends).catch(e => console.error(e))
+  useEffect(() => { reloadRealFriends() }, [user.id])
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
@@ -94,6 +115,21 @@ export default function GroupPage() {
       setPendingInvitations(updated)
     } catch (err) {
       console.error(err)
+    }
+  }
+
+  const handleUnfriend = async () => {
+    if (!selectedFriend?.requestId || unfriending) return
+    setUnfriending(true)
+    try {
+      await removeFriend(selectedFriend.requestId, user.id)
+      setConfirmUnfriend(false)
+      setSelectedFriendId(null)
+      reloadRealFriends()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setUnfriending(false)
     }
   }
 
@@ -155,7 +191,8 @@ export default function GroupPage() {
     return map
   }
 
-  // 나를 제외한 모든 친구 + 각자 속한 그룹 정보
+  // 같은 그룹 멤버 + 친구찾기로 맺어진 실제 친구를 하나의 목록으로 합친다.
+  // 같은 그룹이 없는 친구는 groups가 빈 배열이라 그룹 태그/오늘 상태가 자연히 표시되지 않는다.
   const friendMap = {}
   groups.forEach(g => {
     (membersMap[g.id] ?? []).forEach(member => {
@@ -166,13 +203,16 @@ export default function GroupPage() {
       friendMap[member.id].groups.push(g)
     })
   })
+  realFriends.forEach(f => {
+    if (!friendMap[f.id]) friendMap[f.id] = { ...f, groups: [] }
+    // 친구찾기 쪽 프로필이 더 최신일 수 있어 닉네임/사진은 덮어쓴다
+    friendMap[f.id].nickname = f.nickname
+    friendMap[f.id].avatar_url = f.avatar_url
+    friendMap[f.id].requestId = f.requestId
+  })
   const friends = Object.values(friendMap)
     .map(f => ({ ...f, statusMap: mergeFriendStatuses(f.id, f.groups) }))
     .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'))
-
-  const totalMembers = new Set(
-    Object.values(membersMap).flat().map(m => m.id).filter(id => id !== user.id)
-  ).size
 
   const selectedFriend = friends.find(f => f.id === selectedFriendId) ?? null
   const relLabel = getRelativeLabel(currentDate)
@@ -182,10 +222,15 @@ export default function GroupPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <span style={styles.headerTitle}>친구 관리</span>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <span style={styles.headerTitle}>친구 관리</span>
+          <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
+            친구 찾기
+          </button>
+        </div>
         <div style={styles.summary}>
           <div style={styles.summaryItem}>
-            <div style={styles.summaryNum}>{totalMembers}</div>
+            <div style={styles.summaryNum}>{friends.length}</div>
             <div style={styles.summaryLabel}>함께하는 친구</div>
           </div>
           <div style={styles.summaryDivider} />
@@ -216,7 +261,7 @@ export default function GroupPage() {
             <div style={{ fontSize: 40 }}>👥</div>
             <div style={{ fontWeight: 700 }}>아직 친구가 없어요</div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
-              그룹에 초대하면 친구들이 여기 표시됩니다.
+              그룹 멤버이거나 친구 찾기로 추가하면{'\n'}여기 표시됩니다.
             </p>
           </div>
         ) : (
@@ -233,8 +278,8 @@ export default function GroupPage() {
                     <div style={styles.avatar}>{friend.nickname[0]}</div>
                   )}
                   <div style={styles.friendInfo}>
-                    <div style={styles.friendName}>{friend.nickname}</div>
-                    <div style={styles.friendGroups}>
+                    <div style={styles.friendNameRow}>
+                      <span style={styles.friendName}>{friend.nickname}</span>
                       {friend.groups.map(g => (
                         <span key={g.id} style={styles.groupTag}>{g.name}</span>
                       ))}
@@ -275,85 +320,123 @@ export default function GroupPage() {
             </div>
 
             <div style={styles.sheetDivider} />
-            <div style={styles.sheetSectionTitle}>{formatDate(currentDate)} {relLabel.label} 상태</div>
 
-            <div style={styles.statusGrid}>
-              {SLOT_KEYS.map(slot => {
-                const s = selectedFriend.statusMap[slot]
-                const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
-                const pendingInv = findPendingInvitation(selectedFriend.id, slot)
-                const invited = hasPendingInvitation(selectedFriend.id, slot)
-                const isSelected = proposeSlot === slot
-                const selectable = !isPastDate && !invited
-                return (
-                  <div
-                    key={slot}
-                    style={{
-                      ...styles.statusCell,
-                      ...(isSelected ? styles.statusCellSelected : {}),
-                      cursor: selectable ? 'pointer' : 'default',
-                      opacity: invited && !isSelected ? 0.55 : 1,
-                    }}
-                    onClick={() => selectable && selectProposeSlot(selectedFriend, slot)}
-                  >
-                    <span style={styles.statusSlotName}>{SLOT_EMOJI[slot]} {slot}</span>
-                    {opt ? (
-                      <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                        {opt.emoji} {opt.label}
-                      </span>
-                    ) : (
-                      <span style={styles.statusDash}>미설정</span>
-                    )}
-                    {pendingInv ? (
-                      <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
-                        제안함 ✓ · 취소
-                      </button>
-                    ) : invited ? (
-                      <span style={styles.statusInvitedTag}>초대함 ✓</span>
-                    ) : null}
-                  </div>
-                )
-              })}
-            </div>
+            {selectedFriend.groups.length === 0 ? (
+              <p style={styles.noGroupNote}>같은 그룹이 없어서 오늘 상태를 확인하거나 제안할 수 없어요.{'\n'}그룹에 초대하면 함께 밥 약속을 잡을 수 있어요.</p>
+            ) : (
+              <>
+                <div style={styles.sheetSectionTitle}>{formatDate(currentDate)} {relLabel.label} 상태</div>
 
-            {proposeSlot && (
-              <div style={styles.proposePanel}>
-                {selectedFriend.groups.length > 1 && (
-                  <div style={styles.friendGroups}>
-                    {selectedFriend.groups.map(g => (
-                      <button
-                        key={g.id}
-                        style={{ ...styles.groupPickTag, ...(proposeGroupId === g.id ? styles.groupPickTagActive : {}) }}
-                        onClick={() => setProposeGroupId(g.id)}
+                <div style={styles.statusGrid}>
+                  {SLOT_KEYS.map(slot => {
+                    const s = selectedFriend.statusMap[slot]
+                    const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
+                    const pendingInv = findPendingInvitation(selectedFriend.id, slot)
+                    const invited = hasPendingInvitation(selectedFriend.id, slot)
+                    const isSelected = proposeSlot === slot
+                    const selectable = !isPastDate && !invited
+                    return (
+                      <div
+                        key={slot}
+                        style={{
+                          ...styles.statusCell,
+                          ...(isSelected ? styles.statusCellSelected : {}),
+                          cursor: selectable ? 'pointer' : 'default',
+                          opacity: invited && !isSelected ? 0.55 : 1,
+                        }}
+                        onClick={() => selectable && selectProposeSlot(selectedFriend, slot)}
                       >
-                        {g.name}
-                      </button>
-                    ))}
+                        <span style={styles.statusSlotName}>{SLOT_EMOJI[slot]} {slot}</span>
+                        {opt ? (
+                          <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
+                            {opt.emoji} {opt.label}
+                          </span>
+                        ) : (
+                          <span style={styles.statusDash}>미설정</span>
+                        )}
+                        {pendingInv ? (
+                          <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
+                            제안함 ✓ · 취소
+                          </button>
+                        ) : invited ? (
+                          <span style={styles.statusInvitedTag}>초대함 ✓</span>
+                        ) : null}
+                      </div>
+                    )
+                  })}
+                </div>
+
+                {proposeSlot && (
+                  <div style={styles.proposePanel}>
+                    {selectedFriend.groups.length > 1 && (
+                      <div style={styles.friendGroups}>
+                        {selectedFriend.groups.map(g => (
+                          <button
+                            key={g.id}
+                            style={{ ...styles.groupPickTag, ...(proposeGroupId === g.id ? styles.groupPickTagActive : {}) }}
+                            onClick={() => setProposeGroupId(g.id)}
+                          >
+                            {g.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <input
+                      style={styles.proposeInput}
+                      placeholder="메뉴나 한마디 (선택)"
+                      value={proposeMenu}
+                      onChange={e => setProposeMenu(e.target.value)}
+                      maxLength={40}
+                    />
+                    {proposeError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{proposeError}</p>}
                   </div>
                 )}
-                <input
-                  style={styles.proposeInput}
-                  placeholder="메뉴나 한마디 (선택)"
-                  value={proposeMenu}
-                  onChange={e => setProposeMenu(e.target.value)}
-                  maxLength={40}
-                />
-                {proposeError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{proposeError}</p>}
-              </div>
+
+                {!isPastDate && (
+                  <button
+                    style={{ ...styles.proposeMainBtn, opacity: proposeSlot && proposeGroupId && !proposeSending ? 1 : 0.4 }}
+                    onClick={sendPropose}
+                    disabled={!proposeSlot || !proposeGroupId || proposeSending}
+                  >
+                    {proposeSending ? '보내는 중...' : proposeSlot ? `🍚 ${proposeSlot} 같이 먹자` : '🍚 슬롯을 선택해주세요'}
+                  </button>
+                )}
+              </>
             )}
 
-            {!isPastDate && (
-              <button
-                style={{ ...styles.proposeMainBtn, opacity: proposeSlot && proposeGroupId && !proposeSending ? 1 : 0.4 }}
-                onClick={sendPropose}
-                disabled={!proposeSlot || !proposeGroupId || proposeSending}
-              >
-                {proposeSending ? '보내는 중...' : proposeSlot ? `🍚 ${proposeSlot} 같이 먹자` : '🍚 슬롯을 선택해주세요'}
-              </button>
+            {selectedFriend.requestId && (
+              <button style={styles.unfriendBtn} onClick={() => setConfirmUnfriend(true)}>친구 끊기</button>
             )}
             <button style={styles.sheetCloseBtn} onClick={() => setSelectedFriendId(null)}>닫기</button>
           </div>
         </div>
+      )}
+
+      {confirmUnfriend && selectedFriend && (
+        <div style={styles.overlay} onClick={() => !unfriending && setConfirmUnfriend(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>👋</div>
+            <div style={styles.dialogTitle}>{selectedFriend.nickname}님과{'\n'}친구를 끊을까요?</div>
+            <div style={styles.dialogBtns}>
+              <button
+                style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }}
+                onClick={handleUnfriend}
+                disabled={unfriending}
+              >
+                {unfriending ? '처리 중...' : '끊기'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConfirmUnfriend(false)} disabled={unfriending}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showFriendsModal && (
+        <FriendsSearchModal
+          myUserId={user.id}
+          initialTab={friendsModalTab}
+          onClose={() => { setShowFriendsModal(false); reloadRealFriends() }}
+        />
       )}
 
       <BottomNav />
@@ -366,6 +449,7 @@ const styles = {
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
   header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
@@ -389,6 +473,7 @@ const styles = {
   avatar: { width: 36, height: 36, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
   avatarImg: { width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+  friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
@@ -413,10 +498,19 @@ const styles = {
   statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
   statusCancelBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
   sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
+  unfriendBtn: { marginTop: 10, padding: '10px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', cursor: 'pointer' },
 
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
   proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },
   groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
   groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
   proposeInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
+
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+  dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
+  dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 }

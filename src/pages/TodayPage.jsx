@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
@@ -14,8 +14,18 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import SlotIcon from '../components/SlotIcon'
+import StatusIcon from '../components/StatusIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+
+// 상태값별 내 상태 카드 보조 문구
+const STATUS_SUBTEXT = {
+  open: (slot) => `오늘 ${slot} 같이 먹을 수 있어요`,
+  closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
+  skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
+}
+const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot} 상태를 정해보세요`
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
@@ -548,15 +558,16 @@ export default function TodayPage() {
 
     let timeStr = null, desc = null
     if (isInPot) {
-      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
+      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}${potCount ? ` · ${potCount}타임` : ''}`
       const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
-      desc = groupName ? `${groupName}에서 ${lockedLabel}` : earliestPot.title
+      desc = groupName ? `${groupName}에서 ${lockedLabel}` : `${earliestPot.title} 밥팟에 ${inPotExpired ? '참여 완료' : '참여 중'}`
     } else if (data?.time) {
-      timeStr = `${data.time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
+      timeStr = `${data.time.slice(0, 5)}${data.end_time ? ` ~ ${data.end_time.slice(0, 5)}` : ''}`
       desc = data?.menu ?? null
     }
 
     return {
+      key: displayOpt?.key ?? null,
       emoji: displayOpt?.emoji ?? SLOT_EMOJI[slot],
       label: displayOpt?.label ?? null,
       color: displayOpt?.color ?? '#ADA59B',
@@ -609,23 +620,23 @@ export default function TodayPage() {
                 )}
               </div>
               <div style={styles.mainStatusBody}>
-                <div style={styles.mainStatusIconWrap}>
-                  <span style={{ fontSize: 20 }}>{SLOT_EMOJI[selectedSlot]}</span>
+                <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
+                  {info.key ? <StatusIcon statusKey={info.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
                 </div>
                 <div style={styles.mainStatusTextCol}>
                   {info.label ? (
                     <>
                       <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                      {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](selectedSlot)}</span>}
                       {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
                       {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
                     </>
                   ) : (
                     <span style={styles.mainStatusEmpty}>
-                      {info.isPastDate ? '기록 없음' : '탭해서 상태를 설정해보세요'}
+                      {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
                     </span>
                   )}
                 </div>
-                {info.isInPot && <RiceBowlIcon size={30} style={{ flexShrink: 0, opacity: 0.8 }} />}
               </div>
             </div>
           )
@@ -654,7 +665,9 @@ export default function TodayPage() {
                     localStorage.setItem('lastSelectedSlot', slot)
                   }}
                 >
-                  <span style={styles.subSlotEmojiWrap}>{SLOT_EMOJI[slot]}</span>
+                  <span style={styles.subSlotEmojiWrap}>
+                    <SlotIcon slot={slot} size={28} muted={!isSelected} />
+                  </span>
                   <span style={styles.subSlotTextCol}>
                     <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
                     <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
@@ -955,7 +968,7 @@ export default function TodayPage() {
               }}
               onClick={() => setDraftData(prev => ({ ...prev, status: undefined }))}
             >
-              ○ 미설정
+              <StatusIcon statusKey={undefined} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> 미설정
             </button>
             {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
               <button
@@ -969,7 +982,7 @@ export default function TodayPage() {
                 }}
                 onClick={() => setDraftData(prev => ({ ...prev, status: o.key }))}
               >
-                {o.emoji} {o.label}
+                <StatusIcon statusKey={o.key} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {o.label}
               </button>
             ))}
           </div>
@@ -1323,6 +1336,35 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
 
+  // 그룹 초대하기 — 친구 선택(내 다른 그룹 멤버) / 초대 코드 / 링크
+  const [inviteTab, setInviteTab] = useState('friend')
+  const [inviteFriends, setInviteFriends] = useState([])
+  const [inviteFriendsLoading, setInviteFriendsLoading] = useState(false)
+  const [invitedGroupFriendIds, setInvitedGroupFriendIds] = useState(new Set())
+  const [invitingGroupFriendId, setInvitingGroupFriendId] = useState(null)
+
+  useEffect(() => {
+    if (!showInvite) return
+    setInviteFriendsLoading(true)
+    getMyFriends()
+      .then(list => {
+        const memberIds = new Set(members.map(m => m.id))
+        setInviteFriends(list.filter(f => !memberIds.has(f.id)))
+      })
+      .catch(e => console.error(e))
+      .finally(() => setInviteFriendsLoading(false))
+  }, [showInvite, group.id, members])
+
+  const handleInviteGroupFriend = async (friendId) => {
+    if (invitingGroupFriendId) return
+    setInvitingGroupFriendId(friendId)
+    try {
+      await inviteGroupFriend(group.id, myUserId, friendId)
+      setInvitedGroupFriendIds(prev => new Set(prev).add(friendId))
+    } catch (e) { console.error(e) }
+    finally { setInvitingGroupFriendId(null) }
+  }
+
   // 참여자 선택 → 같이 먹자 제안
   const [proposeTarget, setProposeTarget] = useState(null) // { id, nickname }
   const [proposeMenu, setProposeMenu] = useState('')
@@ -1382,7 +1424,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   }
 
   // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(showSettings || confirmRemoveMember || proposeTarget))
+  useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showInvite || confirmRemoveMember || proposeTarget))
 
   const handleToggleSharing = () => onToggleShare(!isShared)
 
@@ -1517,7 +1559,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               onClick={handleToggleSharing}
             >{isShared ? '공유중' : '비공유'}</button>
           )}
-          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
+          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
           <button style={{ ...styles.groupHeaderIconBtn, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
         </div>
       </div>
@@ -1533,123 +1575,49 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
       {/* 그룹 설정 바텀시트 */}
       {showSettings && (
-        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowInvite(false) }}>
+        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowInvite(false) }}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
 
-            {/* 타이틀 + 나가기 아이콘 */}
-            <div style={styles.sheetTitleRow}>
+            {/* 타이틀 */}
+            <div style={{ ...styles.sheetTitleRow, justifyContent: 'center' }}>
               <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
                 <div style={styles.sheetTitle}>{group.name}</div>
                 <div style={styles.sheetMaster}>
                   👑 {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
                 </div>
               </div>
-              <button style={styles.sheetLeaveIcon} onClick={() => setConfirmLeave(true)} title="그룹 나가기">🚪</button>
             </div>
 
             <div style={styles.sheetDivider} />
 
             {/* 1. 그룹명 변경 (방장만) */}
             {isMaster && (
-              <div>
-                <button style={styles.sheetRow} onClick={() => { setEditingName(v => !v); setEditingNickname(false); setShowInvite(false) }}>
-                  <span>✏️</span>
-                  <span style={styles.sheetRowLabel}>그룹명 변경</span>
-                  <span style={styles.sheetRowChevron}>{editingName ? '▴' : '▾'}</span>
-                </button>
-                {editingName && (
-                  <div style={styles.sheetInlineExpand}>
-                    <div style={styles.sheetInlineInputRow}>
-                      <input
-                        style={styles.sheetInlineInput}
-                        value={nameValue}
-                        onChange={e => setNameValue(e.target.value)}
-                        maxLength={20}
-                        autoFocus
-                        onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-                        placeholder="새 그룹명"
-                      />
-                      <button style={styles.sheetInlineSave} onClick={handleSaveName}>저장</button>
-                      <button style={styles.sheetInlineCancel} onClick={() => { setEditingName(false); setNameValue(group.name) }}>취소</button>
-                    </div>
-                  </div>
-                )}
-              </div>
+              <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
+                <span>✏️</span>
+                <span style={styles.sheetRowLabel}>그룹명 변경</span>
+                <span style={styles.sheetRowChevron}>›</span>
+              </button>
             )}
 
             {/* 2. 그룹내 닉네임 변경 */}
-            <div>
-              <button style={styles.sheetRow} onClick={() => { setEditingNickname(v => !v); setEditingName(false); setShowInvite(false); if (!editingNickname) handleEditNicknameOpen() }}>
-                <span>👤</span>
-                <span style={styles.sheetRowLabel}>
-                  그룹내 닉네임 변경
-                  {myMember?.group_nickname && (
-                    <span style={styles.sheetNicknameBadge}>{myMember.group_nickname}</span>
-                  )}
-                </span>
-                <span style={styles.sheetRowChevron}>{editingNickname ? '▴' : '▾'}</span>
-              </button>
-              {editingNickname && (
-                <div style={styles.sheetInlineExpand}>
-                  <div style={{ fontSize: 11, color: 'var(--color-text-muted)', marginBottom: 6 }}>
-                    기본 닉네임: {myMember?.default_nickname}
-                  </div>
-                  <div style={styles.sheetInlineInputRow}>
-                    <input
-                      style={styles.sheetInlineInput}
-                      value={nicknameValue}
-                      onChange={e => setNicknameValue(e.target.value)}
-                      placeholder={myMember?.default_nickname ?? '닉네임'}
-                      maxLength={10}
-                      autoFocus
-                      onKeyDown={e => e.key === 'Enter' && handleSaveNickname()}
-                    />
-                    <button style={styles.sheetInlineSave} onClick={handleSaveNickname}>저장</button>
-                    <button style={styles.sheetInlineCancel} onClick={() => setEditingNickname(false)}>취소</button>
-                  </div>
-                  {myMember?.group_nickname && (
-                    <button style={styles.sheetResetNicknameBtn} onClick={handleResetNickname}>
-                      기본 닉네임으로 되돌리기
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
+            <button style={styles.sheetRow} onClick={handleEditNicknameOpen}>
+              <span>👤</span>
+              <span style={styles.sheetRowLabel}>
+                그룹내 닉네임 변경
+                {myMember?.group_nickname && (
+                  <span style={styles.sheetNicknameBadge}>{myMember.group_nickname}</span>
+                )}
+              </span>
+              <span style={styles.sheetRowChevron}>›</span>
+            </button>
 
             {/* 3. 멤버 관리 (방장만) */}
             {isMaster && (
-              <div>
-                <button style={styles.sheetRow} onClick={() => { setShowMemberManage(v => !v); setEditingName(false); setEditingNickname(false); setShowInvite(false) }}>
-                  <span>👥</span>
-                  <span style={styles.sheetRowLabel}>멤버 관리</span>
-                  <span style={styles.sheetRowChevron}>{showMemberManage ? '▴' : '▾'}</span>
-                </button>
-                {showMemberManage && (
-                  <div style={styles.sheetInlineExpand}>
-                    {members.filter(m => m.id !== myUserId).length === 0 && (
-                      <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', padding: '4px 0' }}>다른 멤버가 없어요</div>
-                    )}
-                    {members.filter(m => m.id !== myUserId).map(member => (
-                      <div key={member.id} style={styles.sheetMemberRow}>
-                        {member.avatar_url ? (
-                          <img src={member.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
-                        ) : (
-                          <div style={{ ...styles.avatar, background: '#888' }}>
-                            {member.nickname[0]}
-                          </div>
-                        )}
-                        <span style={styles.sheetMemberName}>{member.nickname}</span>
-                        <button
-                          style={styles.sheetRemoveBtn}
-                          onClick={() => setConfirmRemoveMember({ id: member.id, nickname: member.nickname })}
-                        >
-                          내보내기
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <button style={styles.sheetRow} onClick={() => setShowMemberManage(true)}>
+                <span>👥</span>
+                <span style={styles.sheetRowLabel}>멤버 관리</span>
+                <span style={styles.sheetRowChevron}>›</span>
+              </button>
             )}
 
             {/* 4. 기본 밥팟 추가 */}
@@ -1657,39 +1625,174 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               <RiceBowlIcon size={20} /><span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
             </button>
 
-            {/* 4. 그룹 초대하기 */}
-            <div>
-              <button style={styles.sheetRow} onClick={() => { setShowInvite(v => !v); setEditingName(false); setEditingNickname(false) }}>
-                <span>📨</span>
-                <span style={styles.sheetRowLabel}>그룹 초대하기</span>
-                <span style={styles.sheetRowChevron}>{showInvite ? '▴' : '▾'}</span>
-              </button>
-              {showInvite && (
-                <div style={styles.sheetInlineExpand}>
-                  <div style={styles.sheetInviteLabel}>초대 코드</div>
-                  <div style={styles.sheetInviteCodeBox}>
-                    <span style={styles.sheetInviteCode}>{group.invite_code}</span>
-                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'code' ? 'var(--color-success)' : 'var(--color-primary)' }}
-                      onClick={() => copyText(group.invite_code, 'code')}>
-                      {copied === 'code' ? '✓' : '복사'}
-                    </button>
-                  </div>
-                  <div style={{ ...styles.sheetInviteLabel, marginTop: 6 }}>초대 링크</div>
-                  <div style={styles.sheetInviteCodeBox}>
-                    <span style={{ ...styles.sheetInviteCode, fontSize: 11 }}>{`${window.location.origin}/join/${group.invite_code}`}</span>
-                    <button style={{ ...styles.sheetInviteCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }}
-                      onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}>
-                      {copied === 'link' ? '✓' : '복사'}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+            {/* 5. 그룹 초대하기 */}
+            <button style={styles.sheetRow} onClick={() => { setShowInvite(true); setInviteTab('friend') }}>
+              <span>📨</span>
+              <span style={styles.sheetRowLabel}>그룹 초대하기</span>
+              <span style={styles.sheetRowChevron}>›</span>
+            </button>
+
+            {/* 6. 그룹 나가기 */}
+            <button style={{ ...styles.sheetRow, color: 'var(--color-danger)' }} onClick={() => setConfirmLeave(true)}>
+              <span>🚪</span>
+              <span style={styles.sheetRowLabel}>그룹 나가기</span>
+            </button>
 
             {/* 닫기 */}
-            <button style={styles.sheetClose} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowInvite(false) }}>
+            <button style={styles.sheetClose} onClick={() => setShowSettings(false)}>
               닫기
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* 그룹명 변경 팝업 */}
+      {editingName && (
+        <div style={styles.overlay} onClick={() => { setEditingName(false); setNameValue(group.name) }}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>✏️</div>
+            <div style={styles.dialogTitle}>그룹명 변경</div>
+            <input
+              style={styles.dialogInput}
+              value={nameValue}
+              onChange={e => setNameValue(e.target.value)}
+              maxLength={20}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleSaveName()}
+              placeholder="새 그룹명"
+            />
+            <div style={styles.dialogBtns}>
+              <button style={styles.dialogBtnPrimary} onClick={handleSaveName}>저장</button>
+              <button style={styles.dialogBtnCancel} onClick={() => { setEditingName(false); setNameValue(group.name) }}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 그룹내 닉네임 변경 팝업 */}
+      {editingNickname && (
+        <div style={styles.overlay} onClick={() => setEditingNickname(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>👤</div>
+            <div style={styles.dialogTitle}>그룹내 닉네임 변경</div>
+            <p style={styles.dialogDesc}>기본 닉네임: {myMember?.default_nickname}</p>
+            <input
+              style={styles.dialogInput}
+              value={nicknameValue}
+              onChange={e => setNicknameValue(e.target.value)}
+              placeholder={myMember?.default_nickname ?? '닉네임'}
+              maxLength={10}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleSaveNickname()}
+            />
+            {myMember?.group_nickname && (
+              <button style={styles.sheetResetNicknameBtn} onClick={handleResetNickname}>
+                기본 닉네임으로 되돌리기
+              </button>
+            )}
+            <div style={styles.dialogBtns}>
+              <button style={styles.dialogBtnPrimary} onClick={handleSaveNickname}>저장</button>
+              <button style={styles.dialogBtnCancel} onClick={() => setEditingNickname(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 멤버 관리 팝업 */}
+      {showMemberManage && (
+        <div style={styles.overlay} onClick={() => setShowMemberManage(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>👥</div>
+            <div style={styles.dialogTitle}>멤버 관리</div>
+            <div style={styles.memberManageList}>
+              {members.filter(m => m.id !== myUserId).length === 0 && (
+                <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', padding: '4px 0' }}>다른 멤버가 없어요</div>
+              )}
+              {members.filter(m => m.id !== myUserId).map(member => (
+                <div key={member.id} style={styles.sheetMemberRow}>
+                  {member.avatar_url ? (
+                    <img src={member.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  ) : (
+                    <div style={{ ...styles.avatar, background: '#888' }}>
+                      {member.nickname[0]}
+                    </div>
+                  )}
+                  <span style={styles.sheetMemberName}>{member.nickname}</span>
+                  <button
+                    style={styles.sheetRemoveBtn}
+                    onClick={() => setConfirmRemoveMember({ id: member.id, nickname: member.nickname })}
+                  >
+                    내보내기
+                  </button>
+                </div>
+              ))}
+            </div>
+            <button style={styles.dialogBtnCancel} onClick={() => setShowMemberManage(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* 그룹 초대하기 팝업 — "같이 먹자고 하기"와 동일한 구성(친구 선택/초대 코드/링크) */}
+      {showInvite && (
+        <div style={styles.overlay} onClick={() => setShowInvite(false)}>
+          <div style={styles.shareDialog} onClick={e => e.stopPropagation()}>
+            <div style={styles.dialogTitle}>📨 그룹 초대하기</div>
+
+            <div style={styles.shareTabs}>
+              <button style={{ ...styles.shareTabBtn, ...(inviteTab === 'friend' ? styles.shareTabBtnActive : {}) }} onClick={() => setInviteTab('friend')}>친구 선택</button>
+              <button style={{ ...styles.shareTabBtn, ...(inviteTab === 'code' ? styles.shareTabBtnActive : {}) }} onClick={() => setInviteTab('code')}>초대 코드</button>
+              <button style={{ ...styles.shareTabBtn, ...(inviteTab === 'link' ? styles.shareTabBtnActive : {}) }} onClick={() => setInviteTab('link')}>링크</button>
+            </div>
+
+            {inviteTab === 'friend' && (
+              <div style={styles.shareFriendList}>
+                {inviteFriendsLoading ? (
+                  <div style={styles.shareFriendEmpty}>불러오는 중...</div>
+                ) : inviteFriends.length === 0 ? (
+                  <div style={styles.shareFriendEmpty}>초대할 수 있는 친구가 없어요.{'\n'}(친구 관리에서 먼저 친구를 추가해보세요)</div>
+                ) : inviteFriends.map(f => {
+                  const invited = invitedGroupFriendIds.has(f.id)
+                  return (
+                    <div key={f.id} style={styles.shareFriendRow}>
+                      <span style={styles.shareFriendName}>{f.nickname}</span>
+                      <button
+                        style={{ ...styles.shareCopyBtn, background: invited ? 'var(--color-success)' : 'var(--color-primary)', opacity: invitingGroupFriendId === f.id ? 0.6 : 1 }}
+                        onClick={() => handleInviteGroupFriend(f.id)}
+                        disabled={invited || invitingGroupFriendId === f.id}
+                      >
+                        {invited ? '보냈어요 ✓' : invitingGroupFriendId === f.id ? '보내는 중...' : '초대'}
+                      </button>
+                    </div>
+                  )
+                })}
+              </div>
+            )}
+
+            {inviteTab === 'code' && (
+              <div style={styles.sharePanel}>
+                <div style={styles.shareLabel}>초대 코드</div>
+                <div style={styles.shareRow}>
+                  <span style={{ ...styles.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{group.invite_code}</span>
+                  <button style={{ ...styles.shareCopyBtn, background: copied === 'code' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(group.invite_code, 'code')}>
+                    {copied === 'code' ? '✓' : '복사'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {inviteTab === 'link' && (
+              <div style={styles.sharePanel}>
+                <div style={styles.shareLabel}>초대 링크</div>
+                <div style={styles.shareRow}>
+                  <span style={styles.shareText}>{`${window.location.origin}/join/${group.invite_code}`}</span>
+                  <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(`${window.location.origin}/join/${group.invite_code}`, 'link')}>
+                    {copied === 'link' ? '✓' : '복사'}
+                  </button>
+                </div>
+              </div>
+            )}
+
+            <button style={styles.dialogBtnCancel} onClick={() => setShowInvite(false)}>닫기</button>
           </div>
         </div>
       )}
@@ -1793,13 +1896,14 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 borderBottom: `1px solid #F5F0EB`,
               }}>
                 {member.avatar_url ? (
-                  <img src={member.avatar_url} alt="" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                  <img src={member.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--color-border)', boxSizing: 'border-box' }} />
                 ) : (
                   <div style={{
-                    width: 30, height: 30, borderRadius: '50%',
+                    width: 40, height: 40, borderRadius: '50%',
                     background: isMe ? 'var(--color-primary)' : 'var(--color-text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
+                    border: '2px solid var(--color-border)', boxSizing: 'border-box',
                   }}>{member.nickname[0]}</div>
                 )}
                 <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
@@ -1918,36 +2022,44 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
         </div>
       )}
 
-      {/* 1순위: 타임명  2순위: 시간 */}
-      <div style={potListStyles.row1}>
-        <span style={potListStyles.icon}>{pot.is_default ? <RiceBowlIcon size={26} /> : <span style={{ fontSize: 26 }}>🎉</span>}</span>
-        <span style={potListStyles.title}>{pot.title}</span>
-        {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
-      </div>
-
-      {/* 메뉴 · 메모 */}
-      {(pot.menu || pot.memo) && (
-        <div style={potListStyles.detailCol}>
-          {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
-          {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+      <div style={potListStyles.mainRow}>
+        {/* 밥공기 썸네일 — 밥팟 카드의 시작점 역할 */}
+        <div style={pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
+          {pot.is_default ? <SlotIcon slot="점심" size={57} /> : <span style={{ fontSize: 30 }}>🎉</span>}
         </div>
-      )}
 
-      {/* 3순위: 참여 인원 · 참여자 아바타 */}
-      <div style={potListStyles.row3}>
-        <div style={potListStyles.avatarStack}>
-          {visibleAvatars.map((m, i) => (
-            <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i }}>
-              {m.nickname[0]}
-              {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
-            </span>
-          ))}
-          {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
-          <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
+        <div style={potListStyles.contentCol}>
+          {/* 1순위: 타임명  2순위: 시간 */}
+          <div style={potListStyles.row1}>
+            <span style={potListStyles.title}>{pot.title}</span>
+            {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
+          </div>
+
+          {/* 메뉴 · 메모 */}
+          {(pot.menu || pot.memo) && (
+            <div style={potListStyles.detailCol}>
+              {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
+              {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+            </div>
+          )}
+
+          {/* 3순위: 참여 인원 · 참여자 아바타 */}
+          <div style={potListStyles.row3}>
+            <div style={potListStyles.avatarStack}>
+              {visibleAvatars.map((m, i) => (
+                <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i }}>
+                  {m.nickname[0]}
+                  {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
+                </span>
+              ))}
+              {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
+              <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
+            </div>
+            <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
+              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : isFull ? '마감' : '같이 먹기'}
+            </button>
+          </div>
         </div>
-        <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
-          {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : isFull ? '마감' : '같이 먹기'}
-        </button>
       </div>
     </div>
   )
@@ -1961,11 +2073,13 @@ const potListStyles = {
     display: 'flex', flexDirection: 'column', gap: 5,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
+  mainRow: { display: 'flex', alignItems: 'center', gap: 10 },
+  iconThumb: { width: 57, height: 57, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 },
   row1: { display: 'flex', alignItems: 'center', gap: 8 },
-  icon: { width: 26, height: 26, fontSize: 26, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' },
   title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   time: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0 },
-  detailCol: { display: 'flex', flexDirection: 'column', gap: 1, paddingLeft: 34 },
+  detailCol: { display: 'flex', flexDirection: 'column', gap: 1 },
   menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   memoText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
@@ -2047,21 +2161,22 @@ const styles = {
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '5px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-text)' },
-  mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 14px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
+  mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
-  mainStatusBody: { display: 'flex', alignItems: 'center', gap: 10 },
-  mainStatusIconWrap: { width: 40, height: 40, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 64 },
+  mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
+  mainStatusIconWrap: { width: 75, height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
-  mainStatusMeta: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },
+  mainStatusMeta: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
   subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minWidth: 0 },
-  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, height: 38, boxSizing: 'border-box', padding: '0 9px', border: '1.5px solid', borderRadius: 11, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
-  subSlotEmojiWrap: { width: 24, height: 24, borderRadius: '50%', background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, flexShrink: 0 },
+  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
+  subSlotEmojiWrap: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
   subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
@@ -2103,26 +2218,33 @@ const styles = {
   sheetTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   sheetMaster: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' },
-  sheetLeaveIcon: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 2px', opacity: 0.5, flexShrink: 0 },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '4px 0 8px' },
   sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
   sheetRowLabel: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
   sheetRowChevron: { fontSize: 10, color: 'var(--color-text-muted)' },
-  sheetInlineExpand: { padding: '0 var(--spacing-sm) 10px 36px', display: 'flex', flexDirection: 'column', gap: 6 },
-  sheetInlineInputRow: { display: 'flex', gap: 6, alignItems: 'center' },
-  sheetInlineInput: { flex: 1, padding: '9px 12px', border: '1.5px solid var(--color-primary)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', minWidth: 0 },
-  sheetInlineSave: { flexShrink: 0, padding: '9px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
-  sheetInlineCancel: { flexShrink: 0, padding: '9px 12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--color-text-muted)' },
   sheetClose: { width: '100%', padding: 12, marginTop: 8, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
   sheetMemberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' },
   sheetMemberName: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
   sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-danger)', cursor: 'pointer' },
   sheetResetNicknameBtn: { padding: '6px 0', background: 'none', border: 'none', fontSize: 'var(--font-size-sm)', color: '#9E9E9E', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' },
-  sheetInviteLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
-  sheetInviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-sm)', padding: '8px 10px' },
-  sheetInviteCode: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 700, letterSpacing: 1, wordBreak: 'break-all' },
-  sheetInviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  memberManageList: { width: '100%', display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' },
+
+  dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
+
+  shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
+  shareTabs: { display: 'flex', width: '100%', gap: 6 },
+  shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+  shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60, maxHeight: '40vh', overflowY: 'auto' },
+  shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  shareFriendEmpty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px 0', whiteSpace: 'pre-line', lineHeight: 1.5 },
+  sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
+  shareLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: '#fff', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
+  shareText: { flex: 1, fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
+  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
   invitePanel: { margin: '0 var(--spacing-md) var(--spacing-sm)', padding: 'var(--spacing-sm) var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column', gap: 6 },
   inviteLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   inviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', border: '1px solid var(--color-border)' },
