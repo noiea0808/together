@@ -1,18 +1,7 @@
 import { useState } from 'react'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
+import { openInChromeAndroid } from '../lib/inAppBrowser'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-
-// 카톡 등 인앱 브라우저는 "다른 브라우저로 열기" 메뉴가 아예 없거나 위치가 제각각이라
-// 안내 문구만으로는 못 찾는 경우가 많다. 안드로이드는 intent:// 스킴으로 크롬을 직접
-// 띄울 수 있어 그 방법을 우선 쓴다 — 이건 앱(카톡)의 메뉴 유무와 무관하게 안드로이드
-// OS 레벨에서 처리되는 링크라 인앱 브라우저에 그런 버튼이 없어도 동작한다.
-// iOS는 인앱 웹뷰에서 사파리를 강제로 띄우는 공식적인 방법이 없어서, 대신 링크를
-// 클립보드에 복사해주고 사용자가 직접 사파리를 열어 붙여넣도록 안내한다.
-function openInChromeAndroid() {
-  const { protocol, host, pathname, search, hash } = window.location
-  const rest = `${host}${pathname}${search}${hash}`
-  window.location.href = `intent://${rest}#Intent;scheme=${protocol.replace(':', '')};package=com.android.chrome;end`
-}
 
 // 홈 화면 추가 / 즐겨찾기 추가 CTA — MyAccountPage와 OnboardingPage에서 공용으로 사용
 // variant: 'default'(주 버튼 스타일) | 'subtle'(로그인 버튼들 옆에서 튀지 않는 보조 스타일)

@@ -19,6 +19,7 @@ import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import BadgeSync from './components/BadgeSync'
 import PendingInviteRedirect from './components/PendingInviteRedirect'
+import InAppBrowserGuard from './components/InAppBrowserGuard'
 
 function ConsumerRoutes() {
   const { user } = useUser()
@@ -75,6 +76,7 @@ function ConsumerApp() {
 export default function App() {
   return (
     <BrowserRouter>
+      <InAppBrowserGuard />
       <Routes>
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/*" element={<ConsumerApp />} />
