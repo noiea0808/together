@@ -9,6 +9,8 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
 import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import LinkPreviewCard from '../components/LinkPreviewCard'
+import AutoTextarea from '../components/AutoTextarea'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -488,14 +490,14 @@ export default function PotDetailPage() {
             {/* 2x2 info grid — 각 항목을 탭하면 그 항목만 따로 수정할 수 있어요 */}
             <div style={S.infoGrid}>
               {[
-                { key: 'time', label: '시간', value: timeStr },
-                { key: 'menu', label: '메뉴', value: pot.menu || '미정' },
-                { key: 'max_people', label: '최대 인원', value: `${pot.max_people}명` },
-                { key: 'memo', label: '메모', value: pot.memo || '없음' },
-              ].map(({ key, label, value }) => (
+                { key: 'time', label: '시간', value: timeStr, full: false },
+                { key: 'max_people', label: '최대 인원', value: `${pot.max_people}명`, full: false },
+                { key: 'menu', label: '메뉴', value: pot.menu || '미정', full: true },
+                { key: 'memo', label: '메모', value: pot.memo || '없음', full: true },
+              ].map(({ key, label, value, full }) => (
                 <div
                   key={key}
-                  style={{ ...S.infoPanel, ...(canEdit ? S.infoPanelEditable : {}) }}
+                  style={{ ...S.infoPanel, ...(full ? S.infoPanelFull : {}), ...(canEdit ? S.infoPanelEditable : {}) }}
                   onClick={canEdit ? () => initDraft(key) : undefined}
                 >
                   {canEdit && (
@@ -506,8 +508,11 @@ export default function PotDetailPage() {
                       </svg>
                     </span>
                   )}
-                  <div style={S.infoPanelLabel}>{label}</div>
-                  <div style={S.infoPanelValue}>{value}</div>
+                  <div style={S.infoPanelRow}>
+                    <span style={S.infoPanelLabel}>{label}</span>
+                    <span style={S.infoPanelValue}>{value}</span>
+                  </div>
+                  {key === 'memo' && pot.memo && <LinkPreviewCard text={pot.memo} />}
                 </div>
               ))}
             </div>
@@ -601,12 +606,12 @@ export default function PotDetailPage() {
                     maxLength={20}
                   />
                 </div>
-                <input
+                <AutoTextarea
                   style={{ ...S.editSectionInput, marginTop: 6 }}
                   placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
                   value={draft.memo}
                   onChange={e => setD('memo', e.target.value)}
-                  maxLength={50}
+                  maxLength={200}
                 />
               </div>
 
@@ -711,12 +716,12 @@ export default function PotDetailPage() {
               )}
 
               {draftScope === 'memo' && (
-                <input
-                  style={S.editSectionInput}
+                <AutoTextarea
+                  style={{ ...S.editSectionInput, width: '100%' }}
                   placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
                   value={draft.memo}
                   onChange={e => setD('memo', e.target.value)}
-                  maxLength={50}
+                  maxLength={200}
                   autoFocus
                 />
               )}
@@ -1043,14 +1048,16 @@ const S = {
   heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
   infoPanel: { position: 'relative', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', padding: '10px 12px' },
-  infoPanelEditable: { cursor: 'pointer' },
+  infoPanelFull: { gridColumn: '1 / -1' },
+  infoPanelEditable: { cursor: 'pointer', paddingRight: 26 },
   infoPanelEditBadge: {
     position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%',
     background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', marginBottom: 3, fontWeight: 600 },
-  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  infoPanelRow: { display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', overflow: 'hidden' },
+  infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, flexShrink: 0 },
+  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
 
   /* Edit sections (matches '밥팟 열기' style) */
   editSections: { display: 'flex', flexDirection: 'column', gap: 6 },

@@ -17,6 +17,7 @@ import RiceBowlIcon from '../components/RiceBowlIcon'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
+import { extractFirstUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 // 상태값별 내 상태 카드 보조 문구
@@ -687,94 +688,97 @@ export default function TodayPage() {
         </div>
       </div>
 
-      {/* 그룹별/밥팟별 보기 전환 — 하나의 세그먼트 컨트롤 */}
-      {groups.length > 0 && (
-        <div style={styles.viewModeTabs}>
-          <button
-            style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
-            onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
-          >그룹별 보기</button>
-          <button
-            style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
-            onClick={() => { setViewMode('pot'); localStorage.setItem('lastViewMode', 'pot') }}
-          >밥팟별 보기</button>
-        </div>
-      )}
-
-      {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 우측에 작게 */}
-      <div style={styles.sectionTitleRow}>
-        <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : '오늘 열린 밥팟'}</div>
-        <div style={{ display: 'flex', gap: 6 }}>
-          {viewMode === 'group' && groups.length > 1 && !editingOrder && (
-            <button style={styles.collapseAllBtn} onClick={startEditingOrder}>순서 편집</button>
-          )}
-          {viewMode === 'group' && !editingOrder && (
-            <button style={styles.collapseAllBtn} onClick={() => { setAllCollapsed(v => !v); setCollapseKey(k => k + 1) }}>
-              {allCollapsed ? '모두 펼치기' : '모두 접기'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {groups.length === 0 && (
-        <div style={styles.emptyGroup}>
-          <div style={{ fontSize: 36 }}>👥</div>
-          <div style={{ fontWeight: 700 }}>아직 그룹이 없어요</div>
-          <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
-            그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
-          </p>
-          <button style={styles.emptyBtn} onClick={() => setShowGroupSetup(true)}>
-            그룹 만들기 / 참여하기
-          </button>
-        </div>
-      )}
-      <div key={viewMode} className="view-mode-content" style={styles.viewModeContent}>
-        {viewMode === 'group' ? (() => {
-          // 내가 이 슬롯의 어느 그룹 팟에든 참여 중인지 전체 기준으로 계산
-          const amIInAnyPot = Object.values(potsMap).flat()
-            .some(p => p.slot === selectedSlot && p.pot_members?.some(pm => pm.user_id === user.id))
-
-          return groups.map(group => {
-            const members = membersMap[group.id] ?? []
-            const statuses = statusesMap[group.id] ?? []
-            const pots = sortPots((potsMap[group.id] ?? []).filter(p => p.slot === selectedSlot))
-            return (
-              <GroupSlotCard
-                key={group.id}
-                group={group}
-                slot={selectedSlot}
-                members={members}
-                statuses={statuses}
-                pots={pots}
-                myUserId={user.id}
-                mySlotData={mySlots[selectedSlot]}
-                isShared={shareSettingsMap[group.id]?.[selectedSlot] ?? true}
-                onToggleShare={(isShared) => handleToggleShare(group.id, selectedSlot, isShared)}
-                amIInAnyPot={amIInAnyPot}
-                allCollapsed={allCollapsed}
-                collapseKey={collapseKey}
-                dateStr={dateStr}
-                onNavigate={navigate}
-                onRefresh={() => loadData({ force: true })}
-                onCreatePot={handleCreatePot}
-              />
-            )
-          })
-        })() : (
-          <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} />
+      {/* 그룹별 보기 영역 전체 — 흰색 풀블리드 블록으로 상단 '내 상태' 영역과 경계를 분리 */}
+      <div style={styles.lowerSection}>
+        {/* 그룹별/밥팟별 보기 전환 — 하나의 세그먼트 컨트롤 */}
+        {groups.length > 0 && (
+          <div style={styles.viewModeTabs}>
+            <button
+              style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
+              onClick={() => { setViewMode('pot'); localStorage.setItem('lastViewMode', 'pot') }}
+            >밥팟별 보기</button>
+            <button
+              style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
+              onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
+            >그룹별 보기</button>
+          </div>
         )}
-      </div>
 
-      {/* 주요 CTA — 밥팟별 보기에서만 전역 CTA를 강하게 노출(그룹별 보기는 그룹마다 자체 생성 버튼이 있음) */}
-      {groups.length > 0 && viewMode === 'pot' && (
-        <button style={styles.primaryCreateBtn} onClick={() => handleCreatePot(groups[0].id, selectedSlot)}>
-          + 밥팟 만들기
-        </button>
-      )}
-      <div style={styles.secondaryLinkRow}>
-        <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
-        <span style={styles.secondaryLinkDivider}>·</span>
-        <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
+        {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 우측에 작게 */}
+        <div style={styles.sectionTitleRow}>
+          <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : '오늘 열린 밥팟'}</div>
+          <div style={{ display: 'flex', gap: 6 }}>
+            {viewMode === 'group' && groups.length > 1 && !editingOrder && (
+              <button style={styles.collapseAllBtn} onClick={startEditingOrder}>순서 편집</button>
+            )}
+            {viewMode === 'group' && !editingOrder && (
+              <button style={styles.collapseAllBtn} onClick={() => { setAllCollapsed(v => !v); setCollapseKey(k => k + 1) }}>
+                {allCollapsed ? '모두 펼치기' : '모두 접기'}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {groups.length === 0 && (
+          <div style={styles.emptyGroup}>
+            <div style={{ fontSize: 36 }}>👥</div>
+            <div style={{ fontWeight: 700 }}>아직 그룹이 없어요</div>
+            <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
+              그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
+            </p>
+            <button style={styles.emptyBtn} onClick={() => setShowGroupSetup(true)}>
+              그룹 만들기 / 참여하기
+            </button>
+          </div>
+        )}
+        <div key={viewMode} className="view-mode-content" style={styles.viewModeContent}>
+          {viewMode === 'group' ? (() => {
+            // 내가 이 슬롯의 어느 그룹 팟에든 참여 중인지 전체 기준으로 계산
+            const amIInAnyPot = Object.values(potsMap).flat()
+              .some(p => p.slot === selectedSlot && p.pot_members?.some(pm => pm.user_id === user.id))
+
+            return groups.map(group => {
+              const members = membersMap[group.id] ?? []
+              const statuses = statusesMap[group.id] ?? []
+              const pots = sortPots((potsMap[group.id] ?? []).filter(p => p.slot === selectedSlot))
+              return (
+                <GroupSlotCard
+                  key={group.id}
+                  group={group}
+                  slot={selectedSlot}
+                  members={members}
+                  statuses={statuses}
+                  pots={pots}
+                  myUserId={user.id}
+                  mySlotData={mySlots[selectedSlot]}
+                  isShared={shareSettingsMap[group.id]?.[selectedSlot] ?? true}
+                  onToggleShare={(isShared) => handleToggleShare(group.id, selectedSlot, isShared)}
+                  amIInAnyPot={amIInAnyPot}
+                  allCollapsed={allCollapsed}
+                  collapseKey={collapseKey}
+                  dateStr={dateStr}
+                  onNavigate={navigate}
+                  onRefresh={() => loadData({ force: true })}
+                  onCreatePot={handleCreatePot}
+                />
+              )
+            })
+          })() : (
+            <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} />
+          )}
+        </div>
+
+        {/* 주요 CTA — 밥팟별 보기에서만 전역 CTA를 강하게 노출(그룹별 보기는 그룹마다 자체 생성 버튼이 있음) */}
+        {groups.length > 0 && viewMode === 'pot' && (
+          <button style={styles.primaryCreateBtn} onClick={() => handleCreatePot(groups[0].id, selectedSlot)}>
+            + 밥팟 만들기
+          </button>
+        )}
+        <div style={styles.secondaryLinkRow}>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
+          <span style={styles.secondaryLinkDivider}>·</span>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
+        </div>
       </div>
     </div>
     <BottomNav />
@@ -1987,7 +1991,7 @@ function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+    <div style={potListStyles.listContainer}>
       {allPots.map(({ pot, groupName }) => (
         <MealPodCard key={pot.id} pot={pot} groupName={groupName} showMeta myUserId={myUserId} onNavigate={onNavigate} />
       ))}
@@ -2039,7 +2043,7 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
           {(pot.menu || pot.memo) && (
             <div style={potListStyles.detailCol}>
               {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
-              {pot.memo && <span style={potListStyles.memoText}>💬 {pot.memo}</span>}
+              {pot.memo && <MemoText memo={pot.memo} />}
             </div>
           )}
 
@@ -2065,7 +2069,29 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
   )
 }
 
+const LINK_PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
+
+// 메모에 링크가 섞여 있으면 주소 대신 링크 제목으로 바꿔서 한 줄로 보여준다.
+function MemoText({ memo }) {
+  const url = extractFirstUrl(memo)
+  const [title, setTitle] = useState(null)
+
+  useEffect(() => {
+    if (!url) return
+    const cached = getCache(`linkpreview:${url}`, LINK_PREVIEW_MAX_AGE_MS)
+    if (cached?.data?.title) { setTitle(cached.data.title); return }
+    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+      .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
+      .then(data => { setCache(`linkpreview:${url}`, data); if (data.title) setTitle(data.title) })
+      .catch(() => {})
+  }, [url])
+
+  const display = title ? memo.replace(url, title) : memo
+  return <span style={potListStyles.memoText}>💬 {display}</span>
+}
+
 const potListStyles = {
+  listContainer: { display: 'flex', flexDirection: 'column', gap: 12, padding: '12px 12px 10px', background: 'var(--color-surface-2)', borderRadius: 16 },
   card: {
     background: '#fff',
     border: '1px solid rgba(0,0,0,0.05)', borderRadius: 14,
@@ -2199,6 +2225,7 @@ const styles = {
   groupHeaderIconBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#F5F0EB', border: '1px solid #E8E3DE', borderRadius: '50%', fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
   groupHeaderPillBtn: { height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '0 10px', cursor: 'pointer', boxSizing: 'border-box', whiteSpace: 'nowrap' },
   collapseAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
+  lowerSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', margin: '0 calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', boxShadow: '0 -1px 6px rgba(0,0,0,0.03)' },
   viewModeTabs: { display: 'flex', gap: 6 },
   viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s, border-color 0.15s' },
   viewModeTabActive: { color: 'var(--color-primary)', background: 'rgba(255,107,53,0.06)', border: '1px solid var(--color-primary)', fontWeight: 700 },

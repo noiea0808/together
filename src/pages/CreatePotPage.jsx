@@ -9,6 +9,7 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_KEYS, SLOT_EMOJI, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import AutoTextarea from '../components/AutoTextarea'
 
 const MIN_PEOPLE = 2
 const MAX_PEOPLE = 8
@@ -287,12 +288,12 @@ export default function CreatePotPage() {
                 maxLength={20}
               />
             </div>
-            <input
+            <AutoTextarea
               style={{ ...S.sectionInput, marginTop: 6 }}
               placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
               value={form.memo}
               onChange={e => set('memo', e.target.value)}
-              maxLength={50}
+              maxLength={200}
             />
           </div>
 
