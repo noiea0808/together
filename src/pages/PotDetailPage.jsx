@@ -741,7 +741,7 @@ export default function PotDetailPage() {
           <p style={S.creatorLine}>👑 {pot.users.nickname} 방장</p>
         )}
         {pot.is_default && pot.modifier?.nickname && (
-          <p style={S.creatorLine}>✎ {pot.modifier.nickname} 마지막 수정</p>
+          <p style={{ ...S.creatorLine, fontSize: 'var(--font-size-2xs)' }}>✎ {pot.modifier.nickname} 마지막 수정</p>
         )}
 
         {/* Members card */}

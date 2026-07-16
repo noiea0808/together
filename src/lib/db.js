@@ -604,7 +604,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('group_share_settings')
       .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
-      .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
+      .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
       .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
@@ -708,7 +708,7 @@ export async function getPotByInviteCode(code) {
 export async function getGroupPots(groupId, date) {
   const { data, error } = await supabase
     .from('meal_pots')
-    .select('*, pot_members(user_id, users(nickname, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)')
+    .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)')
     .eq('group_id', groupId)
     .eq('date', date)
   if (error) throw error
