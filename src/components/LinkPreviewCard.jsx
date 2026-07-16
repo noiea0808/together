@@ -18,6 +18,7 @@ export default function LinkPreviewCard({ text }) {
   const url = extractFirstUrl(text)
   const [preview, setPreview] = useState(null)
   const [failed, setFailed] = useState(false)
+  const [imgFailed, setImgFailed] = useState(false)
 
   useEffect(() => {
     if (!url) return
@@ -30,6 +31,8 @@ export default function LinkPreviewCard({ text }) {
       .catch(() => setFailed(true))
   }, [url])
 
+  useEffect(() => { setImgFailed(false) }, [preview?.image])
+
   if (!url || failed) return null
 
   return (
@@ -40,8 +43,16 @@ export default function LinkPreviewCard({ text }) {
       style={styles.card}
       onClick={e => e.stopPropagation()}
     >
-      {preview?.image
-        ? <img src={preview.image} alt="" style={styles.thumb} onError={e => { e.currentTarget.style.display = 'none' }} />
+      {preview?.image && !imgFailed
+        ? (
+          <img
+            src={preview.image}
+            alt=""
+            style={styles.thumb}
+            referrerPolicy="no-referrer"
+            onError={() => setImgFailed(true)}
+          />
+        )
         : <div style={styles.thumbFallback}>🔗</div>}
       <div style={styles.body}>
         <div style={styles.title}>{preview?.title || url}</div>
