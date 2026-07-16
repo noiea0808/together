@@ -10,6 +10,7 @@ import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/butt
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import LinkPreviewCard from '../components/LinkPreviewCard'
+import AutoTextarea from '../components/AutoTextarea'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -605,12 +606,12 @@ export default function PotDetailPage() {
                     maxLength={20}
                   />
                 </div>
-                <input
+                <AutoTextarea
                   style={{ ...S.editSectionInput, marginTop: 6 }}
                   placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
                   value={draft.memo}
                   onChange={e => setD('memo', e.target.value)}
-                  maxLength={50}
+                  maxLength={200}
                 />
               </div>
 
@@ -715,12 +716,12 @@ export default function PotDetailPage() {
               )}
 
               {draftScope === 'memo' && (
-                <input
-                  style={S.editSectionInput}
+                <AutoTextarea
+                  style={{ ...S.editSectionInput, width: '100%' }}
                   placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
                   value={draft.memo}
                   onChange={e => setD('memo', e.target.value)}
-                  maxLength={50}
+                  maxLength={200}
                   autoFocus
                 />
               )}

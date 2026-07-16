@@ -61,7 +61,6 @@ export default function LinkPreviewCard({ text }) {
         : <div style={styles.thumbFallback}>🔗</div>}
       <div style={styles.body}>
         <div style={styles.title}>{preview?.title || url}</div>
-        {preview?.description && <div style={styles.desc}>{preview.description}</div>}
         <div style={styles.host}>{preview?.siteName || hostnameOf(url)}</div>
       </div>
     </a>
@@ -80,9 +79,8 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
   },
   body: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center' },
-  title: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  desc: {
-    fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', overflow: 'hidden',
+  title: {
+    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden',
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4,
   },
   host: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', opacity: 0.8 },
