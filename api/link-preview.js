@@ -1,5 +1,7 @@
 // 메모에 붙여넣은 링크의 미리보기(썸네일/제목/설명)를 가져오는 서버리스 함수.
 // 브라우저에서 바로 외부 사이트를 fetch하면 대부분 CORS로 막히기 때문에 서버를 거친다.
+import { parseSafeUrl } from './_url-guard.js'
+
 const FETCH_TIMEOUT_MS = 6000
 const READ_BUDGET_MS = 8000 // </head> 검색용 스트림 읽기 전체에 허용하는 시간
 const MAX_HTML_BYTES = 3_000_000 // 유튜브처럼 <head> 안에 인라인 스크립트가 커서 og 태그가
@@ -17,20 +19,6 @@ function resolveFetchUrl(target) {
     }
   }
   return target
-}
-
-function isBlockedHost(hostname) {
-  const h = hostname.toLowerCase()
-  if (h === 'localhost' || h.endsWith('.localhost') || h === '0.0.0.0' || h === '::1') return true
-  const ipv4 = h.match(/^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/)
-  if (ipv4) {
-    const [a, b] = ipv4.slice(1, 3).map(Number)
-    if (a === 10 || a === 127 || a === 0) return true
-    if (a === 169 && b === 254) return true
-    if (a === 172 && b >= 16 && b <= 31) return true
-    if (a === 192 && b === 168) return true
-  }
-  return false
 }
 
 function extractMeta(html) {
@@ -58,25 +46,9 @@ function extractMeta(html) {
 }
 
 export default async function handler(req, res) {
-  const rawUrl = req.query?.url
-  if (!rawUrl || typeof rawUrl !== 'string') {
-    res.status(400).json({ error: 'url required' })
-    return
-  }
-
-  let target
-  try {
-    target = new URL(rawUrl)
-  } catch {
-    res.status(400).json({ error: 'invalid url' })
-    return
-  }
-  if (target.protocol !== 'http:' && target.protocol !== 'https:') {
-    res.status(400).json({ error: 'unsupported protocol' })
-    return
-  }
-  if (isBlockedHost(target.hostname)) {
-    res.status(400).json({ error: 'blocked host' })
+  const { url: target, error } = parseSafeUrl(req.query?.url)
+  if (error) {
+    res.status(400).json({ error })
     return
   }
 

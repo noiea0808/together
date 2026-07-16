@@ -14,6 +14,12 @@ function hostnameOf(url) {
   try { return new URL(url).hostname } catch { return url }
 }
 
+// 썸네일은 우리 이미지 프록시를 거쳐 불러온다. 네이버 등 일부 CDN이 Referer로
+// 핫링크를 차단해 <img>로 직접 부르면 배포 도메인에서 403이 나기 때문이다.
+function proxied(imageUrl) {
+  return `/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
+}
+
 export default function LinkPreviewCard({ text }) {
   const url = extractFirstUrl(text)
   const [preview, setPreview] = useState(null)
@@ -46,10 +52,9 @@ export default function LinkPreviewCard({ text }) {
       {preview?.image && !imgFailed
         ? (
           <img
-            src={preview.image}
+            src={proxied(preview.image)}
             alt=""
             style={styles.thumb}
-            referrerPolicy="no-referrer"
             onError={() => setImgFailed(true)}
           />
         )
