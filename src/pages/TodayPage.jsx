@@ -2019,30 +2019,31 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
       onClick={() => onNavigate(`/pot/${pot.id}`)}
     >
       {/* 끼니 · 그룹명 — 밥팟별 보기에서만 표시 (그룹별 보기는 이미 슬롯/그룹 문맥 안이라 생략) */}
+      {/* 슬롯만 색 배지로 강조하고 그룹명은 텍스트로 낮춰, 두 정보가 같은 무게로 경쟁하지 않게 함 */}
       {showMeta && (
         <div style={potListStyles.metaRow}>
-          <span style={potListStyles.metaBadge}>{SLOT_EMOJI[pot.slot]} {pot.slot}</span>
-          <span style={potListStyles.metaBadge}>👥 {groupName}</span>
+          <span style={potListStyles.slotBadge}>{SLOT_EMOJI[pot.slot]} {pot.slot}</span>
+          <span style={potListStyles.groupNameText}>{groupName}</span>
         </div>
       )}
 
       <div style={potListStyles.mainRow}>
         {/* 밥공기 썸네일 — 밥팟 카드의 시작점 역할 */}
         <div style={pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
-          {pot.is_default ? <SlotIcon slot="점심" size={57} /> : <span style={{ fontSize: 30 }}>🎉</span>}
+          {pot.is_default ? <SlotIcon slot="점심" size={52} /> : <span style={{ fontSize: 26 }}>🎉</span>}
         </div>
 
         <div style={potListStyles.contentCol}>
-          {/* 1순위: 타임명  2순위: 시간 */}
+          {/* 1순위: 타임명  2순위: 시간 — 시간은 톤을 낮춰 타이틀과의 위계를 분명히 함 */}
           <div style={potListStyles.row1}>
             <span style={potListStyles.title}>{pot.title}</span>
-            {timeStr && <span style={potListStyles.time}>🕒 {timeStr}{endStr}</span>}
+            {timeStr && <span style={potListStyles.time}>{timeStr}{endStr}</span>}
           </div>
 
-          {/* 메뉴 · 메모 */}
+          {/* 메뉴 · 메모 — 아이콘 대신 굵기/색으로만 구분 */}
           {(pot.menu || pot.memo) && (
             <div style={potListStyles.detailCol}>
-              {pot.menu && <span style={potListStyles.menuText}>🍽 {pot.menu}</span>}
+              {pot.menu && <span style={potListStyles.menuText}>{pot.menu}</span>}
               {pot.memo && <MemoText memo={pot.memo} />}
             </div>
           )}
@@ -2050,13 +2051,15 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
           {/* 3순위: 참여 인원 · 참여자 아바타 */}
           <div style={potListStyles.row3}>
             <div style={potListStyles.avatarStack}>
-              {visibleAvatars.map((m, i) => (
-                <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i }}>
-                  {m.nickname[0]}
-                  {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
-                </span>
-              ))}
-              {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
+              <div style={potListStyles.avatarGroup}>
+                {visibleAvatars.map((m, i) => (
+                  <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i }}>
+                    {m.nickname[0]}
+                    {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
+                  </span>
+                ))}
+                {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -8 }}>+{extraCount}</span>}
+              </div>
               <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
             </div>
             <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : isFull ? potListStyles.joinBtnFull : {}) }}>
@@ -2087,7 +2090,11 @@ function MemoText({ memo }) {
   }, [url])
 
   const display = title ? memo.replace(url, title) : memo
-  return <span style={potListStyles.memoText}>💬 {display}</span>
+  return (
+    <span style={url ? potListStyles.memoTextLink : potListStyles.memoText}>
+      {url ? '🔗 ' : ''}{display}
+    </span>
+  )
 }
 
 const potListStyles = {
@@ -2095,29 +2102,31 @@ const potListStyles = {
   card: {
     background: '#fff',
     border: '1px solid rgba(0,0,0,0.05)', borderRadius: 14,
-    padding: '11px 13px', cursor: 'pointer',
-    display: 'flex', flexDirection: 'column', gap: 5,
+    padding: '12px 14px', cursor: 'pointer',
+    display: 'flex', flexDirection: 'column', gap: 7,
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   mainRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  iconThumb: { width: 57, height: 57, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
-  contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 5 },
-  row1: { display: 'flex', alignItems: 'center', gap: 8 },
+  iconThumb: { width: 52, height: 52, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
+  row1: { display: 'flex', alignItems: 'baseline', gap: 6 },
   title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  time: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', flexShrink: 0 },
+  time: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
   detailCol: { display: 'flex', flexDirection: 'column', gap: 1 },
-  menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  memoText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 2 },
-  avatarStack: { display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 },
+  menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  memoText: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  memoTextLink: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-primary-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 3 },
+  avatarStack: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
+  avatarGroup: { display: 'flex', alignItems: 'center', flexShrink: 0 },
   avatarDot: {
-    width: 20, height: 20, borderRadius: '50%',
-    background: '#A89E93', color: '#fff', fontSize: 9, fontWeight: 800,
+    width: 24, height: 24, borderRadius: '50%',
+    background: '#A89E93', color: '#fff', fontSize: 10, fontWeight: 800,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '1.5px solid #fff', flexShrink: 0, position: 'relative',
   },
   guestMark: { position: 'absolute', bottom: -2, right: -2, fontSize: 7, color: '#fff', background: '#FF9800', borderRadius: '50%', width: 9, height: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 },
-  count: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginLeft: 8, flexShrink: 0 },
+  count: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
   joinBtn: {
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff',
     background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)',
@@ -2126,11 +2135,12 @@ const potListStyles = {
   joinBtnFull: { background: 'var(--color-surface-2)', color: 'var(--color-text-muted)' },
   joinBtnJoined: { background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)' },
   metaRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 },
-  metaBadge: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
-    background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)',
+  slotBadge: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-dark)',
+    background: 'rgba(255,107,53,0.08)', borderRadius: 'var(--radius-full)',
     padding: '2px 8px', whiteSpace: 'nowrap',
   },
+  groupNameText: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
 }
 
 const styles = {
@@ -2147,7 +2157,7 @@ const styles = {
   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
-  myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6 },
+  myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
   resetLinkRow: { display: 'flex', justifyContent: 'flex-end' },
   resetAllBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },

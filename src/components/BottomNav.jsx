@@ -116,5 +116,5 @@ const styles = {
     background: 'none', border: 'none', cursor: 'pointer',
     WebkitTapHighlightColor: 'transparent',
   },
-  avatarIcon: { width: 34, height: 34, borderRadius: '50%', objectFit: 'cover', boxSizing: 'border-box' },
+  avatarIcon: { width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', boxSizing: 'border-box' },
 }
