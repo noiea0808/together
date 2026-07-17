@@ -105,6 +105,10 @@ export default function BottomNav() {
                 alt=""
                 style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-text)' : '2px solid transparent' }}
               />
+            ) : path === '/account' && user?.nickname ? (
+              <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-text)' : '2px solid var(--color-border)' }}>
+                {user.nickname[0]}
+              </div>
             ) : (
               <Icon active={active} />
             )}
@@ -132,4 +136,10 @@ const styles = {
     WebkitTapHighlightColor: 'transparent',
   },
   avatarIcon: { width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', boxSizing: 'border-box' },
+  avatarInitial: {
+    width: 40, height: 40, borderRadius: '50%', boxSizing: 'border-box',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'var(--color-primary)', color: 'white',
+    fontSize: 'var(--font-size-sm)', fontWeight: 800,
+  },
 }

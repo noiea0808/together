@@ -47,49 +47,54 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
   const socialRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
 
+  const footer = (
+    <div style={S.footerRow}>
+      <div style={S.avatarGroup}>
+        {participants.slice(0, 5).map((p, i) => (
+          <div key={p.id} style={{ ...S.avatarDot, marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i, ...(p.avatar_url ? S.avatarDotImg : {}) }}>
+            {p.avatar_url ? <img src={p.avatar_url} alt="" style={S.avatarImgInner} /> : p.nickname[0]}
+          </div>
+        ))}
+        {participants.length > 5 && <span style={S.avatarOverflow}>+{participants.length - 5}</span>}
+      </div>
+      <div style={S.footerRight}>
+        {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
+        {canPost && (
+          <div style={{ position: 'relative' }}>
+            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)}>⋯</button>
+            {menuOpen && (
+              <>
+                <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
+                <div style={S.menuDropdown}>
+                  <button
+                    style={S.menuItem}
+                    onClick={() => { setMenuOpen(false); socialRef.current?.openPhotoPicker() }}
+                  >
+                    📷 사진 등록
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+
   return (
     <div style={S.potCard}>
-      <div style={S.potHeader}>
-        <div style={S.potHeaderText} onClick={() => onOpenDetail(pot.id)}>
-          <div style={S.groupTitleRow}>
-            <span style={S.groupLabel}>{groupName}</span>
-            <span style={S.potTitle}>{pot.title}</span>
-          </div>
-          <div style={S.potMeta}>
-            {dateLabel} · {pot.slot}{timeStr !== '미정' ? ` · ${timeStr}` : ''}
-            {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
-          </div>
+      <div style={S.potHeaderText} onClick={() => onOpenDetail(pot.id)}>
+        <div style={S.groupTitleRow}>
+          <span style={S.groupLabel}>{groupName}</span>
+          <span style={S.potTitle}>{pot.title}</span>
+          {pot.moment_scope === 'participants' && <span style={S.scopeChip}>참여자만</span>}
         </div>
-        <div style={S.headerRight}>
-          <div style={S.avatarGroup}>
-            {participants.slice(0, 5).map((p, i) => (
-              <div key={p.id} style={{ ...S.avatarDot, marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i, ...(p.avatar_url ? S.avatarDotImg : {}) }}>
-                {p.avatar_url ? <img src={p.avatar_url} alt="" style={S.avatarImgInner} /> : p.nickname[0]}
-              </div>
-            ))}
-            {participants.length > 5 && <span style={S.avatarOverflow}>+{participants.length - 5}</span>}
-          </div>
-          {canPost && (
-            <div style={{ position: 'relative' }}>
-              <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)}>⋯</button>
-              {menuOpen && (
-                <>
-                  <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
-                  <div style={S.menuDropdown}>
-                    <button
-                      style={S.menuItem}
-                      onClick={() => { setMenuOpen(false); socialRef.current?.openPhotoPicker() }}
-                    >
-                      📷 사진 등록
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
-          )}
+        <div style={S.potMeta}>
+          {pot.menu && <span style={S.menuText}>{pot.menu}</span>}
+          <span style={S.metaSub}>{dateLabel} · {pot.slot}{timeStr !== '미정' ? ` · ${timeStr}` : ''}</span>
         </div>
       </div>
-      <PotSocialSection ref={socialRef} potId={pot.id} currentUserId={currentUserId} canPost={canPost} onChange={onChange} compact />
+      <PotSocialSection ref={socialRef} potId={pot.id} currentUserId={currentUserId} canPost={canPost} onChange={onChange} compact footer={footer} />
     </div>
   )
 }
@@ -213,15 +218,22 @@ const S = {
   dateHeader: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', padding: '6px 2px' },
 
   potCard: { background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
-  potHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   potHeaderText: { minWidth: 0, cursor: 'pointer' },
   groupTitleRow: { display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 },
   groupLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0 },
-  potTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  potMeta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, marginTop: 2, display: 'flex', alignItems: 'center', gap: 6 },
-  commentBadge: { color: 'var(--color-text-muted)' },
+  potTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  scopeChip: {
+    flexShrink: 0, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
+  },
+  potMeta: { display: 'flex', flexDirection: 'column', gap: 1, marginTop: 3 },
+  menuText: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  metaSub: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  commentBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
 
-  headerRight: { display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 },
+  footerRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 2 },
+  footerRight: { display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 },
   avatarGroup: { display: 'flex', alignItems: 'center', flexShrink: 0 },
   avatarDot: {
     width: 24, height: 24, borderRadius: '50%',

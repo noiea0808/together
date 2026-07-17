@@ -23,7 +23,8 @@ function timeAgo(iso) {
 // canPost: 해당 밥팟 참여자만 true (사진/코멘트 등록 가능)
 // compact: 카드 테두리·"사진"/"코멘트" 라벨 없이 이어붙는 형태로 렌더링(모먼트 피드용).
 //          사진 등록 버튼은 숨기고 openPhotoPicker()를 ref로 노출해 바깥(⋯ 메뉴)에서 파일 선택창을 열 수 있게 한다.
-const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, onChange, compact = false }, ref) {
+// footer: 사진과 코멘트 사이에 끼워 넣을 요소(모먼트 피드의 아바타·댓글수·⋯메뉴 액션바 용도).
+const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, onChange, compact = false, footer = null }, ref) {
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -136,7 +137,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           !compact && <p style={S.empty}>아직 등록된 사진이 없어요.</p>
         ) : (
           <>
-            <div style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll}>
+            <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll}>
               {photos.map(p => (
                 <div key={p.id} style={S.photoItem}>
                   <img src={p.photo_url} alt="" style={S.photoImg} />
@@ -203,6 +204,8 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           />
         )}
       </div>
+
+      {footer}
 
       {/* Comments */}
       <div style={cardStyle}>
@@ -279,7 +282,7 @@ const S = {
 
   /* Photos — SNS 스타일 풀폭 캐러셀 (밥팟 상세/모먼트 공용) */
   photoScroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' },
-  photoItem: { position: 'relative', flex: '0 0 100%', width: '100%', aspectRatio: '1', scrollSnapAlign: 'start', background: 'var(--color-surface-2)', overflow: 'hidden', borderRadius: 'var(--radius-md)' },
+  photoItem: { position: 'relative', flex: '0 0 100%', width: '100%', aspectRatio: '1', scrollSnapAlign: 'start', scrollSnapStop: 'always', background: 'var(--color-surface-2)', overflow: 'hidden', borderRadius: 'var(--radius-md)' },
   photoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 },
   dot: { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-border)', transition: 'width 0.15s, background 0.15s' },
