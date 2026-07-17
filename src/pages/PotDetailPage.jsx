@@ -1,16 +1,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, getPotComments, addPotComment, deletePotComment, getGroupMembers, invitePotFriend } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, setPotMomentScope, getGroupMembers, invitePotFriend } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import LinkPreviewCard from '../components/LinkPreviewCard'
 import AutoTextarea from '../components/AutoTextarea'
+import PotSocialSection from '../components/PotSocialSection'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -26,27 +27,11 @@ function addMinutes(timeStr, minutes) {
   return `${String(Math.floor(total / 60) % 24).padStart(2, '0')}:${String(total % 60).padStart(2, '0')}`
 }
 
-function avBg(name) {
-  const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
-  let h = 0
-  for (const x of name) h = (h * 31 + x.charCodeAt(0)) & 0xfffff
-  return colors[h % colors.length]
-}
-
 function durationOf(start, end) {
   if (!start || !end) return 0
   const [sh, sm] = start.split(':').map(Number)
   const [eh, em] = end.split(':').map(Number)
   return (eh * 60 + em) - (sh * 60 + sm)
-}
-
-function timeAgo(iso) {
-  const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
-  if (diffMin < 1) return '방금'
-  if (diffMin < 60) return `${diffMin}분 전`
-  const diffHour = Math.floor(diffMin / 60)
-  if (diffHour < 24) return `${diffHour}시간 전`
-  return `${Math.floor(diffHour / 24)}일 전`
 }
 
 function GuestGate({ potId, onJoined, navigate }) {
@@ -138,9 +123,7 @@ export default function PotDetailPage() {
   const [draftScope, setDraftScope] = useState('all') // 'all' | 'time' | 'menu' | 'max_people' | 'memo'
   const [timePicker, setTimePicker] = useState(null)
   const [pickerSnapshot, setPickerSnapshot] = useState(null)
-  const [comments, setComments] = useState([])
-  const [commentText, setCommentText] = useState('')
-  const [postingComment, setPostingComment] = useState(false)
+  const [momentScopeLoading, setMomentScopeLoading] = useState(false)
 
   const isQuickEdit = !!draft && draftScope !== 'all'
   useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker || showShare || isQuickEdit))
@@ -168,34 +151,6 @@ export default function PotDetailPage() {
   }
 
   useEffect(() => { loadPot() }, [id])
-
-  const loadComments = async () => {
-    try {
-      setComments(await getPotComments(id))
-    } catch (e) { console.error(e) }
-  }
-
-  useEffect(() => { if (user) loadComments() }, [id, user])
-
-  const handlePostComment = async () => {
-    if (!commentText.trim() || postingComment) return
-    setPostingComment(true)
-    try {
-      const comment = await addPotComment(id, user.id, commentText)
-      setComments(prev => [...prev, comment])
-      setCommentText('')
-      invalidateBoard()
-    } catch (e) { console.error(e) }
-    finally { setPostingComment(false) }
-  }
-
-  const handleDeleteComment = async (commentId) => {
-    setComments(prev => prev.filter(c => c.id !== commentId))
-    try {
-      await deletePotComment(commentId, user.id)
-      invalidateBoard()
-    } catch (e) { console.error(e); loadComments() }
-  }
 
   useEffect(() => {
     const onPop = () => loadPot()
@@ -326,6 +281,16 @@ export default function PotDetailPage() {
     if (!canEdit) return
     if (draft) { setDraft(d => ({ ...d, is_public: !d.is_public })); return }
     setDraft(buildDraft({ is_public: !pot.is_public }))
+  }
+
+  const changeMomentScope = async (scope) => {
+    if (!isJoined || momentScopeLoading || scope === pot.moment_scope) return
+    setMomentScopeLoading(true)
+    try {
+      await setPotMomentScope(pot.id, scope)
+      setPot(prev => ({ ...prev, moment_scope: scope }))
+    } catch (e) { console.error(e) }
+    finally { setMomentScopeLoading(false) }
   }
 
   const doJoin = async () => {
@@ -515,6 +480,30 @@ export default function PotDetailPage() {
                   {key === 'memo' && pot.memo && <LinkPreviewCard text={pot.memo} />}
                 </div>
               ))}
+            </div>
+
+            {/* 모먼트 공유 범위 — 참여자만 조정 가능 */}
+            <div style={S.momentScopeRow}>
+              <span style={S.momentScopeLabel}>📸 모먼트 공유</span>
+              <div style={S.momentScopeChips}>
+                {MOMENT_SCOPE_OPTIONS.map(({ value, label }) => {
+                  const active = pot.moment_scope === value
+                  return (
+                    <button
+                      key={value}
+                      style={{
+                        ...S.momentScopeChip,
+                        ...(active ? S.momentScopeChipActive : {}),
+                        cursor: isJoined ? 'pointer' : 'default',
+                      }}
+                      onClick={() => changeMomentScope(value)}
+                      disabled={!isJoined || momentScopeLoading}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
         )}
@@ -783,52 +772,7 @@ export default function PotDetailPage() {
           </div>
         </div>
 
-        {/* Comments card */}
-        <div style={S.commentsCard}>
-          <div style={S.membersHeader}>
-            <span style={S.membersTitle}>코멘트</span>
-            <span style={S.membersCount}>{comments.length}개</span>
-          </div>
-          <div style={S.commentsList}>
-            {comments.length === 0 && <p style={S.commentsEmpty}>아직 코멘트가 없어요.</p>}
-            {comments.map(c => (
-              <div key={c.id} style={S.commentItem}>
-                <div style={{ ...S.commentAvatar, background: avBg(c.users?.nickname ?? '?') }}>
-                  {(c.users?.nickname ?? '?')[0]}
-                </div>
-                <div style={S.commentBody}>
-                  <div style={S.commentMetaRow}>
-                    <span style={S.commentName}>{c.users?.nickname ?? '탈퇴한 사용자'}</span>
-                    <span style={S.commentTime}>{timeAgo(c.created_at)}</span>
-                  </div>
-                  <div style={S.commentText}>{c.content}</div>
-                </div>
-                {c.user_id === user?.id && (
-                  <button style={S.commentDeleteBtn} onClick={() => handleDeleteComment(c.id)}>삭제</button>
-                )}
-              </div>
-            ))}
-          </div>
-          {isJoined && (
-            <div style={S.commentInputRow}>
-              <input
-                style={S.commentInput}
-                placeholder="코멘트 남기기"
-                value={commentText}
-                onChange={e => setCommentText(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && handlePostComment()}
-                maxLength={200}
-              />
-              <button
-                style={{ ...S.commentSendBtn, opacity: commentText.trim() && !postingComment ? 1 : 0.4 }}
-                onClick={handlePostComment}
-                disabled={!commentText.trim() || postingComment}
-              >
-                등록
-              </button>
-            </div>
-          )}
-        </div>
+        <PotSocialSection potId={pot.id} currentUserId={user?.id} canPost={isJoined} onChange={invalidateBoard} />
 
         {/* Action buttons */}
         {isPotExpired ? (
@@ -1059,6 +1003,16 @@ const S = {
   infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, flexShrink: 0 },
   infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
 
+  momentScopeRow: { marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
+  momentScopeLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', flexShrink: 0 },
+  momentScopeChips: { display: 'flex', gap: 5 },
+  momentScopeChip: {
+    padding: '4px 9px', background: 'rgba(255,255,255,0.7)', border: '1px solid transparent',
+    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 600,
+    color: 'var(--color-text-muted)', fontFamily: 'inherit',
+  },
+  momentScopeChipActive: { background: '#FFF4EF', border: '1px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+
   /* Edit sections (matches '밥팟 열기' style) */
   editSections: { display: 'flex', flexDirection: 'column', gap: 6 },
   editSection: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 10 },
@@ -1105,22 +1059,6 @@ const S = {
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
   kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--color-danger)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   memberName: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
-
-  /* Comments card */
-  commentsCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 18, padding: 16 },
-  commentsList: { display: 'flex', flexDirection: 'column', gap: 12 },
-  commentsEmpty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
-  commentItem: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  commentAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-2xs)' },
-  commentBody: { flex: 1, minWidth: 0 },
-  commentMetaRow: { display: 'flex', alignItems: 'center', gap: 6 },
-  commentName: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)' },
-  commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
-  commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
-  commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
-  commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
-  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
-  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
 
   /* Action buttons */
   joinBtn: { ...PRIMARY_ACTION_BUTTON },

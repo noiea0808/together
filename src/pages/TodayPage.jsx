@@ -31,6 +31,16 @@ const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot} 상태를 정해보세요
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
 
+// 슬롯별 분위기에 어울리는 상태 카드 배경 — 아침(새벽 노을)/오전간식(커피)/점심(한낮 햇살)/오후간식(녹차)/저녁(노을)/야식(밤)
+const SLOT_THEME = {
+  '아침':    { bg: '#FFF1E6', border: '#FFD9B8' },
+  '오전간식': { bg: '#F3E6D8', border: '#E0C9A6' },
+  '점심':    { bg: '#FFF9DB', border: '#FFE993' },
+  '오후간식': { bg: '#EAF5E4', border: '#C8E6B9' },
+  '저녁':    { bg: '#F7E6EE', border: '#E7C2D8' },
+  '야식':    { bg: '#E6E9F5', border: '#C3CAE8' },
+}
+
 const SLOT_TIME_PRESETS = {
   '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
   '오전간식': ['09:30', '10:00', '10:30', '11:00'],
@@ -608,40 +618,41 @@ export default function TodayPage() {
       </div>
 
       {/* 나의 상태 — 독립된 핵심 카드 하나 + 슬림한 슬롯 네비게이션 */}
-      <div style={styles.myStatusSection}>
+      {(() => {
+        const sectionInfo = getSlotInfo(selectedSlot)
+        const sectionTheme = sectionInfo.isPastDate
+          ? { bg: '#EFE6D6' }
+          : SLOT_THEME[selectedSlot]
+        return (
+      <div style={{ ...styles.myStatusSection, background: sectionTheme.bg }}>
         {/* 핵심 카드: 항상 흰 배경, 상태는 텍스트 색상으로만 강조 */}
-        {(() => {
-          const info = getSlotInfo(selectedSlot)
-          return (
-            <div style={styles.mainStatusCard}>
-              <div style={styles.mainStatusHeaderRow}>
-                <span style={styles.mainStatusTitle}>내 {selectedSlot} 상태</span>
-                {!info.isPastDate && (
-                  <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
-                )}
-              </div>
-              <div style={styles.mainStatusBody}>
-                <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
-                  {info.key ? <StatusIcon statusKey={info.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
-                </div>
-                <div style={styles.mainStatusTextCol}>
-                  {info.label ? (
-                    <>
-                      <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
-                      {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](selectedSlot)}</span>}
-                      {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
-                      {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
-                    </>
-                  ) : (
-                    <span style={styles.mainStatusEmpty}>
-                      {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
-                    </span>
-                  )}
-                </div>
-              </div>
+        <div style={styles.mainStatusCard}>
+          <div style={styles.mainStatusHeaderRow}>
+            <span style={styles.mainStatusTitle}>내 {selectedSlot} 상태</span>
+            {!sectionInfo.isPastDate && (
+              <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
+            )}
+          </div>
+          <div style={styles.mainStatusBody}>
+            <div style={{ ...styles.mainStatusIconWrap, opacity: sectionInfo.isPastDate ? 0.6 : 1 }}>
+              {sectionInfo.key ? <StatusIcon statusKey={sectionInfo.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
             </div>
-          )
-        })()}
+            <div style={styles.mainStatusTextCol}>
+              {sectionInfo.label ? (
+                <>
+                  <span style={{ ...styles.mainStatusLabel, color: sectionInfo.color }}>{sectionInfo.label}</span>
+                  {STATUS_SUBTEXT[sectionInfo.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[sectionInfo.key](selectedSlot)}</span>}
+                  {sectionInfo.timeStr && <span style={styles.mainStatusMeta}>{sectionInfo.timeStr}</span>}
+                  {sectionInfo.desc && <span style={styles.mainStatusDesc}>{sectionInfo.desc}</span>}
+                </>
+              ) : (
+                <span style={styles.mainStatusEmpty}>
+                  {sectionInfo.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
 
         {/* 슬림한 한 줄 슬롯 네비게이션 — 화살표는 양 끝에 분리되어 카드와 겹치지 않음 */}
         <div style={styles.subSlotWrap}>
@@ -658,7 +669,7 @@ export default function TodayPage() {
                   style={{
                     ...styles.subSlotBtn,
                     borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                    background: isSelected ? 'rgba(255,107,53,0.06)' : '#fff',
+                    background: '#fff',
                     opacity: info.isPastDate ? 0.65 : 1,
                   }}
                   onClick={() => {
@@ -687,6 +698,8 @@ export default function TodayPage() {
           <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>↺ 하루 초기화</button>
         </div>
       </div>
+        )
+      })()}
 
       {/* 그룹별 보기 영역 전체 — 흰색 풀블리드 블록으로 상단 '내 상태' 영역과 경계를 분리 */}
       <div style={styles.lowerSection}>

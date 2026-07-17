@@ -1331,7 +1331,7 @@ export async function updatePotMenu(potId, menu) {
 export async function getPotComments(potId) {
   const { data, error } = await supabase
     .from('pot_comments')
-    .select('id, content, created_at, user_id, users(nickname, is_guest)')
+    .select('id, content, created_at, user_id, users(nickname, is_guest, avatar_url)')
     .eq('pot_id', potId)
     .order('created_at', { ascending: true })
   if (error) throw error
@@ -1343,7 +1343,7 @@ export async function addPotComment(potId, userId, content) {
   const { data, error } = await supabase
     .from('pot_comments')
     .insert({ pot_id: potId, user_id: userId, content: trimmed })
-    .select('id, content, created_at, user_id, users(nickname, is_guest)')
+    .select('id, content, created_at, user_id, users(nickname, is_guest, avatar_url)')
     .single()
   if (error) throw error
 
@@ -1363,4 +1363,95 @@ export async function deletePotComment(commentId, userId) {
     .delete()
     .match({ id: commentId, user_id: userId })
   if (error) throw error
+}
+
+// ── 밥팟 사진 ──────────────────────────────────────
+export async function getPotPhotos(potId) {
+  const { data, error } = await supabase
+    .from('pot_photos')
+    .select('id, photo_url, created_at, user_id, users(nickname, is_guest)')
+    .eq('pot_id', potId)
+    .order('created_at', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+// blob: PhotoAdjustModal에서 정사각형으로 잘라 재인코딩한 JPEG 이미지
+export async function addPotPhoto(potId, userId, blob) {
+  const { data: { user: authUser } } = await supabase.auth.getUser()
+  if (!authUser) throw new Error('로그인이 필요합니다.')
+
+  const path = `${authUser.id}/${potId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const { error: uploadError } = await supabase.storage
+    .from('pot-photos')
+    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+  if (uploadError) throw uploadError
+
+  const { data: { publicUrl } } = supabase.storage.from('pot-photos').getPublicUrl(path)
+
+  const { data, error } = await supabase
+    .from('pot_photos')
+    .insert({ pot_id: potId, user_id: userId, photo_url: publicUrl })
+    .select('id, photo_url, created_at, user_id, users(nickname, is_guest)')
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deletePotPhoto(photoId, userId) {
+  const { error } = await supabase
+    .from('pot_photos')
+    .delete()
+    .match({ id: photoId, user_id: userId })
+  if (error) throw error
+}
+
+// ── 모먼트 (종료된 밥팟의 사진/코멘트 공유: 참여자만 / 그룹공유 / 전체공유) ────
+// scope: 'participants' | 'group' | 'public'. RLS 우회 없이 pot_members 참여 여부를
+// 서버(RPC)에서 검증하므로, 밥팟 참여자면 누구나 호출 가능 (수정 권한자 아니어도 됨).
+export async function setPotMomentScope(potId, scope) {
+  const { error } = await supabase.rpc('set_pot_moment_scope', { p_pot_id: potId, p_scope: scope })
+  if (error) throw error
+}
+
+const MOMENT_POT_SELECT = '*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), pot_comments(count)'
+
+// "내 그룹" 모먼트 피드: 내 그룹에 방송된(그룹공유·전체공유) 밥팟 + 범위와 무관하게
+// 내가 직접 참여했던 밥팟을 합쳐서 반환한다 (참여자만 범위여도 본인에게는 보임).
+// todayStr 이하 날짜(오늘 포함)까지 가져오고, 오늘 밥팟 중 아직 안 끝난 건 호출부(isPotEnded)에서 걸러낸다.
+export async function getGroupMomentPots(groupIds, userId, todayStr) {
+  if (!groupIds || groupIds.length === 0) return []
+  const [broadcastRes, ownRes] = await Promise.all([
+    supabase
+      .from('meal_pots')
+      .select(MOMENT_POT_SELECT)
+      .in('group_id', groupIds)
+      .in('moment_scope', ['group', 'public'])
+      .lte('date', todayStr),
+    supabase
+      .from('pot_members')
+      .select(`meal_pots!inner(${MOMENT_POT_SELECT})`)
+      .eq('user_id', userId)
+      .in('meal_pots.group_id', groupIds)
+      .lte('meal_pots.date', todayStr),
+  ])
+  if (broadcastRes.error) throw broadcastRes.error
+  if (ownRes.error) throw ownRes.error
+
+  const byId = new Map()
+  for (const pot of broadcastRes.data) byId.set(pot.id, pot)
+  for (const row of ownRes.data) byId.set(row.meal_pots.id, row.meal_pots)
+  return [...byId.values()].sort((a, b) => b.date.localeCompare(a.date))
+}
+
+// "전체" 모먼트 피드: 그룹 소속과 무관하게 전체공유로 설정된 밥팟을 앱 전체에서 조회.
+export async function getPublicMomentPots(todayStr) {
+  const { data, error } = await supabase
+    .from('meal_pots')
+    .select(`${MOMENT_POT_SELECT}, groups(name)`)
+    .eq('moment_scope', 'public')
+    .lte('date', todayStr)
+    .order('date', { ascending: false })
+  if (error) throw error
+  return data
 }
