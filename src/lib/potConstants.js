@@ -10,6 +10,12 @@ export const SLOT_TIME_PRESETS = {
   '야식':    ['21:00', '21:30', '22:00', '23:00'],
 }
 
+export const MOMENT_SCOPE_OPTIONS = [
+  { value: 'participants', label: '참여자만' },
+  { value: 'group', label: '그룹공유' },
+  { value: 'public', label: '전체공유' },
+]
+
 export const DURATION_OPTIONS = [
   { min: 30, label: '30분' },
   { min: 60, label: '1시간' },

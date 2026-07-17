@@ -6,6 +6,7 @@ import ProfileSetupPage from './pages/ProfileSetupPage'
 import TodayPage from './pages/TodayPage'
 import GuestHomePage from './pages/GuestHomePage'
 import MySchedulePage from './pages/MySchedulePage'
+import MomentPage from './pages/MomentPage'
 import MyAccountPage from './pages/MyAccountPage'
 import CreatePotPage from './pages/CreatePotPage'
 import PotDetailPage from './pages/PotDetailPage'
@@ -47,6 +48,7 @@ function ConsumerRoutes() {
       <Route path="/welcome" element={!user ? <Navigate to="/onboarding" replace /> : (user.onboarded ? <Navigate to="/today" replace /> : <ProfileSetupPage />)} />
       <Route path="/today"    element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
+      <Route path="/moment"   element={guestSafe(<MomentPage />)} />
       <Route path="/account"  element={guestSafe(<MyAccountPage />)} />
       <Route path="/create"   element={guestSafe(<CreatePotPage />)} />
       <Route path="/pot/:id"  element={<PotDetailPage />} />

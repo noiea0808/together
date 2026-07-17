@@ -29,6 +29,20 @@ function CalendarIcon({ active }) {
   )
 }
 
+function MomentIcon({ active }) {
+  return active ? (
+    <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
+      <path d="M8.5 3.5 7.4 5H4.5A1.5 1.5 0 0 0 3 6.5v12A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 19.5 5h-2.9l-1.1-1.5a1 1 0 0 0-.8-.5h-5.4a1 1 0 0 0-.8.5Z" />
+      <circle cx="12" cy="13" r="4" fill="var(--color-surface)" />
+    </svg>
+  ) : (
+    <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M8.5 3.5 7.4 5H4.5A1.5 1.5 0 0 0 3 6.5v12A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 19.5 5h-2.9l-1.1-1.5a1 1 0 0 0-.8-.5h-5.4a1 1 0 0 0-.8.5Z" />
+      <circle cx="12" cy="13" r="3.6" />
+    </svg>
+  )
+}
+
 function PeopleIcon({ active }) {
   return active ? (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
@@ -64,6 +78,7 @@ function UserIcon({ active }) {
 const TABS = [
   { path: '/today',    Icon: HomeIcon,     label: '오늘' },
   { path: '/schedule', Icon: CalendarIcon, label: '일정' },
+  { path: '/moment',   Icon: MomentIcon,   label: '모먼트' },
   { path: '/group',    Icon: PeopleIcon,   label: '친구' },
   { path: '/account',  Icon: UserIcon,     label: '내 계정' },
 ]
