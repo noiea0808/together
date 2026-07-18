@@ -1,0 +1,650 @@
+From 4c86c4573a798db7392885478fd45a653557fa5b Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Tue, 30 Jun 2026 15:36:10 +0000
+Subject: [PATCH] =?UTF-8?q?Redesign=20TodayPage=20UI=20to=20match=20?=
+ =?UTF-8?q?=EA=B0=99=EC=9D=B4=20=EB=A8=B9=EC=9E=90=20Claude=20Design=20han?=
+ =?UTF-8?q?doff?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+- Warm ivory background (#FAF8F5) and warm border (#EDE8E3) throughout
+- Slot cards: flat design with status-colored backgrounds and inline labels
+  - open: green (#16A34A / #F0FDF4), closed: blue (#2563EB / #EFF6FF)
+  - skip: slate (#94A3B8 / #F8FAFC), 참여중: orange (#FF6B35 / #FFF4EF)
+- Replace carousel time picker with preset time chips per slot
+  (아침 07:00~09:00, 점심 11:30~13:00, 저녁 17:30~19:30, etc.) + direct input
+- Group cards: 18px radius white cards with warm border, no background header
+- Add status summary chips at top of each group card
+- Member rows: pill-badge status display instead of inline text
+- Unset members collapsible with dimmed display
+- Pots inside group card: compact inline cards with 🍚 icon
+- Create pot button: dashed orange border inside group card
+- Date nav arrows: circular button style matching design
+
+Co-Authored-By: Claude Sonnet 4.6 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_016thSGmYKLyqCtZiYcsdx4B
+---
+ package-lock.json       |  28 ++-
+ src/index.css           |   8 +-
+ src/mock/data.js        |   8 +-
+ src/pages/TodayPage.jsx | 419 ++++++++++++++++++++++++++++------------
+ 4 files changed, 329 insertions(+), 134 deletions(-)
+
+diff --git a/package-lock.json b/package-lock.json
+index ea02142..7e015a9 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -33,6 +33,29 @@
+         "url": "https://github.com/sponsors/Borewit"
+       }
+     },
++    "node_modules/@emnapi/core": {
++      "version": "1.11.1",
++      "resolved": "https://registry.npmjs.org/@emnapi/core/-/core-1.11.1.tgz",
++      "integrity": "sha512-RSvbQmHzdKzNsLYa/wHrbc3KN4sYLKAdPZxqiM2HATqv/SBk2/ENSHpvXGaLOMcsAyz0poEGqkmmKYG3OWiJEQ==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "@emnapi/wasi-threads": "1.2.2",
++        "tslib": "^2.4.0"
++      }
++    },
++    "node_modules/@emnapi/runtime": {
++      "version": "1.11.1",
++      "resolved": "https://registry.npmjs.org/@emnapi/runtime/-/runtime-1.11.1.tgz",
++      "integrity": "sha512-vgj7R3y3Wgx24IQaGPA/R6YFXLHVMOZ0uVEyIQPaWs+rd1AzfEMXlAC22FYwO1XkKR6NPsq7mUandH8oIRdZFw==",
++      "dev": true,
++      "license": "MIT",
++      "optional": true,
++      "dependencies": {
++        "tslib": "^2.4.0"
++      }
++    },
+     "node_modules/@emnapi/wasi-threads": {
+       "version": "1.2.2",
+       "resolved": "https://registry.npmjs.org/@emnapi/wasi-threads/-/wasi-threads-1.2.2.tgz",
+@@ -1226,7 +1249,6 @@
+       "integrity": "sha512-MXfmqaVPEVgkBT/aY0aGCkRWWtByiYQXo3xdQ8r5RzuFrPiRn8Gar2tQdXSUQ2GKV3bkXckek89V8wQBY2Q/Aw==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "csstype": "^3.2.2"
+       }
+@@ -1902,7 +1924,6 @@
+       "integrity": "sha512-QP88BAKvMam/3NxH6vj2o21R6MjxZUAd6nlwAS/pnGvN9IVLocLHxGYIzFhg6fUQ+5th6P4dv4eW9jX3DSIj7A==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "engines": {
+         "node": ">=12"
+       },
+@@ -1977,7 +1998,6 @@
+       "resolved": "https://registry.npmjs.org/react/-/react-19.2.7.tgz",
+       "integrity": "sha512-HNe9WslTbXmFK8o8cmwgAeJFSBvt1bPdHCVKtaaV+WlAN36mpT4hcRpwbf3fY56ar2oIXzsBpOAiIRHAdY0OlQ==",
+       "license": "MIT",
+-      "peer": true,
+       "engines": {
+         "node": ">=0.10.0"
+       }
+@@ -1987,7 +2007,6 @@
+       "resolved": "https://registry.npmjs.org/react-dom/-/react-dom-19.2.7.tgz",
+       "integrity": "sha512-t0BRVXvbiE/o20Hfw669rLbMCDWtYZLvmJigy2f0MxsXF+71pxhR3xOkspmsO8h3ZlNzyibAmtCa3l4lYKk6gQ==",
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "scheduler": "^0.27.0"
+       },
+@@ -2204,7 +2223,6 @@
+       "integrity": "sha512-BuJcQK/56NQTWDGn4ABea3q4SSBdNPWwNZKTkkUpcMPnLoquSYH8llRtSUIgoL1KSCpHt5eghLShn50mH36y7Q==",
+       "dev": true,
+       "license": "MIT",
+-      "peer": true,
+       "dependencies": {
+         "lightningcss": "^1.32.0",
+         "picomatch": "^4.0.4",
+diff --git a/src/index.css b/src/index.css
+index 8ac1df7..ef0e38b 100644
+--- a/src/index.css
++++ b/src/index.css
+@@ -11,13 +11,13 @@
+   --color-primary-light: #FF8C5A;
+   --color-primary-dark: #E05520;
+ 
+-  --color-bg: #FAFAFA;
++  --color-bg: #FAF8F5;
+   --color-surface: #FFFFFF;
+-  --color-surface-2: #F5F5F5;
++  --color-surface-2: #F5F0EB;
+ 
+   --color-text: #1A1A1A;
+-  --color-text-muted: #888888;
+-  --color-border: #E8E8E8;
++  --color-text-muted: #A89E94;
++  --color-border: #EDE8E3;
+ 
+   --color-status-lunch: #4CAF50;
+   --color-status-dinner: #2196F3;
+diff --git a/src/mock/data.js b/src/mock/data.js
+index b435f20..07a1cd4 100644
+--- a/src/mock/data.js
++++ b/src/mock/data.js
+@@ -3,10 +3,10 @@ export const ME = { id: 'user-1', nickname: '나' }
+ export const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
+ 
+ export const SLOT_STATUS_OPTIONS = [
+-  { key: 'open',   label: '열려있음', emoji: '🟢', color: '#BDBDBD', selectable: true },
+-  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#BDBDBD', selectable: true },
+-  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2196F3', selectable: true },
+-  { key: '참여중', label: '참여중',    emoji: '✅', color: '#4CAF50', selectable: false },
++  { key: 'open',   label: '열려있음', emoji: '🟢', color: '#16A34A', bg: '#F0FDF4', border: '#BBF7D0', selectable: true },
++  { key: 'skip',   label: '패스',      emoji: '🙅', color: '#94A3B8', bg: '#F8FAFC', border: '#E2E8F0', selectable: true },
++  { key: 'closed', label: '약속있음',  emoji: '🔒', color: '#2563EB', bg: '#EFF6FF', border: '#BFDBFE', selectable: true },
++  { key: '참여중', label: '참여중',    emoji: '🍚', color: '#FF6B35', bg: '#FFF4EF', border: '#FFD6C0', selectable: false },
+ ]
+ 
+ export const GROUPS = [
+diff --git a/src/pages/TodayPage.jsx b/src/pages/TodayPage.jsx
+index 32d36e8..65af3d4 100644
+--- a/src/pages/TodayPage.jsx
++++ b/src/pages/TodayPage.jsx
+@@ -13,6 +13,15 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
+ 
+ const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
+ 
++const SLOT_TIME_PRESETS = {
++  '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
++  '오전간식': ['09:30', '10:00', '10:30', '11:00'],
++  '점심':    ['11:30', '12:00', '12:30', '13:00'],
++  '오후간식': ['14:00', '14:30', '15:00', '15:30'],
++  '저녁':    ['17:30', '18:00', '18:30', '19:00', '19:30'],
++  '야식':    ['21:00', '21:30', '22:00', '23:00'],
++}
++
+ function toDateStr(date) {
+   const year = date.getFullYear()
+   const month = String(date.getMonth() + 1).padStart(2, '0')
+@@ -517,62 +526,59 @@ export default function TodayPage() {
+             const lockedOpt = isInPot ? SLOT_STATUS_OPTIONS.find(o => o.key === '참여중') : null
+             const displayOpt = lockedOpt ?? opt
+ 
++            const cardStatusOpt = isInPot ? lockedOpt : displayOpt
++            const cardBg = isPastDate ? '#F0EEEB' : cardStatusOpt ? (cardStatusOpt.bg ?? cardStatusOpt.color + '15') : 'var(--color-surface)'
++            const cardBorder = isPastDate ? '#E8E3DE' : isSelected ? 'var(--color-primary)' : cardStatusOpt ? (cardStatusOpt.border ?? 'var(--color-border)') : 'var(--color-border)'
++
+             return (
+               <div
+                 key={slot}
+                 style={{
+-                  ...styles.slotCard,
+-                  borderColor: isPastDate ? '#E0E0E0' : isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+-                  borderWidth: isSelected && !isPastDate ? 2 : 1.5,
+-                  background: isPastDate ? '#F5F5F5' : displayOpt ? displayOpt.color + '0d' : 'var(--color-surface)',
+-                  opacity: isPastDate ? 0.6 : 1,
++                  background: cardBg,
++                  border: `${isSelected && !isPastDate ? 2 : 1.5}px solid ${cardBorder}`,
++                  borderRadius: 14,
++                  padding: '11px 9px',
++                  minHeight: 80,
++                  cursor: 'pointer',
++                  display: 'flex',
++                  flexDirection: 'column',
++                  gap: 3,
++                  opacity: isPastDate ? 0.65 : 1,
++                  WebkitTapHighlightColor: 'transparent',
++                  transition: 'border-color 0.15s',
++                }}
++                onClick={() => {
++                  setSelectedSlot(slot)
++                  localStorage.setItem('lastSelectedSlot', slot)
++                  openSlotEditor(slot)
+                 }}
+               >
+-                {/* 헤더: 탭하면 그룹현황만 전환 */}
+-                <div
+-                  style={styles.slotName}
+-                  onClick={() => { if (!isPastDate) { setSelectedSlot(slot); localStorage.setItem('lastSelectedSlot', slot) } }}
+-                >
+-                  {slot}
+-                </div>
+-
+-                {/* 바디: 탭하면 팝업 편집 (지난 날짜는 열람 전용으로 열림) */}
+-                <div
+-                  style={{ ...styles.slotBody, cursor: 'pointer' }}
+-                  onClick={() => {
+-                    setSelectedSlot(slot)
+-                    localStorage.setItem('lastSelectedSlot', slot)
+-                    openSlotEditor(slot)
+-                  }}
+-                >
+-                  {isInPot ? (
+-                    <>
+-                      <div style={styles.slotStatusRow}>
+-                        <span style={{ fontSize: 18, lineHeight: 1 }}>{lockedOpt.emoji}</span>
+-                        <span style={{ fontSize: 12, fontWeight: 700, color: lockedOpt.color }}>{lockedOpt.label}</span>
+-                      </div>
+-                      <div style={styles.slotMeta}>
+-                        {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
+-                      </div>
+-                      <div style={{ ...styles.slotMeta, fontSize: 11 }}>{earliestPot.title}</div>
+-                    </>
+-                  ) : displayOpt ? (
+-                    <>
+-                      <div style={styles.slotStatusRow}>
+-                        <span style={{ fontSize: 18, lineHeight: 1 }}>{displayOpt.emoji}</span>
+-                        <span style={{ fontSize: 12, fontWeight: 700, color: displayOpt.color }}>{displayOpt.label}</span>
+-                      </div>
+-                      {data?.time && (
+-                        <div style={styles.slotMeta}>
+-                          {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
+-                        </div>
+-                      )}
+-                      {data?.menu && <div style={{ ...styles.slotMeta, fontSize: 11 }}>{data.menu}</div>}
+-                    </>
+-                  ) : (
+-                    <div style={styles.slotEmpty}>+ 설정</div>
+-                  )}
+-                </div>
++                <span style={{ fontSize: 10, color: '#A89E94', fontWeight: 600, letterSpacing: '-0.1px' }}>{slot}</span>
++                {isInPot ? (
++                  <>
++                    <span style={{ fontSize: 11, fontWeight: 800, color: '#FF6B35', marginTop: 1 }}>{lockedOpt.label}</span>
++                    <span style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
++                      {earliestPot.meal_time?.slice(0, 5)}{earliestPot.end_time ? `~${earliestPot.end_time.slice(0, 5)}` : ''}
++                    </span>
++                    {earliestPot.title && (
++                      <span style={{ fontSize: 10, color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{earliestPot.title}</span>
++                    )}
++                  </>
++                ) : displayOpt ? (
++                  <>
++                    <span style={{ fontSize: 11, fontWeight: 800, color: displayOpt.color, marginTop: 1 }}>{displayOpt.label}</span>
++                    {data?.time && (
++                      <span style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
++                        {data.time.slice(0, 5)}{data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}
++                      </span>
++                    )}
++                    {data?.menu && (
++                      <span style={{ fontSize: 10, color: '#A89E94', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{data.menu}</span>
++                    )}
++                  </>
++                ) : (
++                  <span style={{ fontSize: 10, color: '#C8BEB4', marginTop: 'auto', letterSpacing: '-0.1px' }}>탭해서 설정</span>
++                )}
+               </div>
+             )
+           })}
+@@ -896,22 +902,89 @@ export default function TodayPage() {
+                     {!draftData.status ? '상태를 먼저 선택하세요' : '패스는 시간/메뉴를 입력할 수 없어요'}
+                   </div>
+                 )}
+-                {/* 시간 행 */}
++                {/* 시간 행 — 프리셋 버튼 */}
+                 <div style={{ ...styles.slotPopupFieldWrap }}>
+-                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+-                    <div style={styles.slotPopupFieldLabel}>시작시간</div>
++                  <div style={styles.slotPopupFieldLabel}>시작시간</div>
++                  <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
++                    {(SLOT_TIME_PRESETS[editingSlot] ?? []).map(t => {
++                      const isActive = !fieldDisabled && (draftData.time?.startsWith(t) ?? false)
++                      return (
++                        <button
++                          key={t}
++                          disabled={fieldDisabled}
++                          style={{
++                            padding: '6px 11px',
++                            border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
++                            borderRadius: 99,
++                            background: isActive ? 'rgba(255,107,53,0.09)' : 'transparent',
++                            color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
++                            fontSize: 12,
++                            fontWeight: isActive ? 700 : 500,
++                            cursor: fieldDisabled ? 'not-allowed' : 'pointer',
++                            opacity: fieldDisabled ? 0.3 : 1,
++                          }}
++                          onClick={() => !fieldDisabled && setDraftData(prev => ({
++                            ...prev,
++                            time: t + ':00',
++                            end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(t + ':00', prev.duration_minutes) : prev.end_time,
++                          }))}
++                        >{t}</button>
++                      )
++                    })}
++                    {/* 직접 입력 */}
++                    {(() => {
++                      const isCustom = timeOn && !fieldDisabled && !(SLOT_TIME_PRESETS[editingSlot] ?? []).some(t => draftData.time?.startsWith(t))
++                      return (
++                        <label style={{
++                          padding: '6px 11px',
++                          border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
++                          borderRadius: 99,
++                          background: isCustom ? 'rgba(255,107,53,0.09)' : 'transparent',
++                          color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
++                          fontSize: 12,
++                          fontWeight: isCustom ? 700 : 500,
++                          cursor: fieldDisabled ? 'not-allowed' : 'pointer',
++                          opacity: fieldDisabled ? 0.3 : 1,
++                          display: 'inline-flex',
++                          alignItems: 'center',
++                          gap: 4,
++                          position: 'relative',
++                        }}>
++                          {isCustom && draftData.time ? draftData.time.slice(0, 5) : '직접 입력'}
++                          <input
++                            type="time"
++                            disabled={fieldDisabled}
++                            style={{ position: 'absolute', inset: 0, opacity: 0, cursor: fieldDisabled ? 'not-allowed' : 'pointer', width: '100%' }}
++                            value={draftData.time?.slice(0, 5) ?? ''}
++                            onChange={e => {
++                              const val = e.target.value
++                              if (!val) return
++                              setDraftData(prev => ({
++                                ...prev,
++                                time: val + ':00',
++                                end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(val + ':00', prev.duration_minutes) : prev.end_time,
++                              }))
++                            }}
++                          />
++                        </label>
++                      )
++                    })()}
++                    {/* 시간 없음 버튼 */}
+                     <button
+-                      style={{ fontSize: 10, fontWeight: 700, background: timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-surface-2)', color: timeOn && !fieldDisabled ? '#fff' : 'var(--color-text-muted)', border: `1px solid ${timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 99, padding: '1px 8px', cursor: fieldDisabled ? 'not-allowed' : 'pointer', lineHeight: 1.6, opacity: fieldDisabled ? 0.4 : 1 }}
+                       disabled={fieldDisabled}
+-                      onClick={() => setDraftData(prev => prev.time ? { ...prev, time: undefined, end_time: null } : { ...prev, time: carouselTimeToStr(getCarouselTime(null)), end_time: addSlotMinutes(carouselTimeToStr(getCarouselTime(null)), prev.duration_minutes ?? 60) })}
+-                    >{timeOn ? 'ON' : 'OFF'}</button>
+-                  </div>
+-                  <div style={{ ...styles.timeCarouselRow, opacity: carouselDisabled ? 0.25 : 1, pointerEvents: carouselDisabled ? 'none' : 'auto' }}>
+-                    <CarouselPicker items={CAROUSEL_AMPM} value={ct.ampm} onChange={ampm => updateCarousel({ ampm })} disabled={carouselDisabled} width={52} />
+-                    <div style={styles.timeCarouselSep} />
+-                    <CarouselPicker items={CAROUSEL_HOURS} value={ct.hour} onChange={hour => updateCarousel({ hour })} disabled={carouselDisabled} width={52} />
+-                    <span style={styles.timeColon}>:</span>
+-                    <CarouselPicker items={CAROUSEL_MINUTES} value={ct.minute} onChange={minute => updateCarousel({ minute })} disabled={carouselDisabled} width={52} />
++                      style={{
++                        padding: '6px 11px',
++                        border: `1.5px solid ${!timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`,
++                        borderRadius: 99,
++                        background: !timeOn && !fieldDisabled ? 'rgba(255,107,53,0.09)' : 'transparent',
++                        color: !timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-text-muted)',
++                        fontSize: 12,
++                        fontWeight: !timeOn && !fieldDisabled ? 700 : 500,
++                        cursor: fieldDisabled ? 'not-allowed' : 'pointer',
++                        opacity: fieldDisabled ? 0.3 : 1,
++                      }}
++                      onClick={() => !fieldDisabled && setDraftData(prev => ({ ...prev, time: undefined, end_time: null }))}
++                    >미정</button>
+                   </div>
+                 </div>
+                 {/* 종료시간 행 — open/closed 이고 시간 ON일 때 */}
+@@ -1182,31 +1255,43 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+     setTimeout(() => setCopied(null), 2000)
+   }
+ 
++  // Summary chips
++  const statusCounts = {}
++  members.forEach(member => {
++    const data = getMemberData(member.id)
++    if (data?.status) statusCounts[data.status] = (statusCounts[data.status] ?? 0) + 1
++  })
++  const chips = SLOT_STATUS_OPTIONS.filter(o => statusCounts[o.key] > 0).map(o => ({
++    ...o,
++    label: `${o.label} ${statusCounts[o.key]}`,
++  }))
++
++  // Separate active and unset members
++  const activeMembers = members.filter(m => getMemberData(m.id)?.status)
++  const unsetMembers = members.filter(m => !getMemberData(m.id)?.status)
++  const [showUnset, setShowUnset] = useState(false)
++
+   return (
+     <div style={styles.groupCard}>
+-      <div style={{
+-        ...styles.groupHeader,
+-        background: !isShared ? '#EEEEEE' : isInThisGroupPot ? '#E8F5E9' : 'var(--color-surface-2)',
+-      }}>
+-        {/* 좌측: 활동 도트 + 그룹명 */}
+-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+-          {hasActivity && <span style={styles.activityDot} />}
+-          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#9E9E9E' }}>{group.name}</span>
++      {/* 그룹 헤더 */}
++      <div style={styles.groupHeader}>
++        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
++          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#B0A89E' }}>{group.name}</span>
+         </div>
+-        {/* 우측: 토글 + 초대 + 설정 */}
+-        <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+-          {/* 공유 토글 — 이 그룹 현재 슬롯 밥팟 참여 중이면 비활성 */}
++        <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+           {isInThisGroupPot ? (
+             <span style={styles.toggleLocked}>🍚 참여중</span>
+           ) : (
+-            <div style={styles.toggleWrap} onClick={handleToggleSharing}>
+-              <div style={{ ...styles.toggleTrack, background: isShared ? 'var(--color-primary)' : '#BDBDBD' }}>
+-                <div style={{ ...styles.toggleThumb, transform: isShared ? 'translateX(14px)' : 'translateX(0)' }} />
+-              </div>
+-              <span style={{ ...styles.toggleLabel, color: isShared ? 'var(--color-primary)' : '#9E9E9E' }}>
+-                {isShared ? '공유중' : '비공유'}
+-              </span>
+-            </div>
++            <button
++              style={{
++                fontSize: 10, fontWeight: 700,
++                color: isShared ? '#FF6B35' : '#B0A89E',
++                background: isShared ? '#FFF4EF' : '#F5F0EB',
++                border: `1px solid ${isShared ? '#FFD6C0' : '#E8E3DE'}`,
++                borderRadius: 99, padding: '3px 9px', cursor: 'pointer',
++              }}
++              onClick={handleToggleSharing}
++            >{isShared ? '공유중' : '비공유'}</button>
+           )}
+           <button style={styles.groupSettingsBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
+           <button style={styles.groupCollapseBtn} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
+@@ -1403,43 +1488,135 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+ 
+ 
+ 
+-      {!collapsed && <div style={styles.memberList}>
+-        {members.map(member => {
+-          const data = getMemberData(member.id)
+-          const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+-          return (
+-            <div key={member.id} style={styles.memberRow}>
+-              <div style={{ ...styles.avatar, background: member.id === myUserId ? 'var(--color-primary)' : '#888' }}>
+-                {member.nickname[0]}
+-              </div>
+-              <span style={styles.memberName}>
+-                {member.nickname}{member.id === myUserId ? ' (나)' : ''}
+-              </span>
+-              <div style={styles.memberInfo}>
+-                {data?.meal_time && <span style={styles.memberMeta}>{data.meal_time.slice(0, 5)}</span>}
+-                {data?.meal_time && data?.menu && <span style={styles.metaDot}>·</span>}
+-                {data?.menu && <span style={styles.memberMeta}>{data.menu}</span>}
+-                {opt && (data?.meal_time || data?.menu) && <span style={styles.metaDot}>·</span>}
+-                {opt
+-                  ? <span style={{ ...styles.memberStatus, color: opt.color }}>{opt.emoji} {opt.label}</span>
+-                  : <span style={styles.memberStatusEmpty}>미설정</span>
+-                }
+-              </div>
++      {!collapsed && (
++        <div style={{ padding: '0 0 2px' }}>
++          {/* 요약 칩 */}
++          {chips.length > 0 && (
++            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
++              {chips.map(chip => (
++                <span key={chip.key} style={{
++                  fontSize: 11, fontWeight: 700,
++                  color: chip.color,
++                  background: chip.bg ?? chip.color + '18',
++                  border: `1px solid ${chip.border ?? chip.color + '44'}`,
++                  borderRadius: 99, padding: '3px 10px',
++                }}>{chip.label}</span>
++              ))}
+             </div>
+-          )
+-        })}
+-      </div>}
++          )}
++
++          {/* 활동 멤버 */}
++          {activeMembers.map((member, idx) => {
++            const data = getMemberData(member.id)
++            const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
++            const isMe = member.id === myUserId
++            return (
++              <div key={member.id} style={{
++                display: 'flex', alignItems: 'center', gap: 9,
++                padding: '7px 0',
++                borderBottom: `1px solid #F5F0EB`,
++              }}>
++                <div style={{
++                  width: 30, height: 30, borderRadius: '50%',
++                  background: isMe ? 'var(--color-primary)' : '#A89E94',
++                  display: 'flex', alignItems: 'center', justifyContent: 'center',
++                  color: 'white', fontSize: 12, fontWeight: 800, flexShrink: 0,
++                }}>{member.nickname[0]}</div>
++                <div style={{ flex: 1, minWidth: 0 }}>
++                  <span style={{ fontSize: 13, fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px' }}>
++                    {member.nickname}{isMe ? ' (나)' : ''}
++                  </span>
++                  {(data?.meal_time || data?.menu) && (
++                    <div style={{ fontSize: 10, color: '#A89E94', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
++                      {data.meal_time?.slice(0, 5)}{data.meal_time && data.menu ? ' · ' : ''}{data.menu}
++                    </div>
++                  )}
++                </div>
++                {opt && (
++                  <span style={{
++                    fontSize: 11, fontWeight: 700,
++                    color: opt.color,
++                    background: opt.bg ?? opt.color + '18',
++                    border: `1px solid ${opt.border ?? opt.color + '44'}`,
++                    borderRadius: 99, padding: '2px 9px', whiteSpace: 'nowrap',
++                  }}>{opt.label}</span>
++                )}
++              </div>
++            )
++          })}
++
++          {/* 미설정 멤버 */}
++          {unsetMembers.length > 0 && (
++            <>
++              <button
++                onClick={() => setShowUnset(v => !v)}
++                style={{
++                  width: '100%', padding: '7px 0', background: 'none', border: 'none',
++                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
++                  color: '#B0A89E', fontSize: 11, fontFamily: 'inherit',
++                }}
++              >
++                <span>미설정 {unsetMembers.length}명</span>
++                <span style={{ fontSize: 10 }}>{showUnset ? '▴' : '▾'}</span>
++              </button>
++              {showUnset && unsetMembers.map(member => (
++                <div key={member.id} style={{
++                  display: 'flex', alignItems: 'center', gap: 9,
++                  padding: '5px 0', opacity: 0.45,
++                  borderBottom: '1px solid #F5F0EB',
++                }}>
++                  <div style={{
++                    width: 28, height: 28, borderRadius: '50%',
++                    background: member.id === myUserId ? 'var(--color-primary)' : '#C0B8B0',
++                    display: 'flex', alignItems: 'center', justifyContent: 'center',
++                    color: 'white', fontSize: 11, fontWeight: 800, flexShrink: 0,
++                  }}>{member.nickname[0]}</div>
++                  <span style={{ flex: 1, fontSize: 12, color: '#6B7280', letterSpacing: '-0.2px' }}>
++                    {member.nickname}{member.id === myUserId ? ' (나)' : ''}
++                  </span>
++                  <span style={{ fontSize: 11, color: '#C8BEB4' }}>미설정</span>
++                </div>
++              ))}
++            </>
++          )}
++        </div>
++      )}
+ 
+       {!collapsed && pots.length > 0 && (
+-        <div style={styles.potsArea}>
+-          <div style={styles.potsLabel}>열린 밥팟</div>
+-          {pots.map(pot => <PotCard key={pot.id} pot={pot} />)}
++        <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 5 }}>
++          {pots.map(pot => (
++            <div
++              key={pot.id}
++              style={{
++                background: '#FAF8F5', border: '1.5px solid #EDE8E3', borderRadius: 11,
++                padding: '10px 12px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 10,
++              }}
++              onClick={() => onNavigate(`/pot/${pot.id}`)}
++            >
++              <span style={{ fontSize: 16 }}>🍚</span>
++              <div style={{ flex: 1, minWidth: 0 }}>
++                <div style={{ fontSize: 12, fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{pot.title}</div>
++                <div style={{ fontSize: 10, color: '#A89E94', marginTop: 1 }}>
++                  {pot.meal_time?.slice(0, 5)} · {pot.pot_members?.length ?? 0}/{pot.max_people}명
++                </div>
++              </div>
++              <span style={{ color: '#C8BEB4', fontSize: 14 }}>›</span>
++            </div>
++          ))}
+         </div>
+       )}
+ 
+-      {!collapsed && <button style={styles.createBtn} onClick={() => onCreatePot(group.id, slot)}>
+-        + 밥팟 만들기
+-      </button>}
++      {!collapsed && (
++        <button
++          style={{
++            width: '100%', padding: 9, marginTop: 9,
++            background: 'transparent', border: '1.5px dashed #FFB899',
++            borderRadius: 11, color: '#FF6B35',
++            fontSize: 12, fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit',
++          }}
++          onClick={() => onCreatePot(group.id, slot)}
++        >+ 밥팟 만들기</button>
++      )}
+     </div>
+   )
+ }
+@@ -1450,16 +1627,16 @@ const styles = {
+   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
+   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
+   emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
+-  dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'var(--color-surface)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
+-  navBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 12px' },
++  dateNav: { position: 'sticky', top: 0, zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid #EDE8E3', background: 'rgba(250,248,245,0.95)', backdropFilter: 'blur(8px)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))' },
++  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: '#EDE8E3', color: '#6B7280', fontSize: 17, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit' },
+   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
+   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
+   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+   todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
+   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
+   todayBtn: { fontSize: 11, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+-  myCard: { background: 'var(--color-surface)', border: '2px solid var(--color-primary)33', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
+-  myCardTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
++  myCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)' },
++  myCardTitle: { fontWeight: 900, fontSize: 15, letterSpacing: '-0.4px' },
+   resetAllBtn: { fontSize: 11, fontWeight: 700, padding: '4px 10px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)' },
+   slotResetBtn: { marginLeft: 3, fontSize: 9, color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
+   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
+@@ -1499,10 +1676,10 @@ const styles = {
+   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
+   slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid', borderRadius: 'var(--radius-md)', transition: 'border-color 0.15s', overflow: 'hidden' },
+   slotName: { fontSize: 12, fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)', cursor: 'pointer' },
+-  sectionTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+-  groupCard: { background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', transition: 'opacity 0.2s' },
+-  groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)' },
+-  groupName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
++  sectionTitle: { fontWeight: 900, fontSize: 15, letterSpacing: '-0.4px' },
++  groupCard: { background: '#FFFFFF', border: '1.5px solid #EDE8E3', borderRadius: 18, padding: 14, marginBottom: 10, transition: 'opacity 0.2s' },
++  groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 9 },
++  groupName: { fontWeight: 800, fontSize: 13, letterSpacing: '-0.3px' },
+   inviteBtn: { fontSize: 12, fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+   groupSettingsBtn: { background: 'none', border: 'none', fontSize: 16, cursor: 'pointer', padding: '0 2px' },
+   groupCollapseBtn: { background: 'none', border: 'none', fontSize: 14, cursor: 'pointer', padding: '0 2px', color: 'var(--color-text-muted)' },
+-- 
+2.43.0
+
