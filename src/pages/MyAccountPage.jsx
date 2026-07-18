@@ -75,6 +75,7 @@ export default function MyAccountPage() {
   const [myGroups, setMyGroups] = useState([])
   const [wishProposals, setWishProposals] = useState([])
   const [expandedProposalsWishId, setExpandedProposalsWishId] = useState(null)
+  const [showAddWishModal, setShowAddWishModal] = useState(false)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -94,6 +95,12 @@ export default function MyAccountPage() {
       .finally(() => setWishLoading(false))
   }, [tab, user?.id])
 
+  const openAddWishModal = () => {
+    setNewWishText('')
+    setNewWishGroupIds([])
+    setShowAddWishModal(true)
+  }
+
   const handleAddWish = async () => {
     if (!newWishText.trim() || addingWish) return
     setAddingWish(true)
@@ -106,6 +113,7 @@ export default function MyAccountPage() {
       setWishPlaces(prev => [...prev, place])
       setNewWishText('')
       setNewWishGroupIds([])
+      setShowAddWishModal(false)
     } catch (e) {
       console.error(e)
     } finally {
@@ -118,6 +126,7 @@ export default function MyAccountPage() {
   }
 
   const startEditWish = (place) => {
+    setShowAddWishModal(false)
     setEditingWishId(place.id)
     setEditingWishText(place.content)
     setEditingWishGroupIds((place.wish_place_shares ?? []).map(s => s.group_id))
@@ -127,6 +136,11 @@ export default function MyAccountPage() {
     setEditingWishId(null)
     setEditingWishText('')
     setEditingWishGroupIds([])
+  }
+
+  const closeWishModal = () => {
+    setShowAddWishModal(false)
+    cancelEditWish()
   }
 
   const toggleEditingWishGroup = (groupId) => {
@@ -454,8 +468,13 @@ export default function MyAccountPage() {
       <div style={styles.body}>
         <div style={styles.wishHeader}>
           <span style={styles.wishCount}>{wishPlaces.length}곳</span>
-          {!reorderingWish && wishPlaces.length > 1 && (
-            <button style={styles.wishOrderToggle} onClick={startReorderWish}>순서 변경</button>
+          {!reorderingWish && (
+            <div style={styles.wishHeaderBtns}>
+              {wishPlaces.length > 1 && (
+                <button style={styles.wishOrderToggle} onClick={startReorderWish}>순서 변경</button>
+              )}
+              <button style={styles.wishAddTriggerBtn} onClick={openAddWishModal}>+ 등록</button>
+            </div>
           )}
         </div>
 
@@ -496,140 +515,113 @@ export default function MyAccountPage() {
           <div style={styles.wishList}>
             {wishPlaces.map(place => (
               <div key={place.id} style={styles.wishItem}>
-                {editingWishId === place.id ? (
-                  <>
-                    <AutoTextarea
-                      style={styles.wishEditInput}
-                      value={editingWishText}
-                      onChange={e => setEditingWishText(e.target.value)}
-                      maxLength={200}
-                      minRows={2}
-                      enterKeyHint="enter"
-                      autoFocus
-                    />
-                    {myGroups.length > 0 && (
-                      <div style={styles.wishScopeBox}>
-                        <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 전체 공개)</span>
-                        <div style={styles.wishScopeChips}>
-                          {myGroups.map(g => (
-                            <button
-                              key={g.id}
-                              style={{ ...styles.groupPickTag, ...(editingWishGroupIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
-                              onClick={() => toggleEditingWishGroup(g.id)}
-                            >{g.name}</button>
+                {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
+                <LinkPreviewCard text={place.content} />
+                {(() => {
+                  const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
+                  return text && <div style={styles.wishText}>{text}</div>
+                })()}
+                {place.wish_place_shares?.length > 0 && (
+                  <span style={styles.wishScopeBadge}>🔒 {place.wish_place_shares.length}개 그룹만</span>
+                )}
+                {(() => {
+                  const itemProposals = wishProposals.filter(p => p.wish_place_id === place.id)
+                  if (itemProposals.length === 0) return null
+                  const isExpanded = expandedProposalsWishId === place.id
+                  return (
+                    <div style={styles.wishProposalsBox}>
+                      <button
+                        style={styles.wishProposalsToggle}
+                        onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
+                      >
+                        💬 {itemProposals.length}명이 관심을 보였어요 {isExpanded ? '▴' : '▾'}
+                      </button>
+                      {isExpanded && (
+                        <div style={styles.wishProposalsList}>
+                          {itemProposals.map(p => (
+                            <div key={p.id} style={styles.wishProposalRow}>
+                              {p.from_avatar_url ? (
+                                <img src={p.from_avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                              ) : (
+                                <div style={styles.wishProposalAvatar}>{p.from_nickname?.[0] ?? '?'}</div>
+                              )}
+                              <div style={styles.wishProposalTextCol}>
+                                <span style={styles.wishProposalName}>
+                                  {p.from_nickname}{p.group_name ? ` · ${p.group_name}` : ''}
+                                </span>
+                                {p.message && <span style={styles.wishProposalMessage}>{p.message}</span>}
+                              </div>
+                              <button style={styles.wishProposalDismiss} onClick={() => handleDismissProposal(p.id)}>닫기</button>
+                            </div>
                           ))}
                         </div>
-                      </div>
-                    )}
-                    <div style={styles.wishItemActions}>
-                      <button
-                        style={styles.wishActionBtn}
-                        onClick={handleSaveEditWish}
-                        disabled={!editingWishText.trim() || savingWishEdit}
-                      >{savingWishEdit ? '저장 중...' : '저장'}</button>
-                      <button style={styles.wishActionBtn} onClick={cancelEditWish} disabled={savingWishEdit}>취소</button>
+                      )}
                     </div>
-                  </>
+                  )
+                })()}
+                {confirmDeleteWishId === place.id ? (
+                  <div style={styles.wishItemActions}>
+                    <span style={styles.wishConfirmText}>삭제할까요?</span>
+                    <button style={styles.wishActionBtnDanger} onClick={() => handleDeleteWish(place.id)}>삭제</button>
+                    <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
+                  </div>
                 ) : (
-                  <>
-                    {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
-                    <LinkPreviewCard text={place.content} />
-                    {(() => {
-                      const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
-                      return text && <div style={styles.wishText}>{text}</div>
-                    })()}
-                    {place.wish_place_shares?.length > 0 && (
-                      <span style={styles.wishScopeBadge}>🔒 {place.wish_place_shares.length}개 그룹만</span>
-                    )}
-                    {(() => {
-                      const itemProposals = wishProposals.filter(p => p.wish_place_id === place.id)
-                      if (itemProposals.length === 0) return null
-                      const isExpanded = expandedProposalsWishId === place.id
-                      return (
-                        <div style={styles.wishProposalsBox}>
-                          <button
-                            style={styles.wishProposalsToggle}
-                            onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
-                          >
-                            💬 {itemProposals.length}명이 관심을 보였어요 {isExpanded ? '▴' : '▾'}
-                          </button>
-                          {isExpanded && (
-                            <div style={styles.wishProposalsList}>
-                              {itemProposals.map(p => (
-                                <div key={p.id} style={styles.wishProposalRow}>
-                                  {p.from_avatar_url ? (
-                                    <img src={p.from_avatar_url} alt="" style={styles.wishProposalAvatarImg} />
-                                  ) : (
-                                    <div style={styles.wishProposalAvatar}>{p.from_nickname?.[0] ?? '?'}</div>
-                                  )}
-                                  <div style={styles.wishProposalTextCol}>
-                                    <span style={styles.wishProposalName}>
-                                      {p.from_nickname}{p.group_name ? ` · ${p.group_name}` : ''}
-                                    </span>
-                                    {p.message && <span style={styles.wishProposalMessage}>{p.message}</span>}
-                                  </div>
-                                  <button style={styles.wishProposalDismiss} onClick={() => handleDismissProposal(p.id)}>닫기</button>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })()}
-                    {confirmDeleteWishId === place.id ? (
-                      <div style={styles.wishItemActions}>
-                        <span style={styles.wishConfirmText}>삭제할까요?</span>
-                        <button style={styles.wishActionBtnDanger} onClick={() => handleDeleteWish(place.id)}>삭제</button>
-                        <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
-                      </div>
-                    ) : (
-                      <div style={styles.wishItemActions}>
-                        <button style={styles.wishActionBtn} onClick={() => startEditWish(place)}>수정</button>
-                        <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(place.id)}>삭제</button>
-                      </div>
-                    )}
-                  </>
+                  <div style={styles.wishItemActions}>
+                    <button style={styles.wishActionBtn} onClick={() => startEditWish(place)}>수정</button>
+                    <button style={styles.wishActionBtnDanger} onClick={() => setConfirmDeleteWishId(place.id)}>삭제</button>
+                  </div>
                 )}
               </div>
             ))}
           </div>
         )}
+      </div>
+      )}
 
-        {!reorderingWish && (
-          <div style={styles.wishAddRow}>
+      {(showAddWishModal || editingWishId) && (
+        <div style={styles.modalOverlay} onClick={closeWishModal}>
+          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+            <div style={styles.wishModalTitle}>{editingWishId ? '가고 싶은 곳 수정' : '가고 싶은 곳 등록'}</div>
             <AutoTextarea
-              style={styles.wishAddInput}
+              style={styles.wishModalInput}
               placeholder="식당 이름, 메모, 링크 등을 자유롭게 적어보세요"
-              value={newWishText}
-              onChange={e => setNewWishText(e.target.value)}
+              value={editingWishId ? editingWishText : newWishText}
+              onChange={e => editingWishId ? setEditingWishText(e.target.value) : setNewWishText(e.target.value)}
               maxLength={200}
-              minRows={2}
+              minRows={3}
               enterKeyHint="enter"
+              autoFocus
             />
             {myGroups.length > 0 && (
               <div style={styles.wishScopeBox}>
                 <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 전체 공개)</span>
                 <div style={styles.wishScopeChips}>
-                  {myGroups.map(g => (
-                    <button
-                      key={g.id}
-                      style={{ ...styles.groupPickTag, ...(newWishGroupIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
-                      onClick={() => toggleNewWishGroup(g.id)}
-                    >{g.name}</button>
-                  ))}
+                  {myGroups.map(g => {
+                    const selectedIds = editingWishId ? editingWishGroupIds : newWishGroupIds
+                    const toggle = editingWishId ? toggleEditingWishGroup : toggleNewWishGroup
+                    return (
+                      <button
+                        key={g.id}
+                        style={{ ...styles.groupPickTag, ...(selectedIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
+                        onClick={() => toggle(g.id)}
+                      >{g.name}</button>
+                    )
+                  })}
                 </div>
               </div>
             )}
-            <button
-              style={{ ...styles.wishAddBtn, opacity: newWishText.trim() && !addingWish ? 1 : 0.4 }}
-              onClick={handleAddWish}
-              disabled={!newWishText.trim() || addingWish}
-            >
-              {addingWish ? '등록 중...' : '등록'}
-            </button>
+            <div style={styles.dialogBtns}>
+              <button
+                style={{ ...styles.dialogBtnPrimary, opacity: (editingWishId ? editingWishText : newWishText).trim() && !(editingWishId ? savingWishEdit : addingWish) ? 1 : 0.5 }}
+                onClick={editingWishId ? handleSaveEditWish : handleAddWish}
+                disabled={!(editingWishId ? editingWishText : newWishText).trim() || (editingWishId ? savingWishEdit : addingWish)}
+              >
+                {editingWishId ? (savingWishEdit ? '저장 중...' : '저장') : (addingWish ? '등록 중...' : '등록')}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={closeWishModal} disabled={editingWishId ? savingWishEdit : addingWish}>취소</button>
+            </div>
           </div>
-        )}
-      </div>
+        </div>
       )}
 
       {cropFile && (
@@ -734,16 +726,19 @@ const styles = {
 
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  wishHeaderBtns: { display: 'flex', alignItems: 'center', gap: 6 },
   wishOrderToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
+  wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
 
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   wishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
-  wishItemActions: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 },
+  wishItemActions: { display: 'flex', alignItems: 'center', gap: 18, marginTop: 4 },
   wishActionBtn: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishActionBtnDanger: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
-  wishEditInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  wishModalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
+  wishModalInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
 
   wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 },
   wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
@@ -762,10 +757,6 @@ const styles = {
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
-
-  wishAddRow: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  wishAddInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
-  wishAddBtn: { alignSelf: 'flex-end', padding: '8px 18px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
 
   wishOrderActions: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
 
