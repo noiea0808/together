@@ -23,23 +23,23 @@ function proxied(imageUrl) {
 export default function LinkPreviewCard({ text }) {
   const url = extractFirstUrl(text)
   const [preview, setPreview] = useState(null)
-  const [failed, setFailed] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
 
   useEffect(() => {
     if (!url) return
     const cached = getCache(`linkpreview:${url}`, ONE_DAY_MS)
     if (cached) { setPreview(cached.data); return }
-    setFailed(false)
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
       .then(data => { setCache(`linkpreview:${url}`, data); setPreview(data) })
-      .catch(() => setFailed(true))
+      .catch(() => {})
   }, [url])
 
   useEffect(() => { setImgFailed(false) }, [preview?.image])
 
-  if (!url || failed) return null
+  // preview 메타데이터를 못 가져와도(failed) 최소한 url/호스트명은 보여준다 —
+  // 위시 리스트처럼 원문 텍스트 없이 카드만 남기는 화면에서 아무것도 안 보이면 안 되기 때문.
+  if (!url) return null
 
   return (
     <a

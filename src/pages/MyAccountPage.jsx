@@ -11,7 +11,7 @@ import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AutoTextarea from '../components/AutoTextarea'
-import LinkPreviewCard from '../components/LinkPreviewCard'
+import LinkPreviewCard, { extractFirstUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
@@ -479,7 +479,10 @@ export default function MyAccountPage() {
                   </>
                 ) : (
                   <>
-                    <div style={styles.wishText}>{place.content}</div>
+                    {/* 등록한 내용이 링크 하나뿐이면 원문 주소 대신 미리보기 카드만 보여준다 */}
+                    {extractFirstUrl(place.content) !== place.content.trim() && (
+                      <div style={styles.wishText}>{place.content}</div>
+                    )}
                     <LinkPreviewCard text={place.content} />
                     {confirmDeleteWishId === place.id ? (
                       <div style={styles.wishItemActions}>
