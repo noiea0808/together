@@ -1,12 +1,17 @@
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { updateNickname, uploadAvatar, deleteAccount, setDiscoverable } from '../lib/db'
+import {
+  updateNickname, uploadAvatar, deleteAccount, setDiscoverable,
+  getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
+} from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
+import AutoTextarea from '../components/AutoTextarea'
+import LinkPreviewCard from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
@@ -51,10 +56,116 @@ export default function MyAccountPage() {
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
 
+  const [tab, setTab] = useState('info') // 'info' | 'wish'
+  const [wishPlaces, setWishPlaces] = useState([])
+  const [wishLoading, setWishLoading] = useState(false)
+  const [newWishText, setNewWishText] = useState('')
+  const [addingWish, setAddingWish] = useState(false)
+  const [editingWishId, setEditingWishId] = useState(null)
+  const [editingWishText, setEditingWishText] = useState('')
+  const [savingWishEdit, setSavingWishEdit] = useState(false)
+  const [confirmDeleteWishId, setConfirmDeleteWishId] = useState(null)
+  const [reorderingWish, setReorderingWish] = useState(false)
+  const [localWishPlaces, setLocalWishPlaces] = useState([])
+  const [savingWishOrder, setSavingWishOrder] = useState(false)
+
   useEffect(() => {
     if (!isPushSupported()) return
     getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
   }, [])
+
+  useEffect(() => {
+    if (tab !== 'wish' || !user) return
+    setWishLoading(true)
+    getWishPlaces(user.id)
+      .then(setWishPlaces)
+      .catch(e => console.error(e))
+      .finally(() => setWishLoading(false))
+  }, [tab, user?.id])
+
+  const handleAddWish = async () => {
+    if (!newWishText.trim() || addingWish) return
+    setAddingWish(true)
+    try {
+      const place = await addWishPlace(user.id, newWishText.trim())
+      setWishPlaces(prev => [...prev, place])
+      setNewWishText('')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAddingWish(false)
+    }
+  }
+
+  const startEditWish = (place) => {
+    setEditingWishId(place.id)
+    setEditingWishText(place.content)
+  }
+
+  const cancelEditWish = () => {
+    setEditingWishId(null)
+    setEditingWishText('')
+  }
+
+  const handleSaveEditWish = async () => {
+    if (!editingWishText.trim() || savingWishEdit) return
+    setSavingWishEdit(true)
+    try {
+      const content = editingWishText.trim()
+      await updateWishPlace(editingWishId, content)
+      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content } : p))
+      cancelEditWish()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingWishEdit(false)
+    }
+  }
+
+  const handleDeleteWish = async (id) => {
+    setConfirmDeleteWishId(null)
+    setWishPlaces(prev => prev.filter(p => p.id !== id))
+    try {
+      await deleteWishPlace(id)
+    } catch (e) {
+      console.error(e)
+      getWishPlaces(user.id).then(setWishPlaces).catch(() => {})
+    }
+  }
+
+  const startReorderWish = () => {
+    setLocalWishPlaces([...wishPlaces])
+    setReorderingWish(true)
+  }
+
+  const moveWish = (idx, dir) => {
+    setLocalWishPlaces(prev => {
+      const next = [...prev]
+      const target = idx + dir
+      if (target < 0 || target >= next.length) return prev
+      ;[next[idx], next[target]] = [next[target], next[idx]]
+      return next
+    })
+  }
+
+  const saveWishOrder = async () => {
+    setSavingWishOrder(true)
+    try {
+      const orders = localWishPlaces.map((p, i) => ({ id: p.id, sort_order: i }))
+      await updateWishPlaceOrder(user.id, orders)
+      setWishPlaces(localWishPlaces)
+      setReorderingWish(false)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setSavingWishOrder(false)
+    }
+  }
+
+  const cancelReorderWish = () => {
+    setReorderingWish(false)
+    setLocalWishPlaces([])
+  }
 
   const handleTogglePush = async () => {
     if (pushLoading) return
@@ -174,6 +285,12 @@ export default function MyAccountPage() {
         <button style={styles.headerLogoutBtn} onClick={handleLogout}>로그아웃</button>
       </div>
 
+      <div style={styles.tabs}>
+        <button style={{ ...styles.tabBtn, ...(tab === 'info' ? styles.tabBtnActive : {}) }} onClick={() => setTab('info')}>내 정보</button>
+        <button style={{ ...styles.tabBtn, ...(tab === 'wish' ? styles.tabBtnActive : {}) }} onClick={() => setTab('wish')}>가고 싶은데...</button>
+      </div>
+
+      {tab === 'info' && (
       <div style={styles.body}>
         {/* 프로필 */}
         <div style={styles.profileCard}>
@@ -294,6 +411,115 @@ export default function MyAccountPage() {
         )}
 
       </div>
+      )}
+
+      {tab === 'wish' && (
+      <div style={styles.body}>
+        <div style={styles.wishHeader}>
+          <span style={styles.wishCount}>{wishPlaces.length}곳</span>
+          {!reorderingWish && wishPlaces.length > 1 && (
+            <button style={styles.wishOrderToggle} onClick={startReorderWish}>순서 변경</button>
+          )}
+        </div>
+
+        {reorderingWish ? (
+          <>
+            <div style={styles.wishList}>
+              {localWishPlaces.map((place, idx) => (
+                <div key={place.id} style={styles.orderRow}>
+                  <span style={styles.orderHandle}>☰</span>
+                  <span style={styles.orderName}>{place.content}</span>
+                  <div style={styles.orderBtns}>
+                    <button
+                      style={{ ...styles.orderBtn, opacity: idx === 0 ? 0.25 : 1 }}
+                      onClick={() => moveWish(idx, -1)}
+                      disabled={idx === 0}
+                    >↑</button>
+                    <button
+                      style={{ ...styles.orderBtn, opacity: idx === localWishPlaces.length - 1 ? 0.25 : 1 }}
+                      onClick={() => moveWish(idx, 1)}
+                      disabled={idx === localWishPlaces.length - 1}
+                    >↓</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={styles.wishOrderActions}>
+              <button style={{ ...styles.dialogBtnPrimary, opacity: savingWishOrder ? 0.6 : 1 }} onClick={saveWishOrder} disabled={savingWishOrder}>
+                {savingWishOrder ? '저장 중...' : '저장'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={cancelReorderWish} disabled={savingWishOrder}>취소</button>
+            </div>
+          </>
+        ) : wishLoading ? (
+          <p style={styles.installDesc}>불러오는 중...</p>
+        ) : wishPlaces.length === 0 ? (
+          <p style={styles.installDesc}>아직 등록한 곳이 없어요. 가고 싶은 식당을 적어보세요!</p>
+        ) : (
+          <div style={styles.wishList}>
+            {wishPlaces.map(place => (
+              <div key={place.id} style={styles.wishItem}>
+                {editingWishId === place.id ? (
+                  <>
+                    <AutoTextarea
+                      style={styles.wishEditInput}
+                      value={editingWishText}
+                      onChange={e => setEditingWishText(e.target.value)}
+                      maxLength={200}
+                      autoFocus
+                    />
+                    <div style={styles.wishItemActions}>
+                      <button
+                        style={styles.wishActionBtn}
+                        onClick={handleSaveEditWish}
+                        disabled={!editingWishText.trim() || savingWishEdit}
+                      >{savingWishEdit ? '저장 중...' : '저장'}</button>
+                      <button style={styles.wishActionBtn} onClick={cancelEditWish} disabled={savingWishEdit}>취소</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div style={styles.wishText}>{place.content}</div>
+                    <LinkPreviewCard text={place.content} />
+                    {confirmDeleteWishId === place.id ? (
+                      <div style={styles.wishItemActions}>
+                        <span style={styles.wishConfirmText}>삭제할까요?</span>
+                        <button style={styles.wishActionBtnDanger} onClick={() => handleDeleteWish(place.id)}>삭제</button>
+                        <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
+                      </div>
+                    ) : (
+                      <div style={styles.wishItemActions}>
+                        <button style={styles.wishActionBtn} onClick={() => startEditWish(place)}>수정</button>
+                        <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(place.id)}>삭제</button>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {!reorderingWish && (
+          <div style={styles.wishAddRow}>
+            <AutoTextarea
+              style={styles.wishAddInput}
+              placeholder="식당 이름, 메모, 링크 등을 자유롭게 적어보세요"
+              value={newWishText}
+              onChange={e => setNewWishText(e.target.value)}
+              maxLength={200}
+            />
+            <button
+              style={{ ...styles.wishAddBtn, opacity: newWishText.trim() && !addingWish ? 1 : 0.4 }}
+              onClick={handleAddWish}
+              disabled={!newWishText.trim() || addingWish}
+            >
+              {addingWish ? '등록 중...' : '등록'}
+            </button>
+          </div>
+        )}
+      </div>
+      )}
 
       {cropFile && (
         <AvatarCropModal
@@ -390,4 +616,33 @@ const styles = {
   withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
   withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
   withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+
+  tabs: { display: 'flex', gap: 6, padding: '10px var(--spacing-md) 0', flexShrink: 0 },
+  tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+
+  wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  wishOrderToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
+
+  wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
+  wishItem: { display: 'flex', flexDirection: 'column', gap: 4, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 },
+  wishItemActions: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 },
+  wishActionBtn: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishActionBtnDanger: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  wishEditInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+
+  wishAddRow: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  wishAddInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  wishAddBtn: { alignSelf: 'flex-end', padding: '8px 18px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+
+  wishOrderActions: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
+
+  orderRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
+  orderHandle: { fontSize: 16, color: 'var(--color-text-muted)', flexShrink: 0 },
+  orderName: { flex: 1, fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  orderBtns: { display: 'flex', gap: 4, flexShrink: 0 },
+  orderBtn: { width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
 }

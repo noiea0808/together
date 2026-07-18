@@ -1455,3 +1455,60 @@ export async function getPublicMomentPots(todayStr) {
   if (error) throw error
   return data
 }
+
+// ── 가고 싶은 식당 (내 계정 > 가고 싶은데...) ──────────────
+// 지금은 본인 것만 조회/작성 가능(RLS). 친구 공유는 나중에 별도 테이블로 확장 예정.
+export async function getWishPlaces(userId) {
+  const { data, error } = await supabase
+    .from('wish_places')
+    .select('*')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addWishPlace(userId, content) {
+  const { data: last, error: lastError } = await supabase
+    .from('wish_places')
+    .select('sort_order')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  if (lastError) throw lastError
+  const nextOrder = (last?.[0]?.sort_order ?? -1) + 1
+
+  const { data, error } = await supabase
+    .from('wish_places')
+    .insert({ user_id: userId, content, sort_order: nextOrder })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateWishPlace(id, content) {
+  const { error } = await supabase
+    .from('wish_places')
+    .update({ content })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteWishPlace(id) {
+  const { error } = await supabase
+    .from('wish_places')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function updateWishPlaceOrder(userId, orders) {
+  // orders: [{ id, sort_order }, ...]
+  await Promise.all(orders.map(({ id, sort_order }) =>
+    supabase
+      .from('wish_places')
+      .update({ sort_order })
+      .match({ id, user_id: userId })
+  ))
+}
