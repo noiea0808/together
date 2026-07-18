@@ -466,6 +466,8 @@ export default function MyAccountPage() {
                       value={editingWishText}
                       onChange={e => setEditingWishText(e.target.value)}
                       maxLength={200}
+                      minRows={2}
+                      enterKeyHint="enter"
                       autoFocus
                     />
                     <div style={styles.wishItemActions}>
@@ -511,6 +513,8 @@ export default function MyAccountPage() {
               value={newWishText}
               onChange={e => setNewWishText(e.target.value)}
               maxLength={200}
+              minRows={2}
+              enterKeyHint="enter"
             />
             <button
               style={{ ...styles.wishAddBtn, opacity: newWishText.trim() && !addingWish ? 1 : 0.4 }}
