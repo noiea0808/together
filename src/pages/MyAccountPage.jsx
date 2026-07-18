@@ -76,6 +76,7 @@ export default function MyAccountPage() {
   const [wishProposals, setWishProposals] = useState([])
   const [expandedProposalsWishId, setExpandedProposalsWishId] = useState(null)
   const [showAddWishModal, setShowAddWishModal] = useState(false)
+  const [openWishMenuId, setOpenWishMenuId] = useState(null)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -515,15 +516,29 @@ export default function MyAccountPage() {
           <div style={styles.wishList}>
             {wishPlaces.map(place => (
               <div key={place.id} style={styles.wishItem}>
+                <div style={styles.wishCardTop}>
+                  <span style={styles.wishScopeBadge}>
+                    {place.wish_place_shares?.length > 0 ? `🔒 ${place.wish_place_shares.length}개 그룹만` : '🌍 전체 공개'}
+                  </span>
+                  <div style={{ position: 'relative' }}>
+                    <button style={styles.wishMenuBtn} onClick={() => setOpenWishMenuId(openWishMenuId === place.id ? null : place.id)}>⋯</button>
+                    {openWishMenuId === place.id && (
+                      <>
+                        <div style={styles.wishMenuBackdrop} onClick={() => setOpenWishMenuId(null)} />
+                        <div style={styles.wishMenuDropdown}>
+                          <button style={styles.wishMenuItem} onClick={() => { setOpenWishMenuId(null); startEditWish(place) }}>✏️ 수정</button>
+                          <button style={{ ...styles.wishMenuItem, color: 'var(--color-danger)' }} onClick={() => { setOpenWishMenuId(null); setConfirmDeleteWishId(place.id) }}>🗑 삭제</button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
                 {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
                 <LinkPreviewCard text={place.content} />
                 {(() => {
                   const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                   return text && <div style={styles.wishText}>{text}</div>
                 })()}
-                {place.wish_place_shares?.length > 0 && (
-                  <span style={styles.wishScopeBadge}>🔒 {place.wish_place_shares.length}개 그룹만</span>
-                )}
                 {(() => {
                   const itemProposals = wishProposals.filter(p => p.wish_place_id === place.id)
                   if (itemProposals.length === 0) return null
@@ -559,16 +574,11 @@ export default function MyAccountPage() {
                     </div>
                   )
                 })()}
-                {confirmDeleteWishId === place.id ? (
+                {confirmDeleteWishId === place.id && (
                   <div style={styles.wishItemActions}>
                     <span style={styles.wishConfirmText}>삭제할까요?</span>
                     <button style={styles.wishActionBtnDanger} onClick={() => handleDeleteWish(place.id)}>삭제</button>
                     <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
-                  </div>
-                ) : (
-                  <div style={styles.wishItemActions}>
-                    <button style={styles.wishActionBtn} onClick={() => startEditWish(place)}>수정</button>
-                    <button style={styles.wishActionBtnDanger} onClick={() => setConfirmDeleteWishId(place.id)}>삭제</button>
                   </div>
                 )}
               </div>
@@ -745,7 +755,24 @@ const styles = {
   wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
   groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
-  wishScopeBadge: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginTop: 2 },
+  wishCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  wishScopeBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
+  wishMenuBtn: {
+    width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
+    color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 900, cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, flexShrink: 0,
+  },
+  wishMenuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
+  wishMenuDropdown: {
+    position: 'absolute', top: '110%', right: 0, zIndex: 50, minWidth: 100,
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden',
+  },
+  wishMenuItem: {
+    width: '100%', padding: '10px 12px', background: 'none', border: 'none', textAlign: 'left',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  },
 
   wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
   wishProposalsToggle: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
