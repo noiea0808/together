@@ -56,6 +56,32 @@ function toDateStr(date) {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// 지금 시각에 가장 가까운 슬롯 — 각 슬롯의 첫 프리셋 시각을 기준으로, 그 시각을 지난 슬롯 중 가장 늦은 것을 고른다.
+// (예: 11시 → 점심, 아침 시작 07:00 이전 새벽 시간대는 기본값인 아침으로 유지)
+function getTimeBasedSlot(date = new Date()) {
+  const nowMin = date.getHours() * 60 + date.getMinutes()
+  const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+  let result = SLOT_ORDER[0]
+  for (const slot of SLOT_ORDER) {
+    if (nowMin >= toMin(SLOT_TIME_PRESETS[slot][0])) result = slot
+  }
+  return result
+}
+
+// 오늘 안에서 직접 고른 슬롯이 있으면 그걸, 없으면(하루가 바뀌었거나 처음 진입) 시간대 기본값을 보여준다.
+function getDefaultSlot() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('lastSelectedSlot') || 'null')
+    if (stored?.slot && stored.date === toDateStr(new Date())) return stored.slot
+  } catch {}
+  return getTimeBasedSlot()
+}
+
+function rememberSlot(slot) {
+  localStorage.setItem('lastSelectedSlot', JSON.stringify({ slot, date: toDateStr(new Date()) }))
+}
+
 function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
@@ -96,9 +122,7 @@ export default function TodayPage() {
     return TODAY
   })()
   const [currentDate, setCurrentDate] = useState(initialDate)
-  const [selectedSlot, setSelectedSlot] = useState(
-    () => localStorage.getItem('lastSelectedSlot') || '점심'
-  )
+  const [selectedSlot, setSelectedSlot] = useState(getDefaultSlot)
   const [viewMode, setViewMode] = useState(
     () => localStorage.getItem('lastViewMode') || 'group'
   )
@@ -127,7 +151,7 @@ export default function TodayPage() {
     if (slot === selectedSlot) return
     setSlideDir(SLOT_ORDER.indexOf(slot) > SLOT_ORDER.indexOf(selectedSlot) ? 'next' : 'prev')
     setSelectedSlot(slot)
-    localStorage.setItem('lastSelectedSlot', slot)
+    rememberSlot(slot)
   }
 
   const handleCardSwipeStart = (e) => { swipeStart.current = { x: e.clientX, y: e.clientY } }
@@ -676,7 +700,9 @@ export default function TodayPage() {
             style={{ ...styles.mainStatusBody, animation: `${slideDir === 'next' ? 'slotSlideFromRight' : 'slotSlideFromLeft'} 0.22s ease-out` }}
           >
             <div style={{ ...styles.mainStatusIconWrap, opacity: sectionInfo.isPastDate ? 0.6 : 1 }}>
-              {sectionInfo.key ? <StatusIcon statusKey={sectionInfo.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
+              {sectionInfo.key
+                ? <StatusIcon statusKey={sectionInfo.key} size={112} style={styles.mainStatusIconImg} />
+                : <SlotIcon slot={selectedSlot} size={112} style={styles.mainStatusIconImg} />}
             </div>
             <div style={styles.mainStatusTextCol}>
               {sectionInfo.label ? (
@@ -717,7 +743,7 @@ export default function TodayPage() {
                   onClick={() => goToSlot(slot)}
                 >
                   <span style={styles.subSlotEmojiWrap}>
-                    <SlotIcon slot={slot} size={28} muted={!isSelected} />
+                    <SlotIcon slot={slot} size={44} muted={!isSelected} style={styles.subSlotEmojiImg} />
                   </span>
                   <span style={styles.subSlotTextCol}>
                     <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
@@ -2238,7 +2264,13 @@ const styles = {
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
-  mainStatusIconWrap: { width: 75, height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  // 아이콘 원본 png에 연한 받침 원이 같이 그려져 있어, 확대 후 원형으로 잘라내 여백을 줄이고 흰 테두리로 마무리한다.
+  mainStatusIconWrap: {
+    width: 86, height: 86, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '3px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+  },
+  mainStatusIconImg: { width: 112, height: 112, flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
   mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },
@@ -2249,7 +2281,12 @@ const styles = {
   subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1, minWidth: 0 },
   subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
-  subSlotEmojiWrap: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  subSlotEmojiWrap: {
+    width: 34, height: 34, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '3px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+  },
+  subSlotEmojiImg: { width: 44, height: 44, flexShrink: 0 },
   subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
   subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },

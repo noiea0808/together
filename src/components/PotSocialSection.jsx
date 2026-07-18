@@ -35,6 +35,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const [batchUploading, setBatchUploading] = useState(null) // { done, total } | null
   const [photoMenuOpenId, setPhotoMenuOpenId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState(null)
   const photoInputRef = useRef(null)
   const photoScrollRef = useRef(null)
 
@@ -55,7 +56,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
     try { setPhotos(await getPotPhotos(potId)) } catch (e) { console.error(e) }
   }
 
-  useEffect(() => { loadComments(); loadPhotos() }, [potId])
+  useEffect(() => { loadComments(); loadPhotos(); setConfirmDeleteCommentId(null) }, [potId])
 
   const handlePostComment = async () => {
     if (!commentText.trim() || postingComment) return
@@ -70,6 +71,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   }
 
   const handleDeleteComment = async (commentId) => {
+    setConfirmDeleteCommentId(null)
     setComments(prev => prev.filter(c => c.id !== commentId))
     try {
       await deletePotComment(commentId, currentUserId)
@@ -232,7 +234,15 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                 <div style={S.commentText}>{c.content}</div>
               </div>
               {c.user_id === currentUserId && (
-                <button style={S.commentDeleteBtn} onClick={() => handleDeleteComment(c.id)}>삭제</button>
+                confirmDeleteCommentId === c.id ? (
+                  <div style={S.commentConfirmRow}>
+                    <span style={S.commentConfirmText}>삭제할까요?</span>
+                    <button style={S.commentConfirmDanger} onClick={() => handleDeleteComment(c.id)}>삭제</button>
+                    <button style={S.commentDeleteBtn} onClick={() => setConfirmDeleteCommentId(null)}>취소</button>
+                  </div>
+                ) : (
+                  <button style={S.commentDeleteBtn} onClick={() => setConfirmDeleteCommentId(c.id)}>삭제</button>
+                )
               )}
             </div>
           ))}
@@ -326,6 +336,9 @@ const S = {
   commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
   commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
+  commentConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
+  commentConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
   commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
   commentInputRowCompact: { marginTop: 10, paddingTop: 10 },
   commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
