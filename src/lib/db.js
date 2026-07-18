@@ -1457,15 +1457,31 @@ export async function getPublicMomentPots(todayStr) {
 }
 
 // ── 가고 싶은 식당 (내 계정 > 가고 싶은데...) ──────────────
-// 지금은 본인 것만 조회/작성 가능(RLS). 친구 공유는 나중에 별도 테이블로 확장 예정.
+// 지금은 본인 것만 조회/작성 가능(RLS). wish_place_shares로 그룹별 공개 범위를 함께 가져온다.
 export async function getWishPlaces(userId) {
   const { data, error } = await supabase
     .from('wish_places')
-    .select('*')
+    .select('*, wish_place_shares(group_id)')
     .eq('user_id', userId)
     .order('sort_order', { ascending: true })
   if (error) throw error
   return data
+}
+
+// 위시 항목의 그룹 공개 범위를 통째로 교체한다. groupIds가 비어있으면 전체 공개(제한 없음).
+export async function setWishPlaceShares(wishPlaceId, groupIds) {
+  const { error: delError } = await supabase
+    .from('wish_place_shares')
+    .delete()
+    .eq('wish_place_id', wishPlaceId)
+  if (delError) throw delError
+
+  if (groupIds.length > 0) {
+    const { error: insError } = await supabase
+      .from('wish_place_shares')
+      .insert(groupIds.map(group_id => ({ wish_place_id: wishPlaceId, group_id })))
+    if (insError) throw insError
+  }
 }
 
 export async function addWishPlace(userId, content) {
@@ -1511,4 +1527,66 @@ export async function updateWishPlaceOrder(userId, orders) {
       .update({ sort_order })
       .match({ id, user_id: userId })
   ))
+}
+
+// 친구 관리 화면에서 상대방의 위시 리스트를 볼 때 사용. wish_places RLS는 본인만
+// 허용하므로 friend_requests(accepted)/같은 그룹 여부(+ 그룹 제한)를 확인하는 RPC를 거친다.
+export async function getFriendWishPlaces(targetUserId) {
+  const { data, error } = await supabase.rpc('get_friend_wish_places', { target_user_id: targetUserId })
+  if (error) throw error
+  return data
+}
+
+// 친구의 위시 항목에 "같이 가고 싶어요" 제안을 보낸다. proposeMealTogether와 동일한 순서:
+// insert -> 보낸 사람 닉네임 조회 -> 알림함 기록 -> 푸시 발송. 알림/푸시 실패는 propose 자체를 막지 않는다.
+export async function proposeWishPlace({ wishPlaceId, fromUserId, toUserId, groupId, message }) {
+  const { data: proposal, error } = await supabase
+    .from('wish_place_proposals')
+    .insert({
+      wish_place_id: wishPlaceId, from_user_id: fromUserId, to_user_id: toUserId,
+      group_id: groupId || null, message: message || null,
+    })
+    .select()
+    .single()
+  if (error) throw error
+
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  // wish_places SELECT RLS는 본인 것만 허용 — 남의 항목 내용은 RLS 우회 RPC로 가져온다.
+  const { data: wishContent } = await supabase.rpc('get_wish_place_content', { p_wish_place_id: wishPlaceId })
+  const shortContent = wishContent ? (wishContent.length > 20 ? `${wishContent.slice(0, 20)}…` : wishContent) : '가고 싶은 곳'
+  const title = '가고 싶은 곳에 제안이 왔어요'
+  const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" 같이 가고 싶대요.`
+  const url = '/account?tab=wish'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: toUserId, wish_place_proposal_id: proposal.id, title, body, url, event_type: 'wish_propose',
+  })
+  if (notifError) console.error('proposeWishPlace 알림 insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [toUserId], title, body, url },
+  })
+  if (pushError) console.warn('proposeWishPlace send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('proposeWishPlace send-push 일부 실패:', pushResult.failures)
+
+  return proposal
+}
+
+// 친구의 위시리스트를 열 때 "이미 제안한 항목"을 표시하기 위해 한 번 불러온다.
+export async function getMySentWishProposals(toUserId) {
+  const { data, error } = await supabase.rpc('get_my_sent_wish_proposals', { p_to_user_id: toUserId })
+  if (error) throw error
+  return data
+}
+
+// 내 계정 화면에서 내 위시 항목들에 누가 관심을 보였는지 한 번에 조회.
+export async function getMyWishPlaceProposals() {
+  const { data, error } = await supabase.rpc('get_my_wish_place_proposals')
+  if (error) throw error
+  return data
+}
+
+export async function deleteWishPlaceProposal(id) {
+  const { error } = await supabase.from('wish_place_proposals').delete().eq('id', id)
+  if (error) throw error
 }

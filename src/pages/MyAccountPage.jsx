@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import {
   updateNickname, uploadAvatar, deleteAccount, setDiscoverable,
   getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
+  getMyGroups, setWishPlaceShares, getMyWishPlaceProposals, deleteWishPlaceProposal,
 } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
@@ -11,19 +12,10 @@ import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AutoTextarea from '../components/AutoTextarea'
-import LinkPreviewCard, { extractFirstUrl } from '../components/LinkPreviewCard'
+import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
-
-// 위시 항목에 링크가 섞여 있으면 카드로 미리보기를 보여주므로, 원문에서
-// 그 주소 부분만 잘라내고 나머지 메모만 카드 뒤에 이어서 보여준다.
-function wishTextWithoutUrl(content, url) {
-  if (!url) return content
-  const idx = content.indexOf(url)
-  if (idx === -1) return content
-  return (content.slice(0, idx) + content.slice(idx + url.length)).trim()
-}
 
 // 텍스트만 바뀌는 버튼("끄기"/"켜기")은 지금 켜져있는 상태인지 헷갈리기 쉬워서,
 // on/off가 색과 위치로 바로 보이는 스위치를 대신 쓴다.
@@ -45,6 +37,7 @@ function ToggleSwitch({ on, onClick, disabled, label }) {
 
 export default function MyAccountPage() {
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { user, logout, login } = useUser()
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const { isInstalled, isIOS } = useInstallPrompt()
@@ -65,18 +58,23 @@ export default function MyAccountPage() {
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
 
-  const [tab, setTab] = useState('info') // 'info' | 'wish'
+  const [tab, setTab] = useState(() => searchParams.get('tab') === 'wish' ? 'wish' : 'info') // 'info' | 'wish'
   const [wishPlaces, setWishPlaces] = useState([])
   const [wishLoading, setWishLoading] = useState(false)
   const [newWishText, setNewWishText] = useState('')
+  const [newWishGroupIds, setNewWishGroupIds] = useState([])
   const [addingWish, setAddingWish] = useState(false)
   const [editingWishId, setEditingWishId] = useState(null)
   const [editingWishText, setEditingWishText] = useState('')
+  const [editingWishGroupIds, setEditingWishGroupIds] = useState([])
   const [savingWishEdit, setSavingWishEdit] = useState(false)
   const [confirmDeleteWishId, setConfirmDeleteWishId] = useState(null)
   const [reorderingWish, setReorderingWish] = useState(false)
   const [localWishPlaces, setLocalWishPlaces] = useState([])
   const [savingWishOrder, setSavingWishOrder] = useState(false)
+  const [myGroups, setMyGroups] = useState([])
+  const [wishProposals, setWishProposals] = useState([])
+  const [expandedProposalsWishId, setExpandedProposalsWishId] = useState(null)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -86,8 +84,12 @@ export default function MyAccountPage() {
   useEffect(() => {
     if (tab !== 'wish' || !user) return
     setWishLoading(true)
-    getWishPlaces(user.id)
-      .then(setWishPlaces)
+    Promise.all([getWishPlaces(user.id), getMyGroups(user.id), getMyWishPlaceProposals()])
+      .then(([places, groups, proposals]) => {
+        setWishPlaces(places)
+        setMyGroups(groups)
+        setWishProposals(proposals)
+      })
       .catch(e => console.error(e))
       .finally(() => setWishLoading(false))
   }, [tab, user?.id])
@@ -97,8 +99,13 @@ export default function MyAccountPage() {
     setAddingWish(true)
     try {
       const place = await addWishPlace(user.id, newWishText.trim())
+      if (newWishGroupIds.length > 0) {
+        await setWishPlaceShares(place.id, newWishGroupIds)
+        place.wish_place_shares = newWishGroupIds.map(group_id => ({ group_id }))
+      }
       setWishPlaces(prev => [...prev, place])
       setNewWishText('')
+      setNewWishGroupIds([])
     } catch (e) {
       console.error(e)
     } finally {
@@ -106,14 +113,24 @@ export default function MyAccountPage() {
     }
   }
 
+  const toggleNewWishGroup = (groupId) => {
+    setNewWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
+  }
+
   const startEditWish = (place) => {
     setEditingWishId(place.id)
     setEditingWishText(place.content)
+    setEditingWishGroupIds((place.wish_place_shares ?? []).map(s => s.group_id))
   }
 
   const cancelEditWish = () => {
     setEditingWishId(null)
     setEditingWishText('')
+    setEditingWishGroupIds([])
+  }
+
+  const toggleEditingWishGroup = (groupId) => {
+    setEditingWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
   }
 
   const handleSaveEditWish = async () => {
@@ -122,12 +139,23 @@ export default function MyAccountPage() {
     try {
       const content = editingWishText.trim()
       await updateWishPlace(editingWishId, content)
-      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content } : p))
+      await setWishPlaceShares(editingWishId, editingWishGroupIds)
+      const shares = editingWishGroupIds.map(group_id => ({ group_id }))
+      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content, wish_place_shares: shares } : p))
       cancelEditWish()
     } catch (e) {
       console.error(e)
     } finally {
       setSavingWishEdit(false)
+    }
+  }
+
+  const handleDismissProposal = async (id) => {
+    setWishProposals(prev => prev.filter(p => p.id !== id))
+    try {
+      await deleteWishPlaceProposal(id)
+    } catch (e) {
+      console.error(e)
     }
   }
 
@@ -479,6 +507,20 @@ export default function MyAccountPage() {
                       enterKeyHint="enter"
                       autoFocus
                     />
+                    {myGroups.length > 0 && (
+                      <div style={styles.wishScopeBox}>
+                        <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 전체 공개)</span>
+                        <div style={styles.wishScopeChips}>
+                          {myGroups.map(g => (
+                            <button
+                              key={g.id}
+                              style={{ ...styles.groupPickTag, ...(editingWishGroupIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
+                              onClick={() => toggleEditingWishGroup(g.id)}
+                            >{g.name}</button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                     <div style={styles.wishItemActions}>
                       <button
                         style={styles.wishActionBtn}
@@ -493,8 +535,46 @@ export default function MyAccountPage() {
                     {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
                     <LinkPreviewCard text={place.content} />
                     {(() => {
-                      const text = wishTextWithoutUrl(place.content, extractFirstUrl(place.content))
+                      const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                       return text && <div style={styles.wishText}>{text}</div>
+                    })()}
+                    {place.wish_place_shares?.length > 0 && (
+                      <span style={styles.wishScopeBadge}>🔒 {place.wish_place_shares.length}개 그룹만</span>
+                    )}
+                    {(() => {
+                      const itemProposals = wishProposals.filter(p => p.wish_place_id === place.id)
+                      if (itemProposals.length === 0) return null
+                      const isExpanded = expandedProposalsWishId === place.id
+                      return (
+                        <div style={styles.wishProposalsBox}>
+                          <button
+                            style={styles.wishProposalsToggle}
+                            onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
+                          >
+                            💬 {itemProposals.length}명이 관심을 보였어요 {isExpanded ? '▴' : '▾'}
+                          </button>
+                          {isExpanded && (
+                            <div style={styles.wishProposalsList}>
+                              {itemProposals.map(p => (
+                                <div key={p.id} style={styles.wishProposalRow}>
+                                  {p.from_avatar_url ? (
+                                    <img src={p.from_avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                                  ) : (
+                                    <div style={styles.wishProposalAvatar}>{p.from_nickname?.[0] ?? '?'}</div>
+                                  )}
+                                  <div style={styles.wishProposalTextCol}>
+                                    <span style={styles.wishProposalName}>
+                                      {p.from_nickname}{p.group_name ? ` · ${p.group_name}` : ''}
+                                    </span>
+                                    {p.message && <span style={styles.wishProposalMessage}>{p.message}</span>}
+                                  </div>
+                                  <button style={styles.wishProposalDismiss} onClick={() => handleDismissProposal(p.id)}>닫기</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )
                     })()}
                     {confirmDeleteWishId === place.id ? (
                       <div style={styles.wishItemActions}>
@@ -526,6 +606,20 @@ export default function MyAccountPage() {
               minRows={2}
               enterKeyHint="enter"
             />
+            {myGroups.length > 0 && (
+              <div style={styles.wishScopeBox}>
+                <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 전체 공개)</span>
+                <div style={styles.wishScopeChips}>
+                  {myGroups.map(g => (
+                    <button
+                      key={g.id}
+                      style={{ ...styles.groupPickTag, ...(newWishGroupIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
+                      onClick={() => toggleNewWishGroup(g.id)}
+                    >{g.name}</button>
+                  ))}
+                </div>
+              </div>
+            )}
             <button
               style={{ ...styles.wishAddBtn, opacity: newWishText.trim() && !addingWish ? 1 : 0.4 }}
               onClick={handleAddWish}
@@ -650,6 +744,24 @@ const styles = {
   wishActionBtnDanger: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishEditInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+
+  wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 },
+  wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  wishScopeBadge: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginTop: 2 },
+
+  wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
+  wishProposalsToggle: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
+  wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
+  wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
+  wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
 
   wishAddRow: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   wishAddInput: { width: '100%', padding: '9px 11px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },

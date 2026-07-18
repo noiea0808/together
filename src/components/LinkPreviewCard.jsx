@@ -10,6 +10,15 @@ export function extractFirstUrl(text) {
   return match[0].replace(/[)\]}>.,!?"']+$/, '')
 }
 
+// 링크가 섞인 텍스트를 카드로 미리보기 할 때, 원문에서 그 주소 부분만 잘라내고
+// 나머지 메모만 카드 뒤에 이어서 보여주기 위한 헬퍼.
+export function textWithoutUrl(content, url) {
+  if (!url) return content
+  const idx = content.indexOf(url)
+  if (idx === -1) return content
+  return (content.slice(0, idx) + content.slice(idx + url.length)).trim()
+}
+
 function hostnameOf(url) {
   try { return new URL(url).hostname } catch { return url }
 }
