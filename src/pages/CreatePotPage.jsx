@@ -270,53 +270,69 @@ export default function CreatePotPage() {
             </div>
           </div>
 
-          {/* 세부 정보 (선택) */}
-          <div style={S.section}>
-            <div style={S.detailsRow}>
-              <input
-                style={S.sectionInput}
-                placeholder="밥팟 이름 (선택)"
-                value={form.title}
-                onChange={e => set('title', e.target.value)}
-                maxLength={20}
-              />
-              <input
-                style={S.sectionInput}
-                placeholder="메뉴 (선택)"
-                value={form.menu}
-                onChange={e => set('menu', e.target.value)}
-                maxLength={20}
-              />
-            </div>
-            <AutoTextarea
-              style={{ ...S.sectionInput, marginTop: 6 }}
-              placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
-              value={form.memo}
-              onChange={e => set('memo', e.target.value)}
-              maxLength={200}
-            />
+          {/* 구분: 필수 → 선택 */}
+          <div style={S.divider}>
+            <div style={S.dividerLine} />
+            <span style={S.dividerLabel}>더 꾸며볼까요 (선택)</span>
+            <div style={S.dividerLine} />
           </div>
 
-          {/* 공개 범위 */}
-          <div style={S.section}>
-            <div style={S.sectionLabel}>🔓 공개 범위</div>
-            <div style={S.groupRow}>
-              <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
-              <button style={{ ...S.groupBtn, ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
+          {/* 선택 트레이: 세부 정보 + 공개 범위 */}
+          <div style={S.tray}>
+            <div>
+              <div style={S.sectionLabel}>✏️ 이름 · 메뉴 · 한마디</div>
+              <div style={S.detailsRow}>
+                <input
+                  style={S.trayInput}
+                  placeholder="밥팟 이름"
+                  value={form.title}
+                  onChange={e => set('title', e.target.value)}
+                  maxLength={20}
+                />
+                <input
+                  style={S.trayInput}
+                  placeholder="메뉴"
+                  value={form.menu}
+                  onChange={e => set('menu', e.target.value)}
+                  maxLength={20}
+                />
+              </div>
+              <AutoTextarea
+                style={{ ...S.trayInput, marginTop: 6 }}
+                placeholder="한마디 (예: 빠르게 먹고 와요!)"
+                value={form.memo}
+                onChange={e => set('memo', e.target.value)}
+                maxLength={200}
+              />
             </div>
-            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+
+            <div style={S.trayDivider} />
+
+            <div>
+              <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+                <span>🔓 공개 범위</span>
+                <span style={S.hint}>기본: 그룹만</span>
+              </div>
+              <div style={S.groupRow}>
+                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
+                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
+              </div>
+              {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+            </div>
           </div>
 
           {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
-
-          <button
-            style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1 }}
-            onClick={handleCreate}
-            disabled={loading}
-          >
-            {loading ? '생성 중...' : <>밥팟 열기 <RiceBowlIcon size={18} /></>}
-          </button>
         </div>
+      </div>
+
+      <div style={S.footer}>
+        <button
+          style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1 }}
+          onClick={handleCreate}
+          disabled={loading}
+        >
+          {loading ? '생성 중...' : <>밥팟 열기 <RiceBowlIcon size={18} /></>}
+        </button>
       </div>
 
       {/* 시간 캐러셀 팝업 */}
@@ -373,7 +389,7 @@ const S = {
     borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
     letterSpacing: '-0.2px',
   },
-  groupBtnActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  groupBtnActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
   groupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
   publicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
 
@@ -382,11 +398,14 @@ const S = {
     padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  chipActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  chipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
 
   stepper: { display: 'flex', alignItems: 'center', gap: 10 },
   stepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
-  stepperNum: { fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 30, textAlign: 'center' },
+  stepperNum: {
+    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary)',
+  },
 
   detailsRow: { display: 'flex', gap: 6 },
   sectionInput: {
@@ -395,7 +414,21 @@ const S = {
     color: 'var(--color-text)', boxSizing: 'border-box',
   },
 
+  divider: { display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' },
+  dividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
+  dividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+
+  tray: { background: 'var(--color-tray)', borderRadius: 'var(--radius-lg)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 },
+  trayInput: {
+    width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-surface)',
+    color: 'var(--color-text)', boxSizing: 'border-box',
+  },
+  trayDivider: { height: 1, background: 'rgba(0,0,0,0.06)' },
+  hint: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 },
+
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
+  footer: { flexShrink: 0, padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   timeDialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },

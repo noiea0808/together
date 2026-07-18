@@ -14,6 +14,7 @@
   --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
   --color-surface-2: #F5F0EB;
+  --color-tray: #F0E3CF;
 
   --color-text: #1A1A1A;
   --color-text-muted: #857B72;
@@ -110,6 +111,14 @@ body {
 @keyframes toastIn {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slotSlideFromRight {
+  from { opacity: 0; transform: translateX(18px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+@keyframes slotSlideFromLeft {
+  from { opacity: 0; transform: translateX(-18px); }
+  to   { opacity: 1; transform: translateX(0); }
 }
 
 /* ===== 공통 유틸 ===== */

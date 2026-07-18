@@ -110,6 +110,37 @@ export default function TodayPage() {
     if (!el) return
     el.scrollLeft += dir * 200
   }
+  const subSlotBtnRefs = useRef({})
+  const [slideDir, setSlideDir] = useState('next')
+  const swipeStart = useRef(null)
+
+  // 선택된 슬롯 버튼을 서브탭 행 중앙으로 — 위 스크롤과 같은 이유로 scrollLeft 직접 대입
+  const centerSubSlot = (slot) => {
+    const container = subSlotRowRef.current
+    const btn = subSlotBtnRefs.current[slot]
+    if (!container || !btn) return
+    container.scrollLeft = Math.max(0, btn.offsetLeft - (container.clientWidth - btn.clientWidth) / 2)
+  }
+
+  // 메인 상태 카드 스와이프·서브탭 클릭 공용 슬롯 전환 — 방향에 따라 슬라이드 애니메이션 결정
+  const goToSlot = (slot) => {
+    if (slot === selectedSlot) return
+    setSlideDir(SLOT_ORDER.indexOf(slot) > SLOT_ORDER.indexOf(selectedSlot) ? 'next' : 'prev')
+    setSelectedSlot(slot)
+    localStorage.setItem('lastSelectedSlot', slot)
+  }
+
+  const handleCardSwipeStart = (e) => { swipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleCardSwipeEnd = (e) => {
+    if (!swipeStart.current) return
+    const dx = e.clientX - swipeStart.current.x
+    const dy = e.clientY - swipeStart.current.y
+    swipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    const idx = SLOT_ORDER.indexOf(selectedSlot)
+    if (dx < 0 && idx < SLOT_ORDER.length - 1) goToSlot(SLOT_ORDER[idx + 1])
+    else if (dx > 0 && idx > 0) goToSlot(SLOT_ORDER[idx - 1])
+  }
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
   const [slotEndPickerOpen, setSlotEndPickerOpen] = useState(false)
@@ -249,6 +280,8 @@ export default function TodayPage() {
       setLoading(false)
     }
   }, [user, dateStr, applySnapshot])
+
+  useEffect(() => { centerSubSlot(selectedSlot) }, [selectedSlot])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -626,14 +659,22 @@ export default function TodayPage() {
         return (
       <div style={{ ...styles.myStatusSection, background: sectionTheme.bg }}>
         {/* 핵심 카드: 항상 흰 배경, 상태는 텍스트 색상으로만 강조 */}
-        <div style={styles.mainStatusCard}>
+        <div
+          style={{ ...styles.mainStatusCard, touchAction: 'pan-y' }}
+          onPointerDown={handleCardSwipeStart}
+          onPointerUp={handleCardSwipeEnd}
+          onPointerCancel={() => { swipeStart.current = null }}
+        >
           <div style={styles.mainStatusHeaderRow}>
             <span style={styles.mainStatusTitle}>내 {selectedSlot} 상태</span>
             {!sectionInfo.isPastDate && (
               <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
             )}
           </div>
-          <div style={styles.mainStatusBody}>
+          <div
+            key={selectedSlot}
+            style={{ ...styles.mainStatusBody, animation: `${slideDir === 'next' ? 'slotSlideFromRight' : 'slotSlideFromLeft'} 0.22s ease-out` }}
+          >
             <div style={{ ...styles.mainStatusIconWrap, opacity: sectionInfo.isPastDate ? 0.6 : 1 }}>
               {sectionInfo.key ? <StatusIcon statusKey={sectionInfo.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
             </div>
@@ -666,16 +707,14 @@ export default function TodayPage() {
               return (
                 <button
                   key={slot}
+                  ref={el => { subSlotBtnRefs.current[slot] = el }}
                   style={{
                     ...styles.subSlotBtn,
                     borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
                     background: '#fff',
                     opacity: info.isPastDate ? 0.65 : 1,
                   }}
-                  onClick={() => {
-                    setSelectedSlot(slot)
-                    localStorage.setItem('lastSelectedSlot', slot)
-                  }}
+                  onClick={() => goToSlot(slot)}
                 >
                   <span style={styles.subSlotEmojiWrap}>
                     <SlotIcon slot={slot} size={28} muted={!isSelected} />
@@ -2208,7 +2247,7 @@ const styles = {
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
   subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minWidth: 0 },
+  subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1, minWidth: 0 },
   subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
   subSlotEmojiWrap: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
