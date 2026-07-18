@@ -16,6 +16,15 @@ import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
+// 위시 항목에 링크가 섞여 있으면 카드로 미리보기를 보여주므로, 원문에서
+// 그 주소 부분만 잘라내고 나머지 메모만 카드 뒤에 이어서 보여준다.
+function wishTextWithoutUrl(content, url) {
+  if (!url) return content
+  const idx = content.indexOf(url)
+  if (idx === -1) return content
+  return (content.slice(0, idx) + content.slice(idx + url.length)).trim()
+}
+
 // 텍스트만 바뀌는 버튼("끄기"/"켜기")은 지금 켜져있는 상태인지 헷갈리기 쉬워서,
 // on/off가 색과 위치로 바로 보이는 스위치를 대신 쓴다.
 function ToggleSwitch({ on, onClick, disabled, label }) {
@@ -481,11 +490,12 @@ export default function MyAccountPage() {
                   </>
                 ) : (
                   <>
-                    {/* 등록한 내용이 링크 하나뿐이면 원문 주소 대신 미리보기 카드만 보여준다 */}
-                    {extractFirstUrl(place.content) !== place.content.trim() && (
-                      <div style={styles.wishText}>{place.content}</div>
-                    )}
+                    {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
                     <LinkPreviewCard text={place.content} />
+                    {(() => {
+                      const text = wishTextWithoutUrl(place.content, extractFirstUrl(place.content))
+                      return text && <div style={styles.wishText}>{text}</div>
+                    })()}
                     {confirmDeleteWishId === place.id ? (
                       <div style={styles.wishItemActions}>
                         <span style={styles.wishConfirmText}>삭제할까요?</span>
@@ -634,7 +644,7 @@ const styles = {
 
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   wishItem: { display: 'flex', flexDirection: 'column', gap: 4, padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5 },
+  wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
   wishItemActions: { display: 'flex', alignItems: 'center', gap: 10, marginTop: 4 },
   wishActionBtn: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishActionBtnDanger: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
