@@ -1,10 +1,10 @@
 // 앱 전역에서 쓰는 라인 아이콘 세트 (원래 그룹 팝업 전용이었으나 이모지 아이콘을
 // 대체하며 공용으로 확장됨). 이모지 대신 stroke 기반 SVG로 통일 — currentColor를
 // 따라가므로 버튼 배경이 밝든 어둡든 색이 항상 정확히 맞는다.
-function IconBase({ size = 20, strokeWidth = 1.8, children }) {
+function IconBase({ size = 20, strokeWidth = 1.8, children, ...rest }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round">
+      strokeWidth={strokeWidth} strokeLinecap="round" strokeLinejoin="round" {...rest}>
       {children}
     </svg>
   )
@@ -82,6 +82,19 @@ export function SettingsIcon(props) {
     <IconBase {...props}>
       <circle cx="12" cy="12" r="3.2" />
       <path d="M12 3v2.2M12 18.8V21M21 12h-2.2M5.2 12H3M18.1 5.9l-1.5 1.5M7.4 16.6l-1.5 1.5M18.1 18.1l-1.5-1.5M7.4 7.4L5.9 5.9" />
+    </IconBase>
+  )
+}
+
+export function SlidersIcon(props) {
+  return (
+    <IconBase {...props}>
+      <line x1="4" y1="6" x2="20" y2="6" />
+      <circle cx="9" cy="6" r="2" fill="currentColor" />
+      <line x1="4" y1="12" x2="20" y2="12" />
+      <circle cx="15" cy="12" r="2" fill="currentColor" />
+      <line x1="4" y1="18" x2="20" y2="18" />
+      <circle cx="11" cy="18" r="2" fill="currentColor" />
     </IconBase>
   )
 }

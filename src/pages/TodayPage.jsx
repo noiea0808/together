@@ -14,7 +14,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SettingsIcon, UndoIcon, ChevronDownIcon } from '../components/GroupIcons'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import PotIcon from '../components/PotIcon'
@@ -1733,7 +1733,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             >{isShared ? '공유중' : '비공유'}</button>
           )}
           <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }} aria-label="그룹 설정">
-            <SettingsIcon size={15} strokeWidth={2} />
+            <SlidersIcon size={15} strokeWidth={2} />
           </button>
           <button style={{ ...styles.groupHeaderIconBtn, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)} aria-label={collapsed ? '펼치기' : '접기'}>
             <ChevronDownIcon size={15} strokeWidth={2.4} style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s ease' }} />
