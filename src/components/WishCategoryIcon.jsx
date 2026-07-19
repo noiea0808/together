@@ -1,5 +1,12 @@
 // 작은 크기(리스트/피커)에서도 구분되도록, 3D PNG 대신 배지+굵은 심볼 형태의 벡터 아이콘을 쓴다.
-// 배경이 같은 원형(브랜드 컬러)이라 실루엣이 아니라 안쪽 심볼 모양만으로 카테고리를 구분한다.
+// 배경 색을 카테고리별로 다르게 줘서 실루엣만으로도 한눈에 구분되게 한다.
+const BG_COLORS = {
+  like: '#FF5D7A',
+  curious: '#8B5CF6',
+  together: '#1E88E5',
+  frequent: '#3DBB5C',
+}
+
 const GLYPHS = {
   like: (
     <path
@@ -30,7 +37,7 @@ const GLYPHS = {
 export default function WishCategoryIcon({ category, size = 24, style, ...props }) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" style={{ display: 'block', flexShrink: 0, ...style }} {...props}>
-      <rect width="24" height="24" rx="7" fill="var(--color-primary)" />
+      <rect width="24" height="24" rx="7" fill={BG_COLORS[category] ?? 'var(--color-primary)'} />
       {GLYPHS[category] ?? GLYPHS.like}
     </svg>
   )

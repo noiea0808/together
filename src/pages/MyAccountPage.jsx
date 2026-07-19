@@ -5,6 +5,7 @@ import {
   updateNickname, uploadAvatar, deleteAccount, setDiscoverable,
   getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
+  getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
@@ -79,6 +80,12 @@ export default function MyAccountPage() {
   const [openWishCommentsId, setOpenWishCommentsId] = useState(null)
   const [wishCommentsMap, setWishCommentsMap] = useState({}) // wish_place_id -> comments[]
   const [wishCommentsLoading, setWishCommentsLoading] = useState(false)
+  const [newWishCommentText, setNewWishCommentText] = useState('')
+  const [wishCommentSending, setWishCommentSending] = useState(false)
+  const [mentionTarget, setMentionTarget] = useState(null) // { userId, nickname } | null
+  const [openWishLikersId, setOpenWishLikersId] = useState(null)
+  const [wishLikersMap, setWishLikersMap] = useState({}) // wish_place_id -> likers[]
+  const [wishLikersLoading, setWishLikersLoading] = useState(false)
   const [showAddWishModal, setShowAddWishModal] = useState(false)
   const [openWishMenuId, setOpenWishMenuId] = useState(null)
 
@@ -103,6 +110,8 @@ export default function MyAccountPage() {
   const toggleWishComments = (place) => {
     const next = openWishCommentsId === place.id ? null : place.id
     setOpenWishCommentsId(next)
+    setNewWishCommentText('')
+    setMentionTarget(null)
     if (next && !wishCommentsMap[next]) {
       setWishCommentsLoading(true)
       getWishPlaceComments(next)
@@ -123,6 +132,53 @@ export default function MyAccountPage() {
     } catch (e) {
       console.error(e)
       getWishPlaceComments(place.id).then(comments => setWishCommentsMap(prev => ({ ...prev, [place.id]: comments }))).catch(() => {})
+    }
+  }
+
+  // 댓글 작성자 닉네임을 선택하면 입력창에 "@닉네임 "을 채우고, 등록 시 그 사람에게 멘션 알림을 보낸다.
+  const insertMention = (comment) => {
+    const tag = `@${comment.nickname} `
+    setNewWishCommentText(prev => (prev.startsWith(tag) ? prev : tag + prev))
+    setMentionTarget({ userId: comment.user_id, nickname: comment.nickname })
+  }
+
+  const onWishCommentTextChange = (value) => {
+    setNewWishCommentText(value)
+    if (mentionTarget && !value.startsWith(`@${mentionTarget.nickname} `)) {
+      setMentionTarget(null)
+    }
+  }
+
+  const sendWishComment = async (place) => {
+    const content = newWishCommentText.trim()
+    if (!content || wishCommentSending) return
+    setWishCommentSending(true)
+    try {
+      const comment = await addWishPlaceComment(place.id, user.id, content, mentionTarget?.userId ?? null)
+      setWishCommentsMap(prev => ({ ...prev, [place.id]: [...(prev[place.id] ?? []), comment] }))
+      setWishReactionsMap(prev => ({
+        ...prev,
+        [place.id]: { ...prev[place.id], comment_count: (prev[place.id]?.comment_count ?? 0) + 1 },
+      }))
+      setNewWishCommentText('')
+      setMentionTarget(null)
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setWishCommentSending(false)
+    }
+  }
+
+  const toggleWishLikers = (place) => {
+    if ((wishReactionsMap[place.id]?.like_count ?? 0) === 0) return
+    const next = openWishLikersId === place.id ? null : place.id
+    setOpenWishLikersId(next)
+    if (next && !wishLikersMap[next]) {
+      setWishLikersLoading(true)
+      getWishPlaceLikers(next)
+        .then(likers => setWishLikersMap(prev => ({ ...prev, [next]: likers })))
+        .catch(e => console.error(e))
+        .finally(() => setWishLikersLoading(false))
     }
   }
 
@@ -519,7 +575,7 @@ export default function MyAccountPage() {
                           </span>
                         ))
                       ) : (
-                        <span style={styles.wishScopeBadge}>🔒 나만 보기</span>
+                        <span style={styles.wishScopeBadge}>나만 보기</span>
                       )}
                     </div>
                   </div>
@@ -549,11 +605,19 @@ export default function MyAccountPage() {
                   const showOrderBtns = wishPlaces.length > 1
                   const isExpanded = openWishCommentsId === place.id
                   const comments = wishCommentsMap[place.id] ?? []
+                  const isLikersExpanded = openWishLikersId === place.id
+                  const likers = wishLikersMap[place.id] ?? []
                   return (
                     <div style={styles.wishProposalsBox}>
                       <div style={styles.wishProposalsRow}>
                         <div style={styles.wishReactionRow}>
-                          <span style={styles.wishLikeCount}>{likeCount > 0 ? `❤️ ${likeCount}` : '🤍 0'}</span>
+                          <button
+                            style={{ ...styles.wishLikeCount, cursor: likeCount > 0 ? 'pointer' : 'default' }}
+                            onClick={() => toggleWishLikers(place)}
+                            disabled={likeCount === 0}
+                          >
+                            {likeCount > 0 ? `❤️ ${likeCount}` : '🤍 0'} {likeCount > 0 ? (isLikersExpanded ? '▴' : '▾') : ''}
+                          </button>
                           <button style={styles.wishProposalsToggle} onClick={() => toggleWishComments(place)}>
                             💬 {commentCount > 0 ? `${commentCount}개의 댓글` : '댓글'} {isExpanded ? '▴' : '▾'}
                           </button>
@@ -573,29 +637,66 @@ export default function MyAccountPage() {
                           </div>
                         )}
                       </div>
-                      {isExpanded && (
-                        wishCommentsLoading && comments.length === 0 ? (
+                      {isLikersExpanded && (
+                        wishLikersLoading && likers.length === 0 ? (
                           <p style={styles.installDesc}>불러오는 중...</p>
-                        ) : comments.length === 0 ? (
-                          <p style={styles.installDesc}>아직 댓글이 없어요.</p>
+                        ) : likers.length === 0 ? (
+                          <p style={styles.installDesc}>아직 아무도 하트를 남기지 않았어요.</p>
                         ) : (
                           <div style={styles.wishProposalsList}>
-                            {comments.map(c => (
-                              <div key={c.id} style={styles.wishProposalRow}>
-                                {c.avatar_url ? (
-                                  <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                            {likers.map(l => (
+                              <div key={l.user_id} style={styles.wishProposalRow}>
+                                {l.avatar_url ? (
+                                  <img src={l.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                 ) : (
-                                  <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                  <div style={styles.wishProposalAvatar}>{l.nickname?.[0] ?? '?'}</div>
                                 )}
-                                <div style={styles.wishProposalTextCol}>
-                                  <span style={styles.wishProposalName}>{c.nickname}</span>
-                                  <span style={styles.wishProposalMessage}>{c.content}</span>
-                                </div>
-                                <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                <span style={styles.wishProposalName}>{l.nickname}</span>
                               </div>
                             ))}
                           </div>
                         )
+                      )}
+                      {isExpanded && (
+                        <>
+                          {wishCommentsLoading && comments.length === 0 ? (
+                            <p style={styles.installDesc}>불러오는 중...</p>
+                          ) : comments.length === 0 ? (
+                            <p style={styles.installDesc}>아직 댓글이 없어요.</p>
+                          ) : (
+                            <div style={styles.wishProposalsList}>
+                              {comments.map(c => (
+                                <div key={c.id} style={styles.wishProposalRow}>
+                                  {c.avatar_url ? (
+                                    <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                                  ) : (
+                                    <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                  )}
+                                  <div style={styles.wishProposalTextCol}>
+                                    <button style={styles.wishProposalNameBtn} onClick={() => insertMention(c)}>{c.nickname}</button>
+                                    <span style={styles.wishProposalMessage}>{c.content}</span>
+                                  </div>
+                                  <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <div style={styles.wishCommentInputRow}>
+                            <input
+                              style={{ ...styles.wishModalInput, ...styles.wishCommentInput }}
+                              placeholder="댓글 달기"
+                              value={newWishCommentText}
+                              onChange={e => onWishCommentTextChange(e.target.value)}
+                              maxLength={200}
+                              onKeyDown={e => { if (e.key === 'Enter') sendWishComment(place) }}
+                            />
+                            <button
+                              style={{ ...styles.wishProposalsToggle, opacity: newWishCommentText.trim() && !wishCommentSending ? 1 : 0.4 }}
+                              onClick={() => sendWishComment(place)}
+                              disabled={!newWishCommentText.trim() || wishCommentSending}
+                            >등록</button>
+                          </div>
+                        </>
                       )}
                     </div>
                   )
@@ -629,16 +730,6 @@ export default function MyAccountPage() {
         <div style={styles.modalOverlay} onClick={closeWishModal}>
           <div style={{ ...styles.modal, paddingLeft: 'var(--spacing-md)', paddingRight: 'var(--spacing-md)' }} onClick={e => e.stopPropagation()}>
             <div style={styles.wishModalTitle}>{editingWishId ? '가고 싶은 곳 수정' : '가고 싶은 곳 등록'}</div>
-            <AutoTextarea
-              style={styles.wishModalInput}
-              placeholder="식당 이름, 메모, 링크 등을 자유롭게 적어보세요"
-              value={editingWishId ? editingWishText : newWishText}
-              onChange={e => editingWishId ? setEditingWishText(e.target.value) : setNewWishText(e.target.value)}
-              maxLength={200}
-              minRows={3}
-              enterKeyHint="enter"
-              autoFocus
-            />
             <div style={styles.wishScopeBox}>
               <span style={styles.wishScopeLabel}>카테고리</span>
               <WishCategoryPicker
@@ -674,6 +765,16 @@ export default function MyAccountPage() {
                 </div>
               </div>
             )}
+            <AutoTextarea
+              style={styles.wishModalInput}
+              placeholder="식당 이름, 메모, 링크 등을 자유롭게 적어보세요"
+              value={editingWishId ? editingWishText : newWishText}
+              onChange={e => editingWishId ? setEditingWishText(e.target.value) : setNewWishText(e.target.value)}
+              maxLength={200}
+              minRows={3}
+              enterKeyHint="enter"
+              autoFocus
+            />
             <div style={styles.dialogBtns}>
               <button
                 style={{ ...styles.dialogBtnPrimary, opacity: (editingWishId ? editingWishText : newWishText).trim() && !(editingWishId ? savingWishEdit : addingWish) ? 1 : 0.5 }}
@@ -845,7 +946,7 @@ const styles = {
   wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
   wishProposalsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishReactionRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' },
   wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
@@ -853,8 +954,11 @@ const styles = {
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishCommentInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 },
+  wishCommentInput: { flex: 1, padding: '8px 12px', fontSize: 'var(--font-size-2xs)' },
 
   wishOrderBtns: { display: 'flex', justifyContent: 'flex-end', gap: 4, flexShrink: 0 },
   wishOrderBtn: { width: 26, height: 26, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' },

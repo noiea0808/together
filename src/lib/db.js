@@ -1621,6 +1621,13 @@ export async function unlikeWishPlace(wishPlaceId, userId) {
   if (error) throw error
 }
 
+// 위시 항목에 좋아요 남긴 사람 목록. users RLS를 우회하는 RPC를 거친다(get_wish_place_likes).
+export async function getWishPlaceLikers(wishPlaceId) {
+  const { data, error } = await supabase.rpc('get_wish_place_likes', { p_wish_place_id: wishPlaceId })
+  if (error) throw error
+  return data
+}
+
 // 위시 항목 댓글 목록. users RLS를 우회하는 RPC를 거친다(get_wish_place_comments).
 export async function getWishPlaceComments(wishPlaceId) {
   const { data, error } = await supabase.rpc('get_wish_place_comments', { p_wish_place_id: wishPlaceId })
@@ -1628,7 +1635,9 @@ export async function getWishPlaceComments(wishPlaceId) {
   return data
 }
 
-export async function addWishPlaceComment(wishPlaceId, userId, content) {
+// mentionedUserId를 넘기면 댓글 등록 후 그 사용자에게 별도로 멘션 알림/푸시를 보낸다
+// (게시물 소유자 알림과는 별개 — 예: owner가 자기 글에 남긴 댓글에서 다른 사람을 멘션한 경우).
+export async function addWishPlaceComment(wishPlaceId, userId, content, mentionedUserId = null) {
   const { data: comment, error } = await supabase
     .from('wish_place_comments')
     .insert({ wish_place_id: wishPlaceId, user_id: userId, content })
@@ -1642,8 +1651,33 @@ export async function addWishPlaceComment(wishPlaceId, userId, content) {
     title: '가고 싶은 곳에 댓글이 달렸어요', bodyPrefix: '에 댓글을 남겼어요.',
   })
 
+  if (mentionedUserId && mentionedUserId !== userId) {
+    await notifyWishPlaceMention({ commentId: comment.id, wishPlaceId, fromUserId: userId, mentionedUserId })
+  }
+
   const { data: from } = await supabase.from('users').select('nickname, avatar_url').eq('id', userId).single()
   return { ...comment, nickname: from?.nickname, avatar_url: from?.avatar_url }
+}
+
+async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, mentionedUserId }) {
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  const { data: wishContent } = await supabase.rpc('get_wish_place_content', { p_wish_place_id: wishPlaceId })
+  const shortContent = wishContent ? (wishContent.length > 20 ? `${wishContent.slice(0, 20)}…` : wishContent) : '가고 싶은 곳'
+  const title = '댓글에서 나를 언급했어요'
+  const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" 댓글에서 나를 언급했어요.`
+  const url = '/account?tab=wish'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: mentionedUserId, title, body, url,
+    wish_place_mention_comment_id: commentId, event_type: 'wish_mention',
+  })
+  if (notifError) console.error('wish mention 알림 insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [mentionedUserId], title, body, url },
+  })
+  if (pushError) console.warn('wish mention send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('wish mention send-push 일부 실패:', pushResult.failures)
 }
 
 export async function deleteWishPlaceComment(id) {
