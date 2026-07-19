@@ -343,6 +343,8 @@ export default function TodayPage() {
 
     // 단일 그룹 재조회 (실시간 변경분 반영 + 캐시 무효화)
     const reloadGroup = async (groupId) => {
+      const configs = await getGroupDefaultPotConfigs(groupId)
+      await ensureDefaultPots(groupId, dateStr, configs) // 다른 기기의 기본팟 설정 변경분 재생성
       const [statuses, pots] = await Promise.all([
         getGroupStatuses(groupId, dateStr),
         getGroupPots(groupId, dateStr),
@@ -420,6 +422,20 @@ export default function TodayPage() {
         if (status !== 'SUBSCRIBED') console.log('[realtime] pot_changes', status, err ?? '')
       })
 
+    const defaultPotConfigSub = supabase
+      .channel(`default_pot_configs_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_default_pot_configs' },
+        (payload) => {
+          const groupId = payload.new?.group_id ?? payload.old?.group_id
+          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
+            scheduleReload([groupId])
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') console.log('[realtime] default_pot_configs', status, err ?? '')
+      })
+
     const shareSub = supabase
       .channel(`share_settings_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_share_settings' },
@@ -446,6 +462,7 @@ export default function TodayPage() {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(statusSub)
       supabase.removeChannel(potSub)
+      supabase.removeChannel(defaultPotConfigSub)
       supabase.removeChannel(shareSub)
     }
   }, [user, dateStr])
