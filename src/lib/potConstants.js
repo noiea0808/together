@@ -13,6 +13,14 @@ export const SLOT_TIME_PRESETS = {
 // group_default_pot_configs.icon 문자열과 그대로 매핑되므로, 키를 바꾸면 기존 데이터와 어긋난다.
 export const POT_ICON_KEYS = ['together', 'tray', 'chat', 'salad', 'ready', 'party', 'care', 'map', 'delivery', 'random']
 
+// 가고 싶은 곳 카테고리 — 값은 DB의 wish_places.category와 그대로 매핑되므로, 키를 바꾸면 기존 데이터와 어긋난다.
+export const WISH_CATEGORY_OPTIONS = [
+  { key: 'like', label: '좋아하는 곳' },
+  { key: 'curious', label: '궁금한 곳' },
+  { key: 'together', label: '같이 가고 싶은 곳' },
+  { key: 'frequent', label: '자주 가는 곳' },
+]
+
 export const MOMENT_SCOPE_OPTIONS = [
   { value: 'participants', label: '참여자만' },
   { value: 'group', label: '그룹공유' },
