@@ -151,6 +151,16 @@ body {
   100% { transform: translateX(0); }
 }
 
+/* 날짜 전환 시 페이지 콘텐츠 전체가 넘어가는 방향으로 슬라이드-인 (TodayPage) */
+@keyframes pageSlideNext {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes pageSlidePrev {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
+
 /* ===== 공통 유틸 ===== */
 .page {
   flex: 1;

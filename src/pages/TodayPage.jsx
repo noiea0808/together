@@ -190,6 +190,16 @@ export default function TodayPage() {
     else if (dx > 0 && idx > 0) goToSlot(SLOT_ORDER[idx - 1])
   }
 
+  // 날짜 전환 시 페이지 전체가 밀려나는 방향 — next(내일 방향)/prev(어제 방향)
+  const [dateSlideDir, setDateSlideDir] = useState('next')
+  const goToDate = (updater) => {
+    setCurrentDate(d => {
+      const next = updater(d)
+      setDateSlideDir(next > d ? 'next' : 'prev')
+      return next
+    })
+  }
+
   // 메인 상태 카드를 제외한 나머지 화면 영역 스와이프 — 전후 날짜로 이동
   const pageSwipeStart = useRef(null)
   const handlePageSwipeStart = (e) => { pageSwipeStart.current = { x: e.clientX, y: e.clientY } }
@@ -199,7 +209,7 @@ export default function TodayPage() {
     const dy = e.clientY - pageSwipeStart.current.y
     pageSwipeStart.current = null
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return
-    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
+    goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
@@ -718,21 +728,30 @@ export default function TodayPage() {
       <div
         style={{ ...styles.dateNav, top: headerHidden ? 0 : 44, touchAction: 'pan-y' }}
       >
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
           {!isToday && (
-            <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
+            <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, 1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7.5 7.5L1.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       </div>
 
+      {/* 날짜 전환 시 페이지 콘텐츠 전체가 방향에 맞춰 슬라이드-인 — 날짜만 바뀌고 끝나는
+          허전함을 없애는 전환 연출. key가 dateStr이라 날짜가 바뀔 때마다 애니메이션이 재생된다. */}
+      <div
+        key={dateStr}
+        style={{
+          display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
+          animation: `${dateSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out`,
+        }}
+      >
       {/* 나의 상태 — 독립된 핵심 카드 하나 + 슬림한 슬롯 네비게이션 */}
       {(() => {
         const sectionInfo = getSlotInfo(selectedSlot)
@@ -948,6 +967,7 @@ export default function TodayPage() {
           <span style={styles.secondaryLinkDivider}>·</span>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
         </div>
+      </div>
       </div>
     </div>
     <BottomNav />
