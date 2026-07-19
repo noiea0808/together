@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
@@ -59,6 +59,17 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
   const [currentDate, setCurrentDate] = useState(TODAY)
+  // 날짜 네비 바 좌우 스와이프로 날짜 이동
+  const dateSwipeStart = useRef(null)
+  const handleDateSwipeStart = (e) => { dateSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleDateSwipeEnd = (e) => {
+    if (!dateSwipeStart.current) return
+    const dx = e.clientX - dateSwipeStart.current.x
+    const dy = e.clientY - dateSwipeStart.current.y
+    dateSwipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
+  }
   const [friendGroupFilter, setFriendGroupFilter] = useState(null) // null = 전체, 아니면 group.id
   const [selectedFriendId, setSelectedFriendId] = useState(null)
   const [friendSheetTab, setFriendSheetTab] = useState('status') // 'status' | 'wish'
@@ -316,7 +327,12 @@ export default function GroupPage() {
         </button>
       </div>
 
-      <div style={styles.dateNav}>
+      <div
+        style={{ ...styles.dateNav, touchAction: 'pan-y' }}
+        onPointerDown={handleDateSwipeStart}
+        onPointerUp={handleDateSwipeEnd}
+        onPointerCancel={() => { dateSwipeStart.current = null }}
+      >
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>

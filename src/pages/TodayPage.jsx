@@ -715,7 +715,9 @@ export default function TodayPage() {
       onPointerCancel={() => { pageSwipeStart.current = null }}
     >
       {/* 날짜 네비 — sticky 고정, 헤더가 접히면 그 자리(top:0)까지 따라 올라간다 */}
-      <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 44 }}>
+      <div
+        style={{ ...styles.dateNav, top: headerHidden ? 0 : 44, touchAction: 'pan-y' }}
+      >
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
