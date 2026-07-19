@@ -148,6 +148,10 @@ export default function TodayPage() {
   }
   const subSlotBtnRefs = useRef({})
   const [slideDir, setSlideDir] = useState('next')
+  // 전환 중 함께 화면에 걸쳐두는 "밀려나가는" 이전 슬롯 — 트랙 애니메이션이 끝나면 null로 비운다.
+  const [prevSlot, setPrevSlot] = useState(null)
+  const slotTransitionTimer = useRef(null)
+  useEffect(() => () => clearTimeout(slotTransitionTimer.current), [])
   const swipeStart = useRef(null)
   // 나의 상태 카드가 스와이프된다는 걸 처음 진입한 사용자에게만 몸으로 알려주는 1회성 넛지.
   const [showSwipeHint, setShowSwipeHint] = useState(() => !localStorage.getItem('statusCardSwipeHintShown'))
@@ -165,8 +169,11 @@ export default function TodayPage() {
   const goToSlot = (slot) => {
     if (slot === selectedSlot) return
     setSlideDir(SLOT_ORDER.indexOf(slot) > SLOT_ORDER.indexOf(selectedSlot) ? 'next' : 'prev')
+    setPrevSlot(selectedSlot)
     setSelectedSlot(slot)
     rememberSlot(slot)
+    clearTimeout(slotTransitionTimer.current)
+    slotTransitionTimer.current = setTimeout(() => setPrevSlot(null), 280)
   }
 
   const handleCardSwipeStart = (e) => { swipeStart.current = { x: e.clientX, y: e.clientY } }
@@ -694,6 +701,44 @@ export default function TodayPage() {
         const sectionTheme = sectionInfo.isPastDate
           ? { bg: '#EFE6D6' }
           : SLOT_THEME[selectedSlot]
+        const prevInfo = prevSlot ? getSlotInfo(prevSlot) : null
+        // 카드 한 장을 그린다 — paired=true면 트랙 안에서 옆 카드와 나란히 절반씩 차지한다.
+        const renderStatusCard = (slot, info, paired) => (
+          <div key={slot} style={{ ...styles.mainStatusCard, width: undefined, minWidth: 0, flex: paired ? '0 0 50%' : '0 0 100%' }}>
+            <div style={styles.mainStatusHeaderRow}>
+              <span style={styles.mainStatusTitle}>내 {slot}</span>
+              {!info.isPastDate && (
+                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(slot)}>변경</button>
+              )}
+            </div>
+            <div style={styles.mainStatusBody}>
+              <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
+                {info.key
+                  ? <StatusIcon statusKey={info.key} size={112} style={styles.mainStatusIconImg} />
+                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} />}
+              </div>
+              <div style={styles.mainStatusTextCol}>
+                {info.label ? (
+                  <>
+                    <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                    {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](slot)}</span>}
+                    {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
+                    {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
+                  </>
+                ) : (
+                  <span style={styles.mainStatusEmpty}>
+                    {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(slot)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+        const trackCards = prevSlot
+          ? (slideDir === 'next'
+              ? [renderStatusCard(prevSlot, prevInfo, true), renderStatusCard(selectedSlot, sectionInfo, true)]
+              : [renderStatusCard(selectedSlot, sectionInfo, true), renderStatusCard(prevSlot, prevInfo, true)])
+          : [renderStatusCard(selectedSlot, sectionInfo, false)]
         return (
       <div style={{ ...styles.myStatusSection, background: sectionTheme.bg }}>
         {/* 핵심 카드: 항상 흰 배경, 상태는 텍스트 색상으로만 강조 */}
@@ -706,39 +751,20 @@ export default function TodayPage() {
           onPointerCancel={() => { swipeStart.current = null }}
           onAnimationEnd={dismissSwipeHint}
         >
-          {/* 실제로 보이는 카드(테두리·배경 포함) — key로 슬롯마다 리마운트시켜 타이틀·아이콘·
-              텍스트가 전부 한 덩어리로 슬라이드되게 한다. 예전엔 아이콘+텍스트만 움직이고
-              카드 테두리/타이틀 줄은 고정돼 있어 "카드 전체가 스와이프된다"는 느낌이 약했다. */}
-          <div
-            key={selectedSlot}
-            style={{ ...styles.mainStatusCard, animation: `${slideDir === 'next' ? 'slotSlideFromRight' : 'slotSlideFromLeft'} 0.22s ease-out` }}
-          >
-            <div style={styles.mainStatusHeaderRow}>
-              <span style={styles.mainStatusTitle}>내 {selectedSlot}</span>
-              {!sectionInfo.isPastDate && (
-                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
-              )}
-            </div>
-            <div style={styles.mainStatusBody}>
-              <div style={{ ...styles.mainStatusIconWrap, opacity: sectionInfo.isPastDate ? 0.6 : 1 }}>
-                {sectionInfo.key
-                  ? <StatusIcon statusKey={sectionInfo.key} size={112} style={styles.mainStatusIconImg} />
-                  : <SlotIcon slot={selectedSlot} size={112} style={styles.mainStatusIconImg} />}
-              </div>
-              <div style={styles.mainStatusTextCol}>
-                {sectionInfo.label ? (
-                  <>
-                    <span style={{ ...styles.mainStatusLabel, color: sectionInfo.color }}>{sectionInfo.label}</span>
-                    {STATUS_SUBTEXT[sectionInfo.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[sectionInfo.key](selectedSlot)}</span>}
-                    {sectionInfo.timeStr && <span style={styles.mainStatusMeta}>{sectionInfo.timeStr}</span>}
-                    {sectionInfo.desc && <span style={styles.mainStatusDesc}>{sectionInfo.desc}</span>}
-                  </>
-                ) : (
-                  <span style={styles.mainStatusEmpty}>
-                    {sectionInfo.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
-                  </span>
-                )}
-              </div>
+          {/* 뷰포트: 트랙 폭(전환 중엔 200%)만큼 넘치는 부분을 가려, 카드 한 장 너비만 보이게 한다. */}
+          <div style={{ overflow: 'hidden', borderRadius: 16 }}>
+            {/* 트랙: 전환 중엔 이전 카드 + 다음 카드를 나란히 붙여 렌더링하고, 트랙 자체를
+                translateX로 밀어 이전 카드가 빠져나가는 동안 다음 카드가 뒤따라 들어오게 한다. */}
+            <div
+              key={prevSlot ? `${prevSlot}->${selectedSlot}` : selectedSlot}
+              style={{
+                display: 'flex',
+                width: prevSlot ? '200%' : '100%',
+                pointerEvents: prevSlot ? 'none' : 'auto',
+                animation: prevSlot ? `${slideDir === 'next' ? 'slotTrackNext' : 'slotTrackPrev'} 0.26s ease-out forwards` : undefined,
+              }}
+            >
+              {trackCards}
             </div>
           </div>
         </div>

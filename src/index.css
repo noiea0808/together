@@ -112,13 +112,15 @@ body {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
-@keyframes slotSlideFromRight {
-  from { opacity: 0; transform: translateX(18px); }
-  to   { opacity: 1; transform: translateX(0); }
+/* 나의 상태 카드 전환: 이전 카드와 다음 카드를 나란히 붙인 트랙을 밀어, 이전 카드가
+   밀려나가는 동안 다음 카드가 뒤따라 등장하게 한다 (TodayPage 메인 상태 카드). */
+@keyframes slotTrackNext {
+  from { transform: translateX(0%); }
+  to   { transform: translateX(-50%); }
 }
-@keyframes slotSlideFromLeft {
-  from { opacity: 0; transform: translateX(-18px); }
-  to   { opacity: 1; transform: translateX(0); }
+@keyframes slotTrackPrev {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0%); }
 }
 
 /* 나의 상태 카드가 스와이프 가능하다는 걸 몸으로 알려주는 최초 1회 넛지 — 왼쪽으로 밀렸다
