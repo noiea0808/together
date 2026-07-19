@@ -22,6 +22,17 @@ function defaultTimeForSlot(slot) {
   return nextFullHour()
 }
 
+const WEEKDAY_OPTIONS = [
+  { value: 0, label: '일' },
+  { value: 1, label: '월' },
+  { value: 2, label: '화' },
+  { value: 3, label: '수' },
+  { value: 4, label: '목' },
+  { value: 5, label: '금' },
+  { value: 6, label: '토' },
+]
+const DEFAULT_REPEAT_DAYS = [1, 2, 3, 4, 5]
+
 function toDateStr(date) {
   const y = date.getFullYear()
   const m = String(date.getMonth() + 1).padStart(2, '0')
@@ -72,6 +83,7 @@ export default function GroupSettingsPage() {
     max_people: 4,
     is_public: false,
     effective_from: toDateStr(new Date()),
+    repeat_days: DEFAULT_REPEAT_DAYS,
     icon: null,
   })
 
@@ -101,6 +113,15 @@ export default function GroupSettingsPage() {
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
+  const toggleRepeatDay = (day) => {
+    setForm(f => {
+      const has = f.repeat_days.includes(day)
+      if (has && f.repeat_days.length === 1) return f // 최소 1개는 선택돼 있어야 함
+      const next = has ? f.repeat_days.filter(d => d !== day) : [...f.repeat_days, day].sort()
+      return { ...f, repeat_days: next }
+    })
+  }
+
   const loadConfigToForm = (cfg) => {
     const mt = cfg.meal_time?.slice(0, 5) ?? '12:00'
     const et = cfg.end_time?.slice(0, 5) ?? '13:00'
@@ -114,6 +135,7 @@ export default function GroupSettingsPage() {
       max_people: cfg.max_people ?? 4,
       is_public: cfg.is_public ?? false,
       effective_from: toDateStr(new Date()),
+      repeat_days: cfg.repeat_days ?? DEFAULT_REPEAT_DAYS,
       icon: cfg.icon ?? null,
     })
     setEditingConfigId(cfg.id)
@@ -165,7 +187,8 @@ export default function GroupSettingsPage() {
       slot: form.slot, meal_time: form.meal_time, end_time: form.end_time,
       title: form.title.trim(), memo: form.memo.trim(),
       max_people: form.max_people, is_public: form.is_public,
-      effective_from: form.effective_from, lastModifiedBy: user.id,
+      effective_from: form.effective_from, repeat_days: form.repeat_days,
+      lastModifiedBy: user.id,
       icon: form.icon,
     }
     try {
@@ -215,6 +238,19 @@ export default function GroupSettingsPage() {
         <div style={S.hero}>매일 자동으로 열리는 밥팟이에요 <RiceBowlIcon size={18} /></div>
 
         <div style={S.sections}>
+          {/* 공개 범위 */}
+          <div style={S.section}>
+            <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+              <span>🔓 공개 범위</span>
+              <span style={S.hint}>기본: 그룹만</span>
+            </div>
+            <div style={S.groupRow}>
+              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
+              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
+            </div>
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+          </div>
+
           {/* 그룹 고정 표시 */}
           <div style={S.section}>
             <div style={S.sectionLabel}>👪 그룹</div>
@@ -298,7 +334,7 @@ export default function GroupSettingsPage() {
             <div style={S.dividerLine} />
           </div>
 
-          {/* 선택 트레이: 아이콘 + 세부 정보 + 공개 범위 */}
+          {/* 선택 트레이: 아이콘 + 세부 정보 */}
           <div style={S.tray}>
             <div>
               <div style={S.sectionLabel}>🖼 아이콘</div>
@@ -324,20 +360,6 @@ export default function GroupSettingsPage() {
                 maxLength={50}
               />
             </div>
-
-            <div style={S.trayDivider} />
-
-            <div>
-              <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
-                <span>🔓 공개 범위</span>
-                <span style={S.hint}>기본: 그룹만</span>
-              </div>
-              <div style={S.groupRow}>
-                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
-                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
-              </div>
-              {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
-            </div>
           </div>
 
           {/* 적용 시작일 */}
@@ -351,6 +373,24 @@ export default function GroupSettingsPage() {
               min={toDateStr(new Date())}
             />
             <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', margin: '6px 0 0' }}>이 날짜 이후 매일 자동으로 열려요</p>
+
+            <div style={{ marginTop: 10 }}>
+              <div style={S.sectionLabel}>🗓 어떤 요일에 반복할까요?</div>
+              <div style={S.chipRow}>
+                {WEEKDAY_OPTIONS.map(({ value, label }) => {
+                  const active = form.repeat_days.includes(value)
+                  return (
+                    <button
+                      key={value}
+                      style={{ ...S.chip, ...(active ? S.chipActive : {}) }}
+                      onClick={() => toggleRepeatDay(value)}
+                    >
+                      {label}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
           </div>
 
           {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}

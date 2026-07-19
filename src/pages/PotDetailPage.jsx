@@ -518,6 +518,19 @@ export default function PotDetailPage() {
           const isCustomTime = draft.time_enabled && !presets.includes(draft.meal_time)
           return (
             <div style={S.editSections}>
+              {/* 공개 범위 */}
+              <div style={S.editSection}>
+                <div style={{ ...S.editSectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+                  <span>🔓 공개 범위</span>
+                  <span style={S.editHint}>기본: 그룹만</span>
+                </div>
+                <div style={S.editGroupRow}>
+                  <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
+                  <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+                </div>
+                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+              </div>
+
               {/* 시간 */}
               <div style={S.editSection}>
                 <div style={S.editSectionLabel}>🕒 언제 먹을까요?</div>
@@ -588,7 +601,7 @@ export default function PotDetailPage() {
                 <div style={S.editDividerLine} />
               </div>
 
-              {/* 선택 트레이: 아이콘 + 세부 정보 + 공개 범위 */}
+              {/* 선택 트레이: 아이콘 + 세부 정보 */}
               <div style={S.editTray}>
                 <div>
                   <div style={S.editSectionLabel}>🖼 아이콘</div>
@@ -622,20 +635,6 @@ export default function PotDetailPage() {
                     onChange={e => setD('memo', e.target.value)}
                     maxLength={200}
                   />
-                </div>
-
-                <div style={S.editTrayDivider} />
-
-                <div>
-                  <div style={{ ...S.editSectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
-                    <span>🔓 공개 범위</span>
-                    <span style={S.editHint}>기본: 그룹만</span>
-                  </div>
-                  <div style={S.editGroupRow}>
-                    <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
-                    <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
-                  </div>
-                  {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
                 </div>
               </div>
             </div>

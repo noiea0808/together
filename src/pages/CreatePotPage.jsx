@@ -178,6 +178,19 @@ export default function CreatePotPage() {
         <div style={S.hero}>오늘 같이 밥 먹어요 <RiceBowlIcon size={18} /></div>
 
         <div style={S.sections}>
+          {/* 공개 범위 */}
+          <div style={S.section}>
+            <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+              <span>🔓 공개 범위</span>
+              <span style={S.hint}>기본: 그룹만</span>
+            </div>
+            <div style={S.groupRow}>
+              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
+              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
+            </div>
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+          </div>
+
           {/* 그룹 선택 */}
           {groups.length > 1 && (
             <div style={S.section}>
@@ -284,7 +297,7 @@ export default function CreatePotPage() {
             <div style={S.dividerLine} />
           </div>
 
-          {/* 선택 트레이: 아이콘 + 세부 정보 + 공개 범위 */}
+          {/* 선택 트레이: 아이콘 + 세부 정보 */}
           <div style={S.tray}>
             <div>
               <div style={S.sectionLabel}>🖼 아이콘</div>
@@ -318,20 +331,6 @@ export default function CreatePotPage() {
                 onChange={e => set('memo', e.target.value)}
                 maxLength={200}
               />
-            </div>
-
-            <div style={S.trayDivider} />
-
-            <div>
-              <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
-                <span>🔓 공개 범위</span>
-                <span style={S.hint}>기본: 그룹만</span>
-              </div>
-              <div style={S.groupRow}>
-                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
-                <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
-              </div>
-              {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
             </div>
           </div>
 

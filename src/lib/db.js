@@ -1243,24 +1243,26 @@ export async function getGroupDefaultPotConfigs(groupId) {
   return data ?? []
 }
 
-export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy, icon }) {
+export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, repeat_days, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .insert({
       group_id: groupId, slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
+      repeat_days: repeat_days ?? [1, 2, 3, 4, 5],
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
       icon: icon || null,
     })
   if (error) throw error
 }
 
-export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy, icon }) {
+export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, repeat_days, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .update({
       slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
+      repeat_days: repeat_days ?? [1, 2, 3, 4, 5],
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
       icon: icon || null,
     })
@@ -1297,7 +1299,8 @@ export async function deleteGroupDefaultPotConfig(id, fromDate) {
 // 기본팟 설정이 있는데 해당 날짜에 아직 팟이 없으면 자동 생성 (config_id 기준으로 중복 방지)
 export async function ensureDefaultPots(groupId, date, configs) {
   if (!configs || configs.length === 0) return
-  const applicable = configs.filter(c => c.effective_from <= date)
+  const weekday = new Date(`${date}T00:00:00`).getDay()
+  const applicable = configs.filter(c => c.effective_from <= date && (c.repeat_days ?? [1, 2, 3, 4, 5]).includes(weekday))
   if (applicable.length === 0) return
 
   const { data: existing } = await supabase
