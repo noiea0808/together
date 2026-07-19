@@ -232,7 +232,7 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 56, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-2xl)', fontWeight: 900, marginBottom: 8 },
+  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-2xl)', fontWeight: 900, marginBottom: 8 },
   sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', whiteSpace: 'pre-line', lineHeight: 1.6 },
   card: {
     width: '100%', background: 'var(--color-surface)',

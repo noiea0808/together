@@ -52,7 +52,7 @@ const styles = {
     flexShrink: 0,
   },
   logo: { fontSize: 18, lineHeight: 1 },
-  title: { fontWeight: 900, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.4px', color: 'var(--color-text)', flex: 1 },
+  title: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.4px', color: 'var(--color-text)', flex: 1 },
   bellBtn: {
     position: 'relative', width: 32, height: 32, flexShrink: 0, display: 'flex',
     alignItems: 'center', justifyContent: 'center', background: 'none', border: 'none',

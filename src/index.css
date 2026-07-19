@@ -5,6 +5,15 @@
   padding: 0;
 }
 
+/* 로고/헤더 대제목 전용 서체 */
+@font-face {
+  font-family: 'GmarketSansBold';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansBold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===== 디자인 토큰 ===== */
 :root {
   --color-primary: #FF6B35;
@@ -60,6 +69,8 @@
   --spacing-xl: 32px;
 
   --max-width: 430px;
+
+  --font-title: 'GmarketSansBold', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
 }
 
 /* ===== 기본 타이포 & 바디 ===== */

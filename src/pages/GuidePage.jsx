@@ -109,7 +109,7 @@ const styles = {
     borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
-  headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
   closeBtn: {
     width: 28, height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 16, cursor: 'pointer', padding: 0,

@@ -305,7 +305,7 @@ const S = {
     borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', gap: 10,
   },
-  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
   tabRow: { display: 'flex', gap: 6 },
   tabBtn: {
     padding: '6px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',

@@ -187,7 +187,7 @@ const S = {
     borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
-  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
   nav: { display: 'flex', alignItems: 'center', gap: 8 },
   navBtn: {
     width: 26, height: 26, borderRadius: '50%', border: '1px solid #EDE8E3', background: '#fff',
