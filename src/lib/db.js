@@ -658,7 +658,7 @@ function generatePotCode() {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
-export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy, icon }) {
   const invite_code = is_default ? null : generatePotCode()
   const { data, error } = await supabase
     .from('meal_pots')
@@ -676,6 +676,7 @@ export async function createPot({ groupId, date, slot, meal_time, end_time, titl
       is_default,
       created_by: is_default ? null : createdBy,
       invite_code,
+      icon: icon || null,
     })
     .select()
     .single()
@@ -1224,8 +1225,8 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, end_time, title, menu, memo, max_people, is_public }, lastModifiedBy = null) {
-  const patch = { meal_time, end_time: end_time || null, title, menu: menu || null, memo: memo || null, max_people, is_public }
+export async function updatePot(potId, { meal_time, end_time, title, menu, memo, max_people, is_public, icon }, lastModifiedBy = null) {
+  const patch = { meal_time, end_time: end_time || null, title, menu: menu || null, memo: memo || null, max_people, is_public, icon: icon || null }
   if (lastModifiedBy) { patch.last_modified_by = lastModifiedBy; patch.last_modified_at = new Date().toISOString() }
   const { error } = await supabase.from('meal_pots').update(patch).eq('id', potId)
   if (error) throw error
@@ -1242,24 +1243,26 @@ export async function getGroupDefaultPotConfigs(groupId) {
   return data ?? []
 }
 
-export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .insert({
       group_id: groupId, slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+      icon: icon || null,
     })
   if (error) throw error
 }
 
-export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .update({
       slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+      icon: icon || null,
     })
     .eq('id', id)
   if (error) throw error
@@ -1312,6 +1315,7 @@ export async function ensureDefaultPots(groupId, date, configs) {
     is_default: true, created_by: null,
     last_modified_by: c.last_modified_by,
     config_id: c.id,
+    icon: c.icon || null,
   }))
   // 유니크 제약(config_id+date) 위반 시 무시 (동시 요청 경합 방지)
   for (const row of rows) {
@@ -1414,46 +1418,73 @@ export async function setPotMomentScope(potId, scope) {
   if (error) throw error
 }
 
-const MOMENT_POT_SELECT = '*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), pot_comments(count)'
+// 목록 렌더링(MomentCard)에 실제로 쓰는 컬럼만 명시 — '*'로 memo 등 불필요한 컬럼까지
+// 매번 끌어오지 않도록 함.
+const MOMENT_POT_SELECT = 'id, group_id, date, slot, meal_time, end_time, title, menu, moment_scope, ' +
+  'pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), pot_comments(count)'
+
+// 커서 기반 페이지네이션 페이지 크기. 한 번에 이 개수만큼만 가져오고, 화면에서
+// 스크롤이 끝에 닿으면 마지막으로 받은 날짜를 커서 삼아 다음 페이지를 더 가져온다.
+const MOMENT_PAGE_SIZE = 20
 
 // "내 그룹" 모먼트 피드: 내 그룹에 방송된(그룹공유·전체공유) 밥팟 + 범위와 무관하게
 // 내가 직접 참여했던 밥팟을 합쳐서 반환한다 (참여자만 범위여도 본인에게는 보임).
-// todayStr 이하 날짜(오늘 포함)까지 가져오고, 오늘 밥팟 중 아직 안 끝난 건 호출부(isPotEnded)에서 걸러낸다.
-export async function getGroupMomentPots(groupIds, userId, todayStr) {
-  if (!groupIds || groupIds.length === 0) return []
+// cursorDate가 없으면 todayStr 이하(오늘 포함)부터, 있으면 그 날짜보다 이전 것부터 최대
+// MOMENT_PAGE_SIZE건 가져온다. 오늘 밥팟 중 아직 안 끝난 건 호출부(isPotEnded)에서 걸러낸다.
+// 반환값의 nextCursor로 다음 페이지를, hasMore로 더 가져올 게 남았는지 확인한다.
+export async function getGroupMomentPots(groupIds, userId, todayStr, cursorDate = null) {
+  if (!groupIds || groupIds.length === 0) return { pots: [], nextCursor: null, hasMore: false }
+
+  let broadcastQuery = supabase
+    .from('meal_pots')
+    .select(MOMENT_POT_SELECT)
+    .in('group_id', groupIds)
+    .in('moment_scope', ['group', 'public'])
+  broadcastQuery = cursorDate ? broadcastQuery.lt('date', cursorDate) : broadcastQuery.lte('date', todayStr)
+
+  let ownQuery = supabase
+    .from('pot_members')
+    .select(`meal_pots!inner(${MOMENT_POT_SELECT})`)
+    .eq('user_id', userId)
+    .in('meal_pots.group_id', groupIds)
+  ownQuery = cursorDate ? ownQuery.lt('meal_pots.date', cursorDate) : ownQuery.lte('meal_pots.date', todayStr)
+
   const [broadcastRes, ownRes] = await Promise.all([
-    supabase
-      .from('meal_pots')
-      .select(MOMENT_POT_SELECT)
-      .in('group_id', groupIds)
-      .in('moment_scope', ['group', 'public'])
-      .lte('date', todayStr),
-    supabase
-      .from('pot_members')
-      .select(`meal_pots!inner(${MOMENT_POT_SELECT})`)
-      .eq('user_id', userId)
-      .in('meal_pots.group_id', groupIds)
-      .lte('meal_pots.date', todayStr),
+    broadcastQuery.order('date', { ascending: false }).limit(MOMENT_PAGE_SIZE),
+    ownQuery.order('date', { ascending: false, referencedTable: 'meal_pots' }).limit(MOMENT_PAGE_SIZE),
   ])
   if (broadcastRes.error) throw broadcastRes.error
   if (ownRes.error) throw ownRes.error
 
+  const rawDates = [...broadcastRes.data.map(p => p.date), ...ownRes.data.map(r => r.meal_pots.date)]
   const byId = new Map()
   for (const pot of broadcastRes.data) byId.set(pot.id, pot)
   for (const row of ownRes.data) byId.set(row.meal_pots.id, row.meal_pots)
-  return [...byId.values()].sort((a, b) => b.date.localeCompare(a.date))
+  const pots = [...byId.values()].sort((a, b) => b.date.localeCompare(a.date))
+
+  // 두 소스 중 하나라도 페이지 꽉 채워 왔으면 더 남았을 가능성 있음 (보수적으로 잡음).
+  const hasMore = broadcastRes.data.length === MOMENT_PAGE_SIZE || ownRes.data.length === MOMENT_PAGE_SIZE
+  // 다음 커서는 이번에 받은 원본 로우들(중복 제거 전) 중 가장 오래된 날짜 — 경계에서 항목이
+  // 씹히지 않도록 병합·중복제거된 pots가 아니라 rawDates 기준으로 잡는다.
+  const nextCursor = hasMore && rawDates.length > 0 ? rawDates.reduce((a, b) => (a < b ? a : b)) : null
+
+  return { pots, nextCursor, hasMore: hasMore && nextCursor !== null }
 }
 
 // "전체" 모먼트 피드: 그룹 소속과 무관하게 전체공유로 설정된 밥팟을 앱 전체에서 조회.
-export async function getPublicMomentPots(todayStr) {
-  const { data, error } = await supabase
+export async function getPublicMomentPots(todayStr, cursorDate = null) {
+  let query = supabase
     .from('meal_pots')
     .select(`${MOMENT_POT_SELECT}, groups(name)`)
     .eq('moment_scope', 'public')
-    .lte('date', todayStr)
-    .order('date', { ascending: false })
+  query = cursorDate ? query.lt('date', cursorDate) : query.lte('date', todayStr)
+
+  const { data, error } = await query.order('date', { ascending: false }).limit(MOMENT_PAGE_SIZE)
   if (error) throw error
-  return data
+
+  const hasMore = data.length === MOMENT_PAGE_SIZE
+  const nextCursor = hasMore ? data[data.length - 1].date : null
+  return { pots: data, nextCursor, hasMore }
 }
 
 // ── 가고 싶은 식당 (내 계정 > 가고 싶은데...) ──────────────
@@ -1468,7 +1499,7 @@ export async function getWishPlaces(userId) {
   return data
 }
 
-// 위시 항목의 그룹 공개 범위를 통째로 교체한다. groupIds가 비어있으면 전체 공개(제한 없음).
+// 위시 항목의 그룹 공개 범위를 통째로 교체한다. groupIds가 비어있으면 나만 보기(비공개).
 export async function setWishPlaceShares(wishPlaceId, groupIds) {
   const { error: delError } = await supabase
     .from('wish_place_shares')
@@ -1520,13 +1551,12 @@ export async function deleteWishPlace(id) {
 }
 
 export async function updateWishPlaceOrder(userId, orders) {
-  // orders: [{ id, sort_order }, ...]
-  await Promise.all(orders.map(({ id, sort_order }) =>
-    supabase
-      .from('wish_places')
-      .update({ sort_order })
-      .match({ id, user_id: userId })
-  ))
+  // orders: [{ id, sort_order }, ...] — 항목 수만큼 UPDATE를 따로 쏘지 않고 한 번에 upsert.
+  if (orders.length === 0) return
+  const { error } = await supabase
+    .from('wish_places')
+    .upsert(orders.map(({ id, sort_order }) => ({ id, sort_order, user_id: userId })))
+  if (error) throw error
 }
 
 // 친구 관리 화면에서 상대방의 위시 리스트를 볼 때 사용. wish_places RLS는 본인만

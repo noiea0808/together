@@ -1,9 +1,6 @@
-import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
-import { useUser } from '../lib/UserContext'
-import { getUnreadNotificationCount } from '../lib/db'
-import { supabase } from '../lib/supabase'
+import { useNotificationSync } from '../lib/NotificationSyncContext'
 import RiceBowlIcon from './RiceBowlIcon'
 
 // hidden을 상위에서 넘기면(dateNav 등 다른 sticky 요소와 동기화할 때) 그 값을 쓰고,
@@ -12,32 +9,9 @@ export default function Header({ hidden: hiddenProp }) {
   const autoHidden = useHideOnScroll()
   const hidden = hiddenProp ?? autoHidden
   const navigate = useNavigate()
-  const { user } = useUser()
-  const [unread, setUnread] = useState(0)
-
-  // 홈 화면 앱 아이콘 배지/푸시 구독 동기화는 BadgeSync(App.jsx, 페이지 전환과 무관하게 상시 마운트)가
-  // 전담한다. 여기선 이 화면에 있는 동안 벨 아이콘의 빨간 점만 표시하면 된다.
-  useEffect(() => {
-    if (!user) return
-
-    // 응답 순서가 보장되지 않으니, 가장 나중에 시작한 요청의 결과만 반영한다.
-    let requestId = 0
-    const refresh = () => {
-      const myRequestId = ++requestId
-      getUnreadNotificationCount(user.id).then(count => {
-        if (myRequestId !== requestId) return
-        setUnread(count)
-      }).catch(() => {})
-    }
-    refresh()
-
-    const channel = supabase
-      .channel(`notifications_${user.id}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, refresh)
-      .subscribe()
-
-    return () => { supabase.removeChannel(channel) }
-  }, [user])
+  // unread count 조회/실시간 구독은 NotificationSyncProvider(App.jsx)가 앱 전체에서 한 번만
+  // 담당한다 — 여기선 벨 아이콘 빨간 점 표시용으로 값만 구독.
+  const { unreadCount: unread } = useNotificationSync()
 
   return (
     <div
@@ -71,7 +45,7 @@ const styles = {
     gap: 6,
     overflow: 'hidden',
     padding: '0 var(--spacing-md)',
-    background: 'rgba(250,248,245,0.96)',
+    background: 'rgba(250,248,245,0.95)',
     backdropFilter: 'blur(8px)',
     borderBottom: '1px solid',
     transition: 'height 0.22s ease, opacity 0.18s ease, border-color 0.18s ease',

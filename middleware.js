@@ -94,10 +94,23 @@ async function metaFor(pathname) {
   return DEFAULT_POT
 }
 
+// title/description은 그룹명·밥팟 제목·메뉴 등 사용자가 자유롭게 입력한 텍스트에서 온다.
+// 이스케이프 없이 그대로 <meta content="..."> 안에 넣으면 그룹명을 "><script>...</script>
+// 식으로 지어 <head> 안에 스크립트를 주입하는 stored XSS가 가능해진다 — 이 응답은 봇뿐 아니라
+// 실제 사용자가 /join/:code, /pot/:id 링크를 열 때도 그대로 서빙되므로 반드시 이스케이프한다.
+function escapeHtml(str) {
+  return String(str ?? '').replace(/[&<>"']/g, (c) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  }[c]))
+}
+
 export default async function middleware(request) {
   const url = new URL(request.url)
-  const { title, description } = await metaFor(url.pathname)
-  const imageUrl = `${url.origin}/icon-512.png`
+  const { title: rawTitle, description: rawDescription } = await metaFor(url.pathname)
+  const title = escapeHtml(rawTitle)
+  const description = escapeHtml(rawDescription)
+  const imageUrl = escapeHtml(`${url.origin}/icon-512.png`)
+  const pageUrl = escapeHtml(url.href)
 
   const res = await fetch(new URL('/index.html', url))
   let html = await res.text()
@@ -111,7 +124,7 @@ export default async function middleware(request) {
     .replace(/<meta name="twitter:title" content=".*?"\s*\/>/, `<meta name="twitter:title" content="${title}" />`)
     .replace(/<meta name="twitter:description" content=".*?"\s*\/>/, `<meta name="twitter:description" content="${description}" />`)
     .replace(/<meta name="twitter:image" content=".*?"\s*\/>/, `<meta name="twitter:image" content="${imageUrl}" />`)
-    .replace('</head>', `<meta property="og:url" content="${url.href}" />\n  </head>`)
+    .replace('</head>', `<meta property="og:url" content="${pageUrl}" />\n  </head>`)
 
   return new Response(html, {
     // 카톡 등 인앱 웹뷰가 이 경로(초대 링크)를 한 번 열어본 뒤 디스크에 캐시해두고 재사용하는

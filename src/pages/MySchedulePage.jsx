@@ -76,7 +76,7 @@ export default function MySchedulePage() {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <span style={S.headerTitle}>나의 일정</span>
+        <span style={S.headerTitle}>일정</span>
         <div style={S.nav}>
           <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
           <span style={S.navLabel}>{rangeLabel}</span>
@@ -182,8 +182,9 @@ export default function MySchedulePage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    padding: '18px 20px 12px', position: 'sticky', top: 0,
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
     background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },

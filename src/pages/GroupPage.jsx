@@ -2,10 +2,11 @@ import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, proposeWishPlace, getMySentWishProposals } from '../lib/db'
-import { SLOT_KEYS, SLOT_EMOJI } from '../lib/potConstants'
+import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import SlotIcon from '../components/SlotIcon'
 import FriendsSearchModal from '../components/FriendsSearchModal'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
@@ -284,12 +285,10 @@ export default function GroupPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={styles.headerTitle}>친구 관리</span>
-          <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-            친구 찾기
-          </button>
-        </div>
+        <span style={styles.headerTitle}>친구</span>
+        <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
+          친구 찾기
+        </button>
       </div>
 
       <div style={styles.dateNav}>
@@ -402,7 +401,7 @@ export default function GroupPage() {
               <button
                 style={{ ...styles.sheetTabBtn, ...(friendSheetTab === 'wish' ? styles.sheetTabBtnActive : {}) }}
                 onClick={() => setFriendSheetTab('wish')}
-              >가고 싶은데...</button>
+              >가고 싶은 곳</button>
             </div>
 
             {friendSheetTab === 'wish' ? (
@@ -492,7 +491,12 @@ export default function GroupPage() {
                         }}
                         onClick={() => selectable && selectProposeSlot(selectedFriend, slot)}
                       >
-                        <span style={styles.statusSlotName}>{SLOT_EMOJI[slot]} {slot}</span>
+                        <span style={styles.statusSlotName}>
+                          <span style={styles.slotIconWrapper}>
+                            <SlotIcon slot={slot} size={30} />
+                          </span>
+                          {slot}
+                        </span>
                         {opt ? (
                           <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
                             {opt.emoji} {opt.label}
@@ -593,7 +597,12 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
+  header: {
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
+    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
   headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
   findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
@@ -644,7 +653,8 @@ const styles = {
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary)18', border: '1.5px solid var(--color-primary)' },
-  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 },
+  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0 },
   statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
   statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
   statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },

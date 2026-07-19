@@ -1,6 +1,6 @@
 // 메모에 붙여넣은 링크의 미리보기(썸네일/제목/설명)를 가져오는 서버리스 함수.
 // 브라우저에서 바로 외부 사이트를 fetch하면 대부분 CORS로 막히기 때문에 서버를 거친다.
-import { parseSafeUrl } from './_url-guard.js'
+import { parseSafeUrl, safeFetch } from './_url-guard.js'
 
 const FETCH_TIMEOUT_MS = 6000
 const READ_BUDGET_MS = 8000 // </head> 검색용 스트림 읽기 전체에 허용하는 시간
@@ -58,9 +58,8 @@ export default async function handler(req, res) {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
   try {
-    const response = await fetch(fetchUrl.href, {
+    const response = await safeFetch(fetchUrl, {
       signal: controller.signal,
-      redirect: 'follow',
       headers: {
         // facebookexternalhit 같은 봇 UA는 위키피디아처럼 오히려 차단하는 사이트가 있어
         // 실제 데스크톱 브라우저 UA를 쓴다. 커스텀/봇 UA로는 로그인·JS 렌더링을 요구하는

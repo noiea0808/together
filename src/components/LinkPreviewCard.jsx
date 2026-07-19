@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getCache, setCache } from '../lib/cache'
 
 const URL_RE = /https?:\/\/[^\s]+/i
@@ -37,16 +37,32 @@ export default function LinkPreviewCard({ text }) {
   // 그래서 일단 컴팩트(아이콘형)로 시작해서, 실제로 로드된 이미지가 크고 정사각형이 아니면(=사진일 가능성)
   // 그때만 큰 카드로 전환한다. 축소보다 확대가 덜 튀어서 기본값을 컴팩트로 둔다.
   const [isIconStyle, setIsIconStyle] = useState(true)
+  const rootRef = useRef(null)
+  const [visible, setVisible] = useState(false)
 
+  // 리스트에 카드가 여러 개 렌더링될 때(위시 리스트, 밥팟 코멘트 등) 화면에 보이기 전까지
+  // /api/link-preview 호출을 미룬다 — 마운트되자마자 전부 요청하면 스크롤 안 한 카드까지 낭비.
   useEffect(() => {
     if (!url) return
+    const el = rootRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) { setVisible(true); observer.disconnect() } },
+      { rootMargin: '300px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [url])
+
+  useEffect(() => {
+    if (!url || !visible) return
     const cached = getCache(`linkpreview:${url}`, ONE_DAY_MS)
     if (cached) { setPreview(cached.data); return }
     fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
       .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
       .then(data => { setCache(`linkpreview:${url}`, data); setPreview(data) })
       .catch(() => {})
-  }, [url])
+  }, [url, visible])
 
   useEffect(() => { setImgFailed(false); setIsIconStyle(true) }, [preview?.image])
 
@@ -64,6 +80,7 @@ export default function LinkPreviewCard({ text }) {
 
   return (
     <a
+      ref={rootRef}
       href={url}
       target="_blank"
       rel="noopener noreferrer"
@@ -76,6 +93,8 @@ export default function LinkPreviewCard({ text }) {
             src={proxied(preview.image)}
             alt=""
             style={isIconStyle ? styles.thumbCompact : styles.thumb}
+            loading="lazy"
+            decoding="async"
             onLoad={handleImgLoad}
             onError={() => setImgFailed(true)}
           />

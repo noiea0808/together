@@ -5,6 +5,7 @@ import AdminLayout from './AdminLayout'
 import StatusGuidePage from './guide/StatusGuidePage'
 import TermsPage from './TermsPage'
 import UsersPage from './UsersPage'
+import IconsPage from './IconsPage'
 import RiceBowlIcon from '../../components/RiceBowlIcon'
 
 // 일반 회원 로그인/온보딩 상태(UserContext)와 완전히 분리된 관리자 전용 라우트 트리.
@@ -26,6 +27,7 @@ function AdminRoutes() {
         <Route path="guide/status" element={<StatusGuidePage />} />
         <Route path="terms" element={<TermsPage />} />
         <Route path="users" element={<UsersPage />} />
+        <Route path="icons" element={<IconsPage />} />
       </Route>
       <Route path="*" element={<Navigate to={adminUser ? '/admin' : '/admin/login'} replace />} />
     </Routes>

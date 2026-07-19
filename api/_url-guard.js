@@ -29,3 +29,29 @@ export function parseSafeUrl(rawUrl) {
   if (isBlockedHost(url.hostname)) return { error: 'blocked host' }
   return { url }
 }
+
+// parseSafeUrl은 최초 URL의 호스트만 검사한다. fetch에 redirect:'follow'를 그대로 쓰면
+// 검사를 통과한 공개 URL이 3xx로 사설 IP/localhost로 리다이렉트했을 때 그대로 따라가버려
+// SSRF 가드를 우회당한다. 그래서 매 홉마다 redirect:'manual'로 받아 Location을 직접
+// parseSafeUrl로 재검증한 뒤에만 다음 요청을 보낸다.
+export async function safeFetch(initialUrl, options = {}, maxRedirects = 3) {
+  let current = initialUrl
+  for (let hop = 0; hop <= maxRedirects; hop++) {
+    const res = await fetch(current.href, { ...options, redirect: 'manual' })
+    const isRedirect = res.status >= 300 && res.status < 400
+    if (!isRedirect) return res
+
+    const location = res.headers.get('location')
+    if (!location) return res
+    let nextUrl
+    try {
+      nextUrl = new URL(location, current)
+    } catch {
+      throw new Error('invalid redirect location')
+    }
+    const { url: validated, error } = parseSafeUrl(nextUrl.href)
+    if (error) throw new Error(`blocked redirect target: ${error}`)
+    current = validated
+  }
+  throw new Error('too many redirects')
+}

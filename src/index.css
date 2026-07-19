@@ -121,6 +121,15 @@ body {
   to   { opacity: 1; transform: translateX(0); }
 }
 
+/* 나의 상태 카드가 스와이프 가능하다는 걸 몸으로 알려주는 최초 1회 넛지 — 왼쪽으로 밀렸다
+   오른쪽으로 살짝 더 밀렸다 제자리로. (TodayPage, localStorage로 1회만 재생) */
+@keyframes statusCardSwipeHint {
+  0%   { transform: translateX(0); }
+  28%  { transform: translateX(-16px); }
+  60%  { transform: translateX(8px); }
+  100% { transform: translateX(0); }
+}
+
 /* ===== 공통 유틸 ===== */
 .page {
   flex: 1;

@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { UsersIcon, UserPlusIcon } from './GroupIcons'
 
 export default function GroupSetupModal({ userId, onClose, onDone }) {
   const [tab, setTab] = useState('create') // 'create' | 'join'
@@ -48,15 +49,15 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
   return (
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-        <div style={{ fontSize: 36 }}>👥</div>
+        <div style={styles.iconBadge}><UsersIcon size={26} /></div>
         <div style={styles.dialogTitle}>그룹 만들기 / 참여하기</div>
 
         <div style={styles.tabs}>
           <button style={{ ...styles.tab, ...(tab === 'create' ? styles.tabActive : {}) }} onClick={() => switchTab('create')}>
-            그룹 만들기
+            <UsersIcon size={16} /> 그룹 만들기
           </button>
           <button style={{ ...styles.tab, ...(tab === 'join' ? styles.tabActive : {}) }} onClick={() => switchTab('join')}>
-            초대 코드로 참여
+            <UserPlusIcon size={16} /> 초대 코드로 참여
           </button>
         </div>
 
@@ -108,8 +109,12 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
 }
 
 const styles = {
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
-  dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  iconBadge: {
+    width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,107,53,0.14)',
+    color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
@@ -118,18 +123,20 @@ const styles = {
 
   tabs: { display: 'flex', width: '100%', gap: 6 },
   tab: {
-    flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 5,
+    padding: '9px 0', border: '1.5px solid var(--color-border)',
+    borderRadius: 'var(--radius-md)', background: 'var(--color-bg)',
     fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer',
     color: 'var(--color-text-muted)', fontFamily: 'inherit',
   },
   tabActive: {
-    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18',
-    color: 'var(--color-primary)',
+    border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)',
+    color: 'var(--color-primary)', fontWeight: 700,
   },
   input: {
     width: '100%', padding: '11px 14px',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
+    fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)',
   },
 }

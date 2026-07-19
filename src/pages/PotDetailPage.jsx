@@ -12,6 +12,8 @@ import RiceBowlIcon from '../components/RiceBowlIcon'
 import LinkPreviewCard from '../components/LinkPreviewCard'
 import AutoTextarea from '../components/AutoTextarea'
 import PotSocialSection from '../components/PotSocialSection'
+import PotIcon from '../components/PotIcon'
+import PotIconPicker from '../components/PotIconPicker'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -195,6 +197,7 @@ export default function PotDetailPage() {
       memo: pot.memo ?? '',
       max_people: pot.max_people ?? 4,
       is_public: pot.is_public ?? false,
+      icon: pot.icon ?? null,
       ...overrides,
     }
   }
@@ -261,6 +264,7 @@ export default function PotDetailPage() {
         memo: newMemo,
         max_people: draft.max_people,
         is_public: draft.is_public,
+        icon: draft.icon,
       }, pot.is_default ? user.id : null)
 
       if (changes.length > 0) {
@@ -446,7 +450,7 @@ export default function PotDetailPage() {
             </div>
             {/* Icon + title */}
             <div style={S.heroHeader}>
-              <div style={S.heroIcon}><RiceBowlIcon size={40} /></div>
+              <div style={S.heroIcon}>{pot.icon ? <PotIcon icon={pot.icon} size={56} /> : <RiceBowlIcon size={56} />}</div>
               <div>
                 <div style={S.heroTitle}>{pot.title}</div>
                 <div style={S.heroSlot}>{pot.slot}</div>
@@ -577,41 +581,62 @@ export default function PotDetailPage() {
                 </div>
               </div>
 
-              {/* 세부 정보 */}
-              <div style={S.editSection}>
-                <div style={S.editDetailsRow}>
-                  <input
-                    style={S.editSectionInput}
-                    placeholder="밥팟 이름"
-                    value={draft.title}
-                    onChange={e => setD('title', e.target.value)}
-                    maxLength={20}
-                  />
-                  <input
-                    style={S.editSectionInput}
-                    placeholder="메뉴 (선택)"
-                    value={draft.menu}
-                    onChange={e => setD('menu', e.target.value)}
-                    maxLength={20}
-                  />
-                </div>
-                <AutoTextarea
-                  style={{ ...S.editSectionInput, marginTop: 6 }}
-                  placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
-                  value={draft.memo}
-                  onChange={e => setD('memo', e.target.value)}
-                  maxLength={200}
-                />
+              {/* 구분: 필수 → 선택 */}
+              <div style={S.editDivider}>
+                <div style={S.editDividerLine} />
+                <span style={S.editDividerLabel}>더 꾸며볼까요 (선택)</span>
+                <div style={S.editDividerLine} />
               </div>
 
-              {/* 공개 범위 */}
-              <div style={S.editSection}>
-                <div style={S.editSectionLabel}>🔓 공개 범위</div>
-                <div style={S.editGroupRow}>
-                  <button style={{ ...S.editGroupBtn, ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
-                  <button style={{ ...S.editGroupBtn, ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+              {/* 선택 트레이: 아이콘 + 세부 정보 + 공개 범위 */}
+              <div style={S.editTray}>
+                <div>
+                  <div style={S.editSectionLabel}>🖼 아이콘</div>
+                  <PotIconPicker value={draft.icon} onChange={v => setD('icon', v)} />
                 </div>
-                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+
+                <div style={S.editTrayDivider} />
+
+                <div>
+                  <div style={S.editSectionLabel}>✏️ 이름 · 메뉴 · 한마디</div>
+                  <div style={S.editDetailsRow}>
+                    <input
+                      style={S.editTrayInput}
+                      placeholder="밥팟 이름"
+                      value={draft.title}
+                      onChange={e => setD('title', e.target.value)}
+                      maxLength={20}
+                    />
+                    <input
+                      style={S.editTrayInput}
+                      placeholder="메뉴"
+                      value={draft.menu}
+                      onChange={e => setD('menu', e.target.value)}
+                      maxLength={20}
+                    />
+                  </div>
+                  <AutoTextarea
+                    style={{ ...S.editTrayInput, marginTop: 6 }}
+                    placeholder="한마디 (예: 빠르게 먹고 와요!)"
+                    value={draft.memo}
+                    onChange={e => setD('memo', e.target.value)}
+                    maxLength={200}
+                  />
+                </div>
+
+                <div style={S.editTrayDivider} />
+
+                <div>
+                  <div style={{ ...S.editSectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+                    <span>🔓 공개 범위</span>
+                    <span style={S.editHint}>기본: 그룹만</span>
+                  </div>
+                  <div style={S.editGroupRow}>
+                    <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
+                    <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+                  </div>
+                  {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+                </div>
               </div>
             </div>
           )
@@ -987,7 +1012,10 @@ const S = {
   publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
   publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
-  heroIcon: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  heroIcon: {
+    width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
+    background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
   heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
@@ -1024,11 +1052,14 @@ const S = {
     padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  editChipActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
 
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
-  editStepperNum: { fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 30, textAlign: 'center' },
+  editStepperNum: {
+    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary)',
+  },
 
   editDetailsRow: { display: 'flex', gap: 6 },
   editSectionInput: {
@@ -1045,6 +1076,19 @@ const S = {
   },
   editGroupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
   editPublicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
+
+  editDivider: { display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' },
+  editDividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
+  editDividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+
+  editTray: { background: 'var(--color-tray)', borderRadius: 'var(--radius-lg)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 },
+  editTrayInput: {
+    width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-surface)',
+    color: 'var(--color-text)', boxSizing: 'border-box',
+  },
+  editTrayDivider: { height: 1, background: 'rgba(0,0,0,0.06)' },
+  editHint: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', margin: '-6px 0 0' },
 

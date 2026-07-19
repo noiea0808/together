@@ -1,7 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 
-function HomeIcon({ active }) {
+export function HomeIcon({ active }) {
   return active ? (
     <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
       <path d="M11.19 2.6a1.4 1.4 0 0 1 1.62 0l7.5 5.36c.43.31.69.82.69 1.36V19.5A1.5 1.5 0 0 1 19.5 21H15a1 1 0 0 1-1-1v-5.5a1.5 1.5 0 0 0-1.5-1.5h-1A1.5 1.5 0 0 0 10 14.5V20a1 1 0 0 1-1 1H4.5A1.5 1.5 0 0 1 3 19.5V9.32c0-.54.26-1.05.69-1.36l7.5-5.36Z" />
@@ -13,7 +13,7 @@ function HomeIcon({ active }) {
   )
 }
 
-function CalendarIcon({ active }) {
+export function CalendarIcon({ active }) {
   return active ? (
     <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
       <rect x="3" y="4.5" width="18" height="16" rx="3" />
@@ -29,21 +29,22 @@ function CalendarIcon({ active }) {
   )
 }
 
-function MomentIcon({ active }) {
+// 예전 아이콘(겹친 사각형)은 "모먼트=사진 공유"라는 의미가 잘 안 읽혀서 카메라 모양으로 교체.
+export function MomentIcon({ active }) {
   return active ? (
     <svg width="25" height="25" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M8.5 3.5 7.4 5H4.5A1.5 1.5 0 0 0 3 6.5v12A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 19.5 5h-2.9l-1.1-1.5a1 1 0 0 0-.8-.5h-5.4a1 1 0 0 0-.8.5Z" />
-      <circle cx="12" cy="13" r="4" fill="var(--color-surface)" />
+      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.4l.9-1.5A1.5 1.5 0 0 1 10.1 4.7h3.8a1.5 1.5 0 0 1 1.3.8L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" />
+      <circle cx="12" cy="13" r="3.2" fill="var(--color-surface)" />
     </svg>
   ) : (
     <svg width="25" height="25" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-      <path d="M8.5 3.5 7.4 5H4.5A1.5 1.5 0 0 0 3 6.5v12A1.5 1.5 0 0 0 4.5 20h15a1.5 1.5 0 0 0 1.5-1.5v-12A1.5 1.5 0 0 0 19.5 5h-2.9l-1.1-1.5a1 1 0 0 0-.8-.5h-5.4a1 1 0 0 0-.8.5Z" />
-      <circle cx="12" cy="13" r="3.6" />
+      <path d="M4 8.5A1.5 1.5 0 0 1 5.5 7h2.4l.9-1.5A1.5 1.5 0 0 1 10.1 4.7h3.8a1.5 1.5 0 0 1 1.3.8L16 7h2.5A1.5 1.5 0 0 1 20 8.5v9A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-9Z" />
+      <circle cx="12" cy="13" r="3.4" />
     </svg>
   )
 }
 
-function PeopleIcon({ active }) {
+export function PeopleIcon({ active }) {
   return active ? (
     <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
       <circle cx="9" cy="8" r="3.4" />
@@ -60,8 +61,8 @@ function PeopleIcon({ active }) {
   )
 }
 
-function UserIcon({ active }) {
-  const borderStyle = { border: `2px solid ${active ? 'var(--color-text)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
+export function UserIcon({ active }) {
+  const borderStyle = { border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
   return active ? (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style={borderStyle}>
       <circle cx="12" cy="7.5" r="4.3" />
@@ -95,7 +96,7 @@ export default function BottomNav() {
         return (
           <button
             key={path}
-            style={{ ...styles.tab, color: active ? 'var(--color-text)' : 'var(--color-text-muted)' }}
+            style={{ ...styles.tab, color: active ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
             onClick={() => navigate(path)}
             aria-label={label}
           >
@@ -103,10 +104,10 @@ export default function BottomNav() {
               <img
                 src={user.avatar_url}
                 alt=""
-                style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-text)' : '2px solid transparent' }}
+                style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-primary)' : '2px solid transparent' }}
               />
             ) : path === '/account' && user?.nickname ? (
-              <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-text)' : '2px solid var(--color-border)' }}>
+              <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-primary)' : '2px solid var(--color-border)' }}>
                 {user.nickname[0]}
               </div>
             ) : (

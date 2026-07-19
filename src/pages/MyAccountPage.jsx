@@ -126,6 +126,10 @@ export default function MyAccountPage() {
     setNewWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
   }
 
+  const toggleAllNewWishGroups = () => {
+    setNewWishGroupIds(prev => prev.length === myGroups.length ? [] : myGroups.map(g => g.id))
+  }
+
   const startEditWish = (place) => {
     setShowAddWishModal(false)
     setEditingWishId(place.id)
@@ -146,6 +150,10 @@ export default function MyAccountPage() {
 
   const toggleEditingWishGroup = (groupId) => {
     setEditingWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
+  }
+
+  const toggleAllEditingWishGroups = () => {
+    setEditingWishGroupIds(prev => prev.length === myGroups.length ? [] : myGroups.map(g => g.id))
   }
 
   const handleSaveEditWish = async () => {
@@ -333,13 +341,16 @@ export default function MyAccountPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <span style={styles.headerTitle}>내 계정</span>
-        <button style={styles.headerLogoutBtn} onClick={handleLogout}>로그아웃</button>
+        <span style={styles.headerTitle}>MY</span>
+        <div style={styles.headerBtns}>
+          <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
+          <button style={styles.headerLogoutBtn} onClick={handleLogout}>로그아웃</button>
+        </div>
       </div>
 
       <div style={styles.tabs}>
         <button style={{ ...styles.tabBtn, ...(tab === 'info' ? styles.tabBtnActive : {}) }} onClick={() => setTab('info')}>내 정보</button>
-        <button style={{ ...styles.tabBtn, ...(tab === 'wish' ? styles.tabBtnActive : {}) }} onClick={() => setTab('wish')}>가고 싶은데...</button>
+        <button style={{ ...styles.tabBtn, ...(tab === 'wish' ? styles.tabBtnActive : {}) }} onClick={() => setTab('wish')}>가고 싶은 곳</button>
       </div>
 
       {tab === 'info' && (
@@ -384,10 +395,10 @@ export default function MyAccountPage() {
         {/* 친구 검색 노출 */}
         <div style={styles.section}>
           <div style={styles.infoRow}>
-            <span style={styles.infoValue}>이메일/닉네임 검색에 노출</span>
+            <span style={styles.infoValue}>친구 찾기에서 내 계정 표시</span>
             <ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="검색 노출" />
           </div>
-          <p style={styles.installDesc}>꺼두면 다른 사람이 검색해서 나를 찾거나 친구 요청을 보낼 수 없어요.</p>
+          <p style={styles.installDesc}>끄면 다른 사람이 이메일이나 닉네임으로 나를 찾을 수 없어요.</p>
         </div>
 
         {/* 알림 받기 */}
@@ -396,10 +407,13 @@ export default function MyAccountPage() {
             {isIOS && !isInstalled ? (
               <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
             ) : (
-              <div style={styles.infoRow}>
-                <span style={styles.infoValue}>푸시 알림</span>
-                <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="푸시 알림" />
-              </div>
+              <>
+                <div style={styles.infoRow}>
+                  <span style={styles.infoValue}>알림 받기</span>
+                  <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="알림 받기" />
+                </div>
+                <p style={styles.installDesc}>밥팟 초대, 참여, 댓글 소식을 알려드려요.</p>
+              </>
             )}
             {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
           </div>
@@ -518,7 +532,7 @@ export default function MyAccountPage() {
               <div key={place.id} style={styles.wishItem}>
                 <div style={styles.wishCardTop}>
                   <span style={styles.wishScopeBadge}>
-                    {place.wish_place_shares?.length > 0 ? `🔒 ${place.wish_place_shares.length}개 그룹만` : '🌍 전체 공개'}
+                    {place.wish_place_shares?.length > 0 ? `🔒 ${place.wish_place_shares.length}개 그룹만` : '🔒 나만 보기'}
                   </span>
                   <div style={{ position: 'relative' }}>
                     <button style={styles.wishMenuBtn} onClick={() => setOpenWishMenuId(openWishMenuId === place.id ? null : place.id)}>⋯</button>
@@ -549,7 +563,7 @@ export default function MyAccountPage() {
                         style={styles.wishProposalsToggle}
                         onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
                       >
-                        💬 {itemProposals.length}명이 관심을 보였어요 {isExpanded ? '▴' : '▾'}
+                        💬 {itemProposals.length}명이 같이 가고 싶어해요 {isExpanded ? '▴' : '▾'}
                       </button>
                       {isExpanded && (
                         <div style={styles.wishProposalsList}>
@@ -574,18 +588,29 @@ export default function MyAccountPage() {
                     </div>
                   )
                 })()}
-                {confirmDeleteWishId === place.id && (
-                  <div style={styles.wishItemActions}>
-                    <span style={styles.wishConfirmText}>삭제할까요?</span>
-                    <button style={styles.wishActionBtnDanger} onClick={() => handleDeleteWish(place.id)}>삭제</button>
-                    <button style={styles.wishActionBtn} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
-                  </div>
-                )}
               </div>
             ))}
           </div>
         )}
       </div>
+      )}
+
+      {confirmDeleteWishId && (
+        <div style={styles.overlay} onClick={() => setConfirmDeleteWishId(null)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>🗑</div>
+            <div style={styles.dialogTitle}>가고 싶은 곳을 삭제할까요?</div>
+            <div style={styles.dialogBtns}>
+              <button
+                style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }}
+                onClick={() => handleDeleteWish(confirmDeleteWishId)}
+              >
+                삭제
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={() => setConfirmDeleteWishId(null)}>취소</button>
+            </div>
+          </div>
+        </div>
       )}
 
       {(showAddWishModal || editingWishId) && (
@@ -604,19 +629,29 @@ export default function MyAccountPage() {
             />
             {myGroups.length > 0 && (
               <div style={styles.wishScopeBox}>
-                <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 전체 공개)</span>
+                <span style={styles.wishScopeLabel}>공개 대상 (선택 안 하면 나만 보기)</span>
                 <div style={styles.wishScopeChips}>
-                  {myGroups.map(g => {
+                  {(() => {
                     const selectedIds = editingWishId ? editingWishGroupIds : newWishGroupIds
                     const toggle = editingWishId ? toggleEditingWishGroup : toggleNewWishGroup
+                    const toggleAll = editingWishId ? toggleAllEditingWishGroups : toggleAllNewWishGroups
+                    const allSelected = selectedIds.length === myGroups.length
                     return (
-                      <button
-                        key={g.id}
-                        style={{ ...styles.groupPickTag, ...(selectedIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
-                        onClick={() => toggle(g.id)}
-                      >{g.name}</button>
+                      <>
+                        <button
+                          style={{ ...styles.groupPickTag, ...(allSelected ? styles.groupPickTagActive : {}) }}
+                          onClick={toggleAll}
+                        >전체선택</button>
+                        {myGroups.map(g => (
+                          <button
+                            key={g.id}
+                            style={{ ...styles.groupPickTag, ...(selectedIds.includes(g.id) ? styles.groupPickTagActive : {}) }}
+                            onClick={() => toggle(g.id)}
+                          >{g.name}</button>
+                        ))}
+                      </>
                     )
-                  })}
+                  })()}
                 </div>
               </div>
             )}
@@ -676,8 +711,15 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
+  header: {
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
+    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
   headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerBtns: { display: 'flex', alignItems: 'center', gap: 4 },
+  headerGuideBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
   headerLogoutBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
 
@@ -743,14 +785,10 @@ const styles = {
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   wishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
-  wishItemActions: { display: 'flex', alignItems: 'center', gap: 18, marginTop: 4 },
-  wishActionBtn: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
-  wishActionBtnDanger: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
-  wishConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishModalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
   wishModalInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
 
-  wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 },
+  wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2, marginBottom: 14 },
   wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },

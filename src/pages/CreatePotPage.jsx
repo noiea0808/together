@@ -7,9 +7,10 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_KEYS, SLOT_EMOJI, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import AutoTextarea from '../components/AutoTextarea'
+import PotIconPicker from '../components/PotIconPicker'
 
 const MIN_PEOPLE = 2
 const MAX_PEOPLE = 8
@@ -61,6 +62,7 @@ export default function CreatePotPage() {
     memo: '',
     max_people: 4,
     is_public: false,
+    icon: null,
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -141,6 +143,7 @@ export default function CreatePotPage() {
         is_public: form.is_public,
         is_default: false,
         createdBy: user.id,
+        icon: form.icon,
       })
       await joinPot(pot.id, user.id)
       await setGroupShareSetting(user.id, form.group_id, initialDate, form.slot, true).catch(() => {})
@@ -199,8 +202,12 @@ export default function CreatePotPage() {
               {SLOT_KEYS.map(s => {
                 const active = form.slot === s
                 return (
-                  <button key={s} style={{ ...S.chip, ...(active ? S.chipActive : {}) }} onClick={() => selectSlot(s)}>
-                    {SLOT_EMOJI[s]} {s}
+                  <button
+                    key={s}
+                    style={{ ...S.chip, ...(active ? S.chipActive : {}) }}
+                    onClick={() => selectSlot(s)}
+                  >
+                    {s}
                   </button>
                 )
               })}
@@ -277,8 +284,15 @@ export default function CreatePotPage() {
             <div style={S.dividerLine} />
           </div>
 
-          {/* 선택 트레이: 세부 정보 + 공개 범위 */}
+          {/* 선택 트레이: 아이콘 + 세부 정보 + 공개 범위 */}
           <div style={S.tray}>
+            <div>
+              <div style={S.sectionLabel}>🖼 아이콘</div>
+              <PotIconPicker value={form.icon} onChange={v => set('icon', v)} />
+            </div>
+
+            <div style={S.trayDivider} />
+
             <div>
               <div style={S.sectionLabel}>✏️ 이름 · 메뉴 · 한마디</div>
               <div style={S.detailsRow}>
