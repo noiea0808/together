@@ -342,10 +342,7 @@ export default function MyAccountPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <span style={styles.headerTitle}>MY</span>
-        <div style={styles.headerBtns}>
-          <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
-          <button style={styles.headerLogoutBtn} onClick={handleLogout}>로그아웃</button>
-        </div>
+        <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
       </div>
 
       <div style={styles.tabs}>
@@ -419,14 +416,21 @@ export default function MyAccountPage() {
           </div>
         )}
 
-        {/* 홈 화면 설치 */}
-        <div style={styles.section}>
-          <InstallAppPrompt />
-        </div>
+        {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
+        {!isInstalled && (
+          <div style={styles.fixedInstallBar}>
+            <InstallAppPrompt hideDesc />
+          </div>
+        )}
 
-        {/* 회원 탈퇴 — 실수 방지를 위해 작고 눈에 띄지 않게. 로그아웃은 헤더로 이동 */}
-        <div style={{ marginTop: 'auto' }}>
+        {/* 회원 탈퇴 · 로그아웃 — 화면 아래쪽으로 밀어 스크롤해야 보이게 해서, 실수로 누르기
+            쉬운 위치(헤더)를 피한다 */}
+        <div style={{ marginTop: '50vh' }}>
           <div style={styles.withdrawWrap}>
+            <button style={styles.withdrawLink} onClick={handleLogout}>
+              로그아웃
+            </button>
+            <span style={styles.withdrawDivider}>·</span>
             <button style={styles.withdrawLink} onClick={() => setShowWithdraw(true)}>
               회원 탈퇴
             </button>
@@ -718,10 +722,18 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
-  headerBtns: { display: 'flex', alignItems: 'center', gap: 4 },
   headerGuideBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
-  headerLogoutBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
+  // 이 페이지는 내부 스크롤 컨테이너가 아니라 문서(페이지) 자체가 스크롤되는 구조라
+  // position:sticky가 걸리지 않는다 — 그래서 fixed로 고정하고, 아래 paddingBottom을
+  // 넉넉히 잡아 끝까지 스크롤하면 로그아웃/회원 탈퇴가 이 바 위로 완전히 올라오게 한다.
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(150px + env(safe-area-inset-bottom))' },
+
+  fixedInstallBar: {
+    position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(72px + env(safe-area-inset-bottom))',
+    width: '100%', maxWidth: 'var(--max-width)', boxSizing: 'border-box',
+    padding: '10px var(--spacing-md)', background: 'rgba(250,248,245,0.95)', backdropFilter: 'blur(8px)',
+    borderTop: '1px solid var(--color-border)', zIndex: 90,
+  },
 
   profileCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
   avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
@@ -759,8 +771,9 @@ const styles = {
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
-  withdrawWrap: { textAlign: 'center', marginTop: 14 },
+  withdrawWrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 14 },
   withdrawLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.6 },
+  withdrawDivider: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', opacity: 0.5 },
   withdrawIcon: { fontSize: 40, textAlign: 'center', marginBottom: 8 },
   withdrawTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.6, marginBottom: 'var(--spacing-md)' },
