@@ -1551,11 +1551,12 @@ export async function deleteWishPlace(id) {
 }
 
 export async function updateWishPlaceOrder(userId, orders) {
-  // orders: [{ id, sort_order }, ...] — 항목 수만큼 UPDATE를 따로 쏘지 않고 한 번에 upsert.
+  // orders: [{ id, sort_order, content }, ...] — content도 함께 보내야 한다.
+  // upsert는 충돌 여부와 무관하게 NOT NULL 컬럼이 빠지면 insert 시도 단계에서 바로 실패한다.
   if (orders.length === 0) return
   const { error } = await supabase
     .from('wish_places')
-    .upsert(orders.map(({ id, sort_order }) => ({ id, sort_order, user_id: userId })))
+    .upsert(orders.map(({ id, sort_order, content }) => ({ id, sort_order, content, user_id: userId })))
   if (error) throw error
 }
 

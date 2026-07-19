@@ -69,9 +69,7 @@ export default function MyAccountPage() {
   const [editingWishGroupIds, setEditingWishGroupIds] = useState([])
   const [savingWishEdit, setSavingWishEdit] = useState(false)
   const [confirmDeleteWishId, setConfirmDeleteWishId] = useState(null)
-  const [reorderingWish, setReorderingWish] = useState(false)
-  const [localWishPlaces, setLocalWishPlaces] = useState([])
-  const [savingWishOrder, setSavingWishOrder] = useState(false)
+  const [movingWishId, setMovingWishId] = useState(null)
   const [myGroups, setMyGroups] = useState([])
   const [wishProposals, setWishProposals] = useState([])
   const [expandedProposalsWishId, setExpandedProposalsWishId] = useState(null)
@@ -193,38 +191,21 @@ export default function MyAccountPage() {
     }
   }
 
-  const startReorderWish = () => {
-    setLocalWishPlaces([...wishPlaces])
-    setReorderingWish(true)
-  }
-
-  const moveWish = (idx, dir) => {
-    setLocalWishPlaces(prev => {
-      const next = [...prev]
-      const target = idx + dir
-      if (target < 0 || target >= next.length) return prev
-      ;[next[idx], next[target]] = [next[target], next[idx]]
-      return next
-    })
-  }
-
-  const saveWishOrder = async () => {
-    setSavingWishOrder(true)
+  const moveWishOrder = async (idx, dir) => {
+    const target = idx + dir
+    if (target < 0 || target >= wishPlaces.length || movingWishId) return
+    const next = [...wishPlaces]
+    ;[next[idx], next[target]] = [next[target], next[idx]]
+    setMovingWishId(wishPlaces[idx].id)
+    setWishPlaces(next)
     try {
-      const orders = localWishPlaces.map((p, i) => ({ id: p.id, sort_order: i }))
-      await updateWishPlaceOrder(user.id, orders)
-      setWishPlaces(localWishPlaces)
-      setReorderingWish(false)
+      await updateWishPlaceOrder(user.id, next.map((p, i) => ({ id: p.id, sort_order: i, content: p.content })))
     } catch (e) {
       console.error(e)
+      getWishPlaces(user.id).then(setWishPlaces).catch(() => {})
     } finally {
-      setSavingWishOrder(false)
+      setMovingWishId(null)
     }
-  }
-
-  const cancelReorderWish = () => {
-    setReorderingWish(false)
-    setLocalWishPlaces([])
   }
 
   const handleTogglePush = async () => {
@@ -487,57 +468,31 @@ export default function MyAccountPage() {
       <div style={styles.body}>
         <div style={styles.wishHeader}>
           <span style={styles.wishCount}>{wishPlaces.length}곳</span>
-          {!reorderingWish && (
-            <div style={styles.wishHeaderBtns}>
-              {wishPlaces.length > 1 && (
-                <button style={styles.wishOrderToggle} onClick={startReorderWish}>순서 변경</button>
-              )}
-              <button style={styles.wishAddTriggerBtn} onClick={openAddWishModal}>+ 등록</button>
-            </div>
-          )}
+          <div style={styles.wishHeaderBtns}>
+            <button style={styles.wishAddTriggerBtn} onClick={openAddWishModal}>+ 등록</button>
+          </div>
         </div>
 
-        {reorderingWish ? (
-          <>
-            <div style={styles.wishList}>
-              {localWishPlaces.map((place, idx) => (
-                <div key={place.id} style={styles.orderRow}>
-                  <span style={styles.orderHandle}>☰</span>
-                  <span style={styles.orderName}>{place.content}</span>
-                  <div style={styles.orderBtns}>
-                    <button
-                      style={{ ...styles.orderBtn, opacity: idx === 0 ? 0.25 : 1 }}
-                      onClick={() => moveWish(idx, -1)}
-                      disabled={idx === 0}
-                    >↑</button>
-                    <button
-                      style={{ ...styles.orderBtn, opacity: idx === localWishPlaces.length - 1 ? 0.25 : 1 }}
-                      onClick={() => moveWish(idx, 1)}
-                      disabled={idx === localWishPlaces.length - 1}
-                    >↓</button>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div style={styles.wishOrderActions}>
-              <button style={{ ...styles.dialogBtnPrimary, opacity: savingWishOrder ? 0.6 : 1 }} onClick={saveWishOrder} disabled={savingWishOrder}>
-                {savingWishOrder ? '저장 중...' : '저장'}
-              </button>
-              <button style={styles.dialogBtnCancel} onClick={cancelReorderWish} disabled={savingWishOrder}>취소</button>
-            </div>
-          </>
-        ) : wishLoading ? (
+        {wishLoading ? (
           <p style={styles.installDesc}>불러오는 중...</p>
         ) : wishPlaces.length === 0 ? (
           <p style={styles.installDesc}>아직 등록한 곳이 없어요. 가고 싶은 식당을 적어보세요!</p>
         ) : (
           <div style={styles.wishList}>
-            {wishPlaces.map(place => (
+            {wishPlaces.map((place, idx) => (
               <div key={place.id} style={styles.wishItem}>
                 <div style={styles.wishCardTop}>
-                  <span style={styles.wishScopeBadge}>
-                    {place.wish_place_shares?.length > 0 ? `🔒 ${place.wish_place_shares.length}개 그룹만` : '🔒 나만 보기'}
-                  </span>
+                  <div style={styles.wishScopeChipRow}>
+                    {place.wish_place_shares?.length > 0 ? (
+                      place.wish_place_shares.map(s => (
+                        <span key={s.group_id} style={styles.wishScopeGroupChip}>
+                          {myGroups.find(g => g.id === s.group_id)?.name ?? '그룹'}
+                        </span>
+                      ))
+                    ) : (
+                      <span style={styles.wishScopeBadge}>🔒 나만 보기</span>
+                    )}
+                  </div>
                   <div style={{ position: 'relative' }}>
                     <button style={styles.wishMenuBtn} onClick={() => setOpenWishMenuId(openWishMenuId === place.id ? null : place.id)}>⋯</button>
                     {openWishMenuId === place.id && (
@@ -559,17 +514,37 @@ export default function MyAccountPage() {
                 })()}
                 {(() => {
                   const itemProposals = wishProposals.filter(p => p.wish_place_id === place.id)
-                  if (itemProposals.length === 0) return null
+                  const hasProposals = itemProposals.length > 0
+                  const showOrderBtns = wishPlaces.length > 1
+                  if (!hasProposals && !showOrderBtns) return null
                   const isExpanded = expandedProposalsWishId === place.id
                   return (
                     <div style={styles.wishProposalsBox}>
-                      <button
-                        style={styles.wishProposalsToggle}
-                        onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
-                      >
-                        💬 {itemProposals.length}명이 같이 가고 싶어해요 {isExpanded ? '▴' : '▾'}
-                      </button>
-                      {isExpanded && (
+                      <div style={styles.wishProposalsRow}>
+                        {hasProposals ? (
+                          <button
+                            style={styles.wishProposalsToggle}
+                            onClick={() => setExpandedProposalsWishId(isExpanded ? null : place.id)}
+                          >
+                            💬 {itemProposals.length}명이 같이 가고 싶어해요 {isExpanded ? '▴' : '▾'}
+                          </button>
+                        ) : <span />}
+                        {showOrderBtns && (
+                          <div style={styles.wishOrderBtns}>
+                            <button
+                              style={{ ...styles.wishOrderBtn, opacity: idx === 0 ? 0.25 : 1 }}
+                              onClick={() => moveWishOrder(idx, -1)}
+                              disabled={idx === 0 || !!movingWishId}
+                            >↑</button>
+                            <button
+                              style={{ ...styles.wishOrderBtn, opacity: idx === wishPlaces.length - 1 ? 0.25 : 1 }}
+                              onClick={() => moveWishOrder(idx, 1)}
+                              disabled={idx === wishPlaces.length - 1 || !!movingWishId}
+                            >↓</button>
+                          </div>
+                        )}
+                      </div>
+                      {hasProposals && isExpanded && (
                         <div style={styles.wishProposalsList}>
                           {itemProposals.map(p => (
                             <div key={p.id} style={styles.wishProposalRow}>
@@ -619,7 +594,7 @@ export default function MyAccountPage() {
 
       {(showAddWishModal || editingWishId) && (
         <div style={styles.modalOverlay} onClick={closeWishModal}>
-          <div style={styles.modal} onClick={e => e.stopPropagation()}>
+          <div style={{ ...styles.modal, paddingLeft: 'var(--spacing-md)', paddingRight: 'var(--spacing-md)' }} onClick={e => e.stopPropagation()}>
             <div style={styles.wishModalTitle}>{editingWishId ? '가고 싶은 곳 수정' : '가고 싶은 곳 등록'}</div>
             <AutoTextarea
               style={styles.wishModalInput}
@@ -792,7 +767,6 @@ const styles = {
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   wishHeaderBtns: { display: 'flex', alignItems: 'center', gap: 6 },
-  wishOrderToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
   wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
 
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
@@ -808,6 +782,8 @@ const styles = {
   groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
   wishCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishScopeBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
+  wishScopeChipRow: { display: 'flex', flexWrap: 'wrap', gap: 4 },
+  wishScopeGroupChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   wishMenuBtn: {
     width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
     color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 900, cursor: 'pointer',
@@ -826,7 +802,8 @@ const styles = {
   },
 
   wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
-  wishProposalsToggle: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
+  wishProposalsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
   wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
@@ -836,11 +813,6 @@ const styles = {
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
 
-  wishOrderActions: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
-
-  orderRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
-  orderHandle: { fontSize: 16, color: 'var(--color-text-muted)', flexShrink: 0 },
-  orderName: { flex: 1, fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  orderBtns: { display: 'flex', gap: 4, flexShrink: 0 },
-  orderBtn: { width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
+  wishOrderBtns: { display: 'flex', justifyContent: 'flex-end', gap: 4, flexShrink: 0 },
+  wishOrderBtn: { width: 26, height: 26, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text-muted)' },
 }
