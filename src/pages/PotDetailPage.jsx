@@ -9,9 +9,12 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
 import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import { MegaphoneIcon } from '../components/GroupIcons'
 import LinkPreviewCard from '../components/LinkPreviewCard'
 import AutoTextarea from '../components/AutoTextarea'
 import PotSocialSection from '../components/PotSocialSection'
+import PotIcon from '../components/PotIcon'
+import PotIconPicker from '../components/PotIconPicker'
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -195,6 +198,7 @@ export default function PotDetailPage() {
       memo: pot.memo ?? '',
       max_people: pot.max_people ?? 4,
       is_public: pot.is_public ?? false,
+      icon: pot.icon ?? null,
       ...overrides,
     }
   }
@@ -261,6 +265,7 @@ export default function PotDetailPage() {
         memo: newMemo,
         max_people: draft.max_people,
         is_public: draft.is_public,
+        icon: draft.icon,
       }, pot.is_default ? user.id : null)
 
       if (changes.length > 0) {
@@ -405,7 +410,7 @@ export default function PotDetailPage() {
           ? <button style={S.headerTextBtn} onClick={cancelDraft}>취소</button>
           // 게스트는 초대 링크로 바로 이 화면에 들어와 브라우저 히스토리가 없는 경우가
           // 많아 navigate(-1)이 아무 반응이 없다. 뒤로가기 모양은 유지하되 홈으로 보낸다.
-          : <button style={S.backBtn} onClick={() => user?.is_guest ? navigate('/today') : navigate(-1)}>‹</button>
+          : <button style={S.backBtn} onClick={() => user?.is_guest ? navigate('/today') : navigate(-1)} aria-label="뒤로가기">‹</button>
         }
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={S.headerTitle}>밥팟 상세</div>
@@ -416,7 +421,7 @@ export default function PotDetailPage() {
               {actionLoading ? '...' : '완료'}
             </button>
           : pot.is_default
-            ? <button style={S.headerEditPill} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>향후 수정</button>
+            ? <button style={S.headerEditPill} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>반복 설정</button>
             : canEdit
             ? <button style={S.headerEditPill} onClick={() => initDraft('all')}>수정</button>
             : <div style={{ width: 60 }} />
@@ -446,11 +451,19 @@ export default function PotDetailPage() {
             </div>
             {/* Icon + title */}
             <div style={S.heroHeader}>
-              <div style={S.heroIcon}><RiceBowlIcon size={40} /></div>
-              <div>
+              <div style={S.heroIcon}>{pot.icon ? <PotIcon icon={pot.icon} size={56} /> : <RiceBowlIcon size={56} />}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={S.heroTitle}>{pot.title}</div>
                 <div style={S.heroSlot}>{pot.slot}</div>
               </div>
+              {canEdit && (
+                <button style={S.heroEditBadge} onClick={() => initDraft('title')} aria-label="아이콘·이름 수정">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+              )}
             </div>
             {/* 2x2 info grid — 각 항목을 탭하면 그 항목만 따로 수정할 수 있어요 */}
             <div style={S.infoGrid}>
@@ -514,6 +527,19 @@ export default function PotDetailPage() {
           const isCustomTime = draft.time_enabled && !presets.includes(draft.meal_time)
           return (
             <div style={S.editSections}>
+              {/* 공개 범위 */}
+              <div style={S.editSection}>
+                <div style={{ ...S.editSectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+                  <span>🔓 공개 범위</span>
+                  <span style={S.editHint}>기본: 그룹만</span>
+                </div>
+                <div style={S.editGroupRow}>
+                  <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
+                  <button style={{ ...S.editGroupBtn, background: 'var(--color-surface)', ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+                </div>
+                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+              </div>
+
               {/* 시간 */}
               <div style={S.editSection}>
                 <div style={S.editSectionLabel}>🕒 언제 먹을까요?</div>
@@ -571,47 +597,54 @@ export default function PotDetailPage() {
               <div style={{ ...S.editSection, ...S.editSectionRow }}>
                 <div style={S.editSectionLabel}>👥 몇 명까지?</div>
                 <div style={S.editStepper}>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
                   <span style={S.editStepperNum}>{draft.max_people}명</span>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
                 </div>
               </div>
 
-              {/* 세부 정보 */}
-              <div style={S.editSection}>
-                <div style={S.editDetailsRow}>
-                  <input
-                    style={S.editSectionInput}
-                    placeholder="밥팟 이름"
-                    value={draft.title}
-                    onChange={e => setD('title', e.target.value)}
-                    maxLength={20}
-                  />
-                  <input
-                    style={S.editSectionInput}
-                    placeholder="메뉴 (선택)"
-                    value={draft.menu}
-                    onChange={e => setD('menu', e.target.value)}
-                    maxLength={20}
-                  />
-                </div>
-                <AutoTextarea
-                  style={{ ...S.editSectionInput, marginTop: 6 }}
-                  placeholder="한마디 (선택, 예: 빠르게 먹고 와요!)"
-                  value={draft.memo}
-                  onChange={e => setD('memo', e.target.value)}
-                  maxLength={200}
-                />
+              {/* 구분: 필수 → 선택 */}
+              <div style={S.editDivider}>
+                <div style={S.editDividerLine} />
+                <span style={S.editDividerLabel}>더 꾸며볼까요 (선택)</span>
+                <div style={S.editDividerLine} />
               </div>
 
-              {/* 공개 범위 */}
-              <div style={S.editSection}>
-                <div style={S.editSectionLabel}>🔓 공개 범위</div>
-                <div style={S.editGroupRow}>
-                  <button style={{ ...S.editGroupBtn, ...(!draft.is_public ? S.editGroupOnlyActive : {}) }} onClick={() => setD('is_public', false)}>그룹만</button>
-                  <button style={{ ...S.editGroupBtn, ...(draft.is_public ? S.editPublicActive : {}) }} onClick={() => setD('is_public', true)}>전체 공개</button>
+              {/* 선택 트레이: 아이콘 + 세부 정보 */}
+              <div style={S.editTray}>
+                <div>
+                  <div style={S.editSectionLabel}>🖼 아이콘</div>
+                  <PotIconPicker value={draft.icon} onChange={v => setD('icon', v)} />
                 </div>
-                {draft.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+
+                <div style={S.editTrayDivider} />
+
+                <div>
+                  <div style={S.editSectionLabel}>✏️ 이름 · 메뉴 · 한마디</div>
+                  <div style={S.editDetailsRow}>
+                    <input
+                      style={S.editTrayInput}
+                      placeholder="밥팟 이름"
+                      value={draft.title}
+                      onChange={e => setD('title', e.target.value)}
+                      maxLength={20}
+                    />
+                    <input
+                      style={S.editTrayInput}
+                      placeholder="메뉴"
+                      value={draft.menu}
+                      onChange={e => setD('menu', e.target.value)}
+                      maxLength={20}
+                    />
+                  </div>
+                  <AutoTextarea
+                    style={{ ...S.editTrayInput, marginTop: 6 }}
+                    placeholder="한마디 (예: 빠르게 먹고 와요!)"
+                    value={draft.memo}
+                    onChange={e => setD('memo', e.target.value)}
+                    maxLength={200}
+                  />
+                </div>
               </div>
             </div>
           )
@@ -622,10 +655,24 @@ export default function PotDetailPage() {
           <div style={S.overlay} onClick={cancelDraft}>
             <div style={S.dialog} onClick={e => e.stopPropagation()}>
               <div style={S.dialogTitle}>
-                {{ time: '🕒 시간 수정', menu: '🍽️ 메뉴 수정', max_people: '👥 최대 인원 수정', memo: '📝 메모 수정' }[draftScope]}
+                {{ title: '🖼️ 아이콘 · 이름 수정', time: '🕒 시간 수정', menu: '🍽️ 메뉴 수정', max_people: '👥 최대 인원 수정', memo: '📝 메모 수정' }[draftScope]}
               </div>
               {pot.is_default && (
                 <p style={S.dialogDesc}>이 밥팟에만 적용돼요.{'\n'}향후 기본 밥팟 설정은 그대로 유지돼요.</p>
+              )}
+
+              {draftScope === 'title' && (
+                <div style={{ width: '100%' }}>
+                  <PotIconPicker value={draft.icon} onChange={v => setD('icon', v)} />
+                  <input
+                    style={{ ...S.editSectionInput, width: '100%', marginTop: 10 }}
+                    placeholder="밥팟 이름"
+                    value={draft.title}
+                    onChange={e => setD('title', e.target.value)}
+                    maxLength={20}
+                    autoFocus
+                  />
+                </div>
               )}
 
               {draftScope === 'time' && (() => {
@@ -698,9 +745,9 @@ export default function PotDetailPage() {
 
               {draftScope === 'max_people' && (
                 <div style={S.editStepper}>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))}>−</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
                   <span style={S.editStepperNum}>{draft.max_people}명</span>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))}>+</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
                 </div>
               )}
 
@@ -762,6 +809,7 @@ export default function PotDetailPage() {
                       <button
                         style={S.kickBtn}
                         onClick={e => { e.stopPropagation(); setConfirmKick({ id: member.id, nickname: member.nickname }) }}
+                        aria-label={`${member?.nickname ?? ''} 내보내기`}
                       >✕</button>
                     )}
                   </div>
@@ -789,7 +837,7 @@ export default function PotDetailPage() {
 
         {!isPotExpired && !user?.is_guest && (
           <button style={S.shareBtn} onClick={() => { setShowShare(true); setShareTab('friend') }}>
-            📣 같이 먹자고 하기
+            <MegaphoneIcon size={16} strokeWidth={2} /> 같이 먹자고 하기
           </button>
         )}
 
@@ -803,7 +851,11 @@ export default function PotDetailPage() {
       {showShare && (
         <div style={S.overlay} onClick={() => setShowShare(false)}>
           <div style={S.shareDialog} onClick={e => e.stopPropagation()}>
-            <div style={S.dialogTitle}>📣 같이 먹자고 하기</div>
+            <div style={S.dialogTitle}>
+              <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                <MegaphoneIcon size={17} strokeWidth={2} /> 같이 먹자고 하기
+              </span>
+            </div>
 
             <div style={S.shareTabs}>
               <button style={{ ...S.shareTabBtn, ...(shareTab === 'friend' ? S.shareTabBtnActive : {}) }} onClick={() => setShareTab('friend')}>친구 선택</button>
@@ -972,7 +1024,7 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
     lineHeight: 1,
   },
-  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   headerSub: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
   headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' },
@@ -987,9 +1039,17 @@ const S = {
   publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
   publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
-  heroIcon: { width: 48, height: 48, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  heroIcon: {
+    width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
+    background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
   heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
+  heroEditBadge: {
+    width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary)', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+  },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
   infoPanel: { position: 'relative', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', padding: '10px 12px' },
   infoPanelFull: { gridColumn: '1 / -1' },
@@ -1024,11 +1084,14 @@ const S = {
     padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  editChipActive: { background: '#FFF4EF', border: '1.5px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
 
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
-  editStepperNum: { fontWeight: 700, fontSize: 'var(--font-size-sm)', minWidth: 30, textAlign: 'center' },
+  editStepperNum: {
+    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary)',
+  },
 
   editDetailsRow: { display: 'flex', gap: 6 },
   editSectionInput: {
@@ -1045,6 +1108,19 @@ const S = {
   },
   editGroupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
   editPublicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
+
+  editDivider: { display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' },
+  editDividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
+  editDividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+
+  editTray: { background: 'var(--color-tray)', borderRadius: 'var(--radius-lg)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 },
+  editTrayInput: {
+    width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-surface)',
+    color: 'var(--color-text)', boxSizing: 'border-box',
+  },
+  editTrayDivider: { height: 1, background: 'rgba(0,0,0,0.06)' },
+  editHint: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 },
 
   creatorLine: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', margin: '-6px 0 0' },
 
@@ -1064,7 +1140,7 @@ const S = {
   joinBtn: { ...PRIMARY_ACTION_BUTTON },
   leaveBtn: { width: '100%', padding: 16, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   expiredCard: { background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 15, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
-  shareBtn: { width: '100%', padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  shareBtn: { width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   deleteBtn: { ...DESTRUCTIVE_ACTION_BUTTON, padding: 14 },
 
   /* Share panel */
@@ -1077,7 +1153,7 @@ const S = {
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },
   shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+  shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
   shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60 },
   shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },

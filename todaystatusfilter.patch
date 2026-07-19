@@ -1,0 +1,141 @@
+diff --git a/src/pages/TodayPage.jsx b/src/pages/TodayPage.jsx
+index 65af3d4..96cb461 100644
+--- a/src/pages/TodayPage.jsx
++++ b/src/pages/TodayPage.jsx
+@@ -1255,21 +1255,30 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+     setTimeout(() => setCopied(null), 2000)
+   }
+ 
+-  // Summary chips
++  // Status counts for filter tabs
+   const statusCounts = {}
+   members.forEach(member => {
+     const data = getMemberData(member.id)
+     if (data?.status) statusCounts[data.status] = (statusCounts[data.status] ?? 0) + 1
+   })
+-  const chips = SLOT_STATUS_OPTIONS.filter(o => statusCounts[o.key] > 0).map(o => ({
+-    ...o,
+-    label: `${o.label} ${statusCounts[o.key]}`,
+-  }))
+ 
+   // Separate active and unset members
+   const activeMembers = members.filter(m => getMemberData(m.id)?.status)
+   const unsetMembers = members.filter(m => !getMemberData(m.id)?.status)
+   const [showUnset, setShowUnset] = useState(false)
++  const [statusFilter, setStatusFilter] = useState(null)
++
++  // Filter tabs: always show all 4 options
++  const filterTabs = [
++    ...SLOT_STATUS_OPTIONS.map(o => ({ ...o, count: statusCounts[o.key] ?? 0 })),
++    { key: 'unset', label: '미설정', color: '#A89E94', bg: '#F5F0EB', border: '#DDD5CC', count: unsetMembers.length },
++  ]
++
++  // Filtered member lists based on active filter
++  const filteredActive = statusFilter && statusFilter !== 'unset'
++    ? activeMembers.filter(m => getMemberData(m.id)?.status === statusFilter)
++    : statusFilter === 'unset' ? [] : activeMembers
++  const showUnsetSection = statusFilter === 'unset' ? true : statusFilter === null
+ 
+   return (
+     <div style={styles.groupCard}>
+@@ -1490,23 +1499,32 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+ 
+       {!collapsed && (
+         <div style={{ padding: '0 0 2px' }}>
+-          {/* 요약 칩 */}
+-          {chips.length > 0 && (
+-            <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
+-              {chips.map(chip => (
+-                <span key={chip.key} style={{
+-                  fontSize: 11, fontWeight: 700,
+-                  color: chip.color,
+-                  background: chip.bg ?? chip.color + '18',
+-                  border: `1px solid ${chip.border ?? chip.color + '44'}`,
+-                  borderRadius: 99, padding: '3px 10px',
+-                }}>{chip.label}</span>
+-              ))}
+-            </div>
+-          )}
++          {/* 상태 필터 탭 */}
++          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
++            {filterTabs.map(tab => {
++              const isActive = statusFilter === tab.key
++              return (
++                <button
++                  key={tab.key}
++                  onClick={() => setStatusFilter(isActive ? null : tab.key)}
++                  style={{
++                    fontSize: 11, fontWeight: 700,
++                    color: isActive ? tab.color : '#A89E94',
++                    background: isActive ? (tab.bg ?? tab.color + '18') : '#F5F0EB',
++                    border: `1px solid ${isActive ? (tab.border ?? tab.color + '44') : '#E8E3DE'}`,
++                    borderRadius: 99, padding: '3px 10px',
++                    cursor: 'pointer', fontFamily: 'inherit',
++                    opacity: tab.count === 0 ? 0.4 : 1,
++                  }}
++                >
++                  {tab.label} {tab.count}
++                </button>
++              )
++            })}
++          </div>
+ 
+           {/* 활동 멤버 */}
+-          {activeMembers.map((member, idx) => {
++          {filteredActive.map((member) => {
+             const data = getMemberData(member.id)
+             const opt = SLOT_STATUS_OPTIONS.find(o => o.key === data?.status)
+             const isMe = member.id === myUserId
+@@ -1532,7 +1550,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+                     </div>
+                   )}
+                 </div>
+-                {opt && (
++                {opt && !statusFilter && (
+                   <span style={{
+                     fontSize: 11, fontWeight: 700,
+                     color: opt.color,
+@@ -1546,20 +1564,22 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+           })}
+ 
+           {/* 미설정 멤버 */}
+-          {unsetMembers.length > 0 && (
++          {unsetMembers.length > 0 && showUnsetSection && (
+             <>
+-              <button
+-                onClick={() => setShowUnset(v => !v)}
+-                style={{
+-                  width: '100%', padding: '7px 0', background: 'none', border: 'none',
+-                  cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+-                  color: '#B0A89E', fontSize: 11, fontFamily: 'inherit',
+-                }}
+-              >
+-                <span>미설정 {unsetMembers.length}명</span>
+-                <span style={{ fontSize: 10 }}>{showUnset ? '▴' : '▾'}</span>
+-              </button>
+-              {showUnset && unsetMembers.map(member => (
++              {statusFilter !== 'unset' ? (
++                <button
++                  onClick={() => setShowUnset(v => !v)}
++                  style={{
++                    width: '100%', padding: '7px 0', background: 'none', border: 'none',
++                    cursor: 'pointer', display: 'flex', justifyContent: 'space-between', alignItems: 'center',
++                    color: '#B0A89E', fontSize: 11, fontFamily: 'inherit',
++                  }}
++                >
++                  <span>미설정 {unsetMembers.length}명</span>
++                  <span style={{ fontSize: 10 }}>{showUnset ? '▴' : '▾'}</span>
++                </button>
++              ) : null}
++              {(statusFilter === 'unset' || showUnset) && unsetMembers.map(member => (
+                 <div key={member.id} style={{
+                   display: 'flex', alignItems: 'center', gap: 9,
+                   padding: '5px 0', opacity: 0.45,
+@@ -1574,7 +1594,6 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
+                   <span style={{ flex: 1, fontSize: 12, color: '#6B7280', letterSpacing: '-0.2px' }}>
+                     {member.nickname}{member.id === myUserId ? ' (나)' : ''}
+                   </span>
+-                  <span style={{ fontSize: 11, color: '#C8BEB4' }}>미설정</span>
+                 </div>
+               ))}
+             </>

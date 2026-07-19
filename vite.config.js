@@ -8,4 +8,7 @@ export default defineConfig({
     port: Number(process.env.PORT) || 5173,
     strictPort: false,
   },
+  test: {
+    environment: 'node',
+  },
 })

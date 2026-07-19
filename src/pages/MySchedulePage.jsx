@@ -34,7 +34,6 @@ export default function MySchedulePage() {
   const navigate = useNavigate()
   const [statuses, setStatuses] = useState([])
   const [loading, setLoading] = useState(true)
-  const [expandedDates, setExpandedDates] = useState(new Set())
   const [weekOffset, setWeekOffset] = useState(0)
 
   const dates = getTwoWeekDates(weekOffset)
@@ -65,18 +64,10 @@ export default function MySchedulePage() {
     byDate[s.date][s.slot] = s
   })
 
-  const toggleDate = (dateStr) => {
-    setExpandedDates(prev => {
-      const next = new Set(prev)
-      next.has(dateStr) ? next.delete(dateStr) : next.add(dateStr)
-      return next
-    })
-  }
-
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <span style={S.headerTitle}>나의 일정</span>
+        <span style={S.headerTitle}>일정</span>
         <div style={S.nav}>
           <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
           <span style={S.navLabel}>{rangeLabel}</span>
@@ -93,7 +84,6 @@ export default function MySchedulePage() {
           const hasStatus = Object.keys(dayStatuses).length > 0
           const isToday = date.getTime() === TODAY.getTime()
           const isPast = date < TODAY
-          const isExpanded = expandedDates.has(dateStr)
           const dow = date.getDay()
           const isWeekend = dow === 0 || dow === 6
           const showMonth = idx === 0 || date.getDate() === 1
@@ -116,7 +106,7 @@ export default function MySchedulePage() {
               )}
               <div
                 style={{ ...S.card, background: cardBg, border: `1.5px solid ${cardBorder}` }}
-                onClick={() => toggleDate(dateStr)}
+                onClick={() => navigate(`/today?date=${dateStr}`)}
               >
                 <div style={S.row}>
                   <div style={S.dateCol}>
@@ -135,39 +125,8 @@ export default function MySchedulePage() {
                     )}
                   </div>
                   {isToday && <span style={S.todayBadge}>오늘</span>}
-                  <span style={S.expIcon}>{isExpanded ? '▲' : '▼'}</span>
+                  <span style={S.goIcon}>›</span>
                 </div>
-
-                {isExpanded && (
-                  <div style={S.expanded}>
-                    <div style={S.slotGrid}>
-                      {SLOT_ORDER.map(slot => {
-                        const s = dayStatuses[slot]
-                        const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
-                        return (
-                          <div key={slot} style={S.slotCell}>
-                            <span style={S.slotName}>{slot}</span>
-                            {opt ? (
-                              <span style={{ ...S.slotBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.color}40` }}>
-                                {opt.label}
-                              </span>
-                            ) : (
-                              <span style={S.slotDash}>—</span>
-                            )}
-                          </div>
-                        )
-                      })}
-                    </div>
-                    <div style={S.goRow}>
-                      <button
-                        style={S.goBtn}
-                        onClick={e => { e.stopPropagation(); navigate(`/today?date=${dateStr}`) }}
-                      >
-                        해당 일자로 이동하기 →
-                      </button>
-                    </div>
-                  </div>
-                )}
               </div>
             </div>
           )
@@ -182,11 +141,12 @@ export default function MySchedulePage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    padding: '18px 20px 12px', position: 'sticky', top: 0,
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
     background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
-  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
   nav: { display: 'flex', alignItems: 'center', gap: 8 },
   navBtn: {
     width: 26, height: 26, borderRadius: '50%', border: '1px solid #EDE8E3', background: '#fff',
@@ -209,14 +169,5 @@ const S = {
   chip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', whiteSpace: 'nowrap' },
   noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
   todayBadge: { background: 'var(--color-primary)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
-  expIcon: { color: '#ADA59B', fontSize: 'var(--font-size-2xs)', flexShrink: 0 },
-
-  expanded: { marginTop: 10, paddingTop: 10, borderTop: '1px solid #EDE8E3' },
-  slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 5 },
-  slotCell: { display: 'flex', alignItems: 'center', gap: 8, padding: '4px 2px' },
-  slotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', minWidth: 44 },
-  slotBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 7px' },
-  slotDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
-  goRow: { display: 'flex', justifyContent: 'flex-end', paddingTop: 8 },
-  goBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#FF6B35', background: 'none', border: 'none', cursor: 'pointer', padding: 0 },
+  goIcon: { color: '#ADA59B', fontSize: 'var(--font-size-base)', fontWeight: 700, flexShrink: 0 },
 }

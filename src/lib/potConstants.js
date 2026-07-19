@@ -1,5 +1,4 @@
 export const SLOT_KEYS = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
-export const SLOT_EMOJI = { '아침': '🌅', '오전간식': '☕', '점심': '☀️', '오후간식': '🍵', '저녁': '🌙', '야식': '🌃' }
 
 export const SLOT_TIME_PRESETS = {
   '아침':    ['07:00', '07:30', '08:00', '08:30', '09:00'],
@@ -9,6 +8,18 @@ export const SLOT_TIME_PRESETS = {
   '저녁':    ['17:00', '17:30', '18:00', '18:30', '19:00'],
   '야식':    ['21:00', '21:30', '22:00', '23:00'],
 }
+
+// 밥팟 카드 왼쪽 썸네일 — 열기/수정 시 사용자가 직접 고르는 아이콘. 값은 DB의 meal_pots.icon /
+// group_default_pot_configs.icon 문자열과 그대로 매핑되므로, 키를 바꾸면 기존 데이터와 어긋난다.
+export const POT_ICON_KEYS = ['together', 'tray', 'chat', 'salad', 'ready', 'party', 'care', 'map', 'delivery', 'random']
+
+// 가고 싶은 곳 카테고리 — 값은 DB의 wish_places.category와 그대로 매핑되므로, 키를 바꾸면 기존 데이터와 어긋난다.
+export const WISH_CATEGORY_OPTIONS = [
+  { key: 'like', label: '좋아하는 곳' },
+  { key: 'curious', label: '궁금한 곳' },
+  { key: 'together', label: '같이 가고 싶은 곳' },
+  { key: 'frequent', label: '자주 가는 곳' },
+]
 
 export const MOMENT_SCOPE_OPTIONS = [
   { value: 'participants', label: '참여자만' },

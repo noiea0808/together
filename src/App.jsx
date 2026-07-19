@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import { UserProvider, useUser } from './lib/UserContext'
+import { NotificationSyncProvider } from './lib/NotificationSyncContext'
 import OnboardingPage from './pages/OnboardingPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import TodayPage from './pages/TodayPage'
@@ -8,6 +9,7 @@ import GuestHomePage from './pages/GuestHomePage'
 import MySchedulePage from './pages/MySchedulePage'
 import MomentPage from './pages/MomentPage'
 import MyAccountPage from './pages/MyAccountPage'
+import GuidePage from './pages/GuidePage'
 import CreatePotPage from './pages/CreatePotPage'
 import PotDetailPage from './pages/PotDetailPage'
 import GroupPage from './pages/GroupPage'
@@ -18,7 +20,6 @@ import NotificationsPage from './pages/NotificationsPage'
 import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
-import BadgeSync from './components/BadgeSync'
 import GroupInviteModal from './components/GroupInviteModal'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 
@@ -50,6 +51,7 @@ function ConsumerRoutes() {
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
       <Route path="/moment"   element={guestSafe(<MomentPage />)} />
       <Route path="/account"  element={guestSafe(<MyAccountPage />)} />
+      <Route path="/guide"    element={guestSafe(<GuidePage />)} />
       <Route path="/create"   element={guestSafe(<CreatePotPage />)} />
       <Route path="/pot/:id"  element={<PotDetailPage />} />
       <Route path="/group"    element={guestSafe(<GroupPage />)} />
@@ -65,10 +67,11 @@ function ConsumerRoutes() {
 function ConsumerApp() {
   return (
     <UserProvider>
-      <NotificationToast />
-      <BadgeSync />
-      <GroupInviteModal />
-      <ConsumerRoutes />
+      <NotificationSyncProvider>
+        <NotificationToast />
+        <GroupInviteModal />
+        <ConsumerRoutes />
+      </NotificationSyncProvider>
     </UserProvider>
   )
 }

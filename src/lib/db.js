@@ -309,6 +309,11 @@ export async function setDiscoverable(userId, value) {
   if (error) throw error
 }
 
+export async function setLunchReminderEnabled(userId, value) {
+  const { error } = await supabase.from('users').update({ notify_lunch_reminder: value }).eq('id', userId)
+  if (error) throw error
+}
+
 // 친구 목록/요청은 users 테이블 RLS(같은 밥팟 참여자만 조회 가능)를 우회해야 해서
 // SECURITY DEFINER RPC를 거친다 — 친구가 반드시 같은 밥팟에 있으리란 보장이 없기 때문.
 export async function getMyFriends() {
@@ -658,7 +663,7 @@ function generatePotCode() {
   return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('')
 }
 
-export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy }) {
+export async function createPot({ groupId, date, slot, meal_time, end_time, title, menu, memo, max_people, is_public, is_default, createdBy, icon }) {
   const invite_code = is_default ? null : generatePotCode()
   const { data, error } = await supabase
     .from('meal_pots')
@@ -676,6 +681,7 @@ export async function createPot({ groupId, date, slot, meal_time, end_time, titl
       is_default,
       created_by: is_default ? null : createdBy,
       invite_code,
+      icon: icon || null,
     })
     .select()
     .single()
@@ -1224,8 +1230,8 @@ export async function deletePot(potId) {
   if (error) throw error
 }
 
-export async function updatePot(potId, { meal_time, end_time, title, menu, memo, max_people, is_public }, lastModifiedBy = null) {
-  const patch = { meal_time, end_time: end_time || null, title, menu: menu || null, memo: memo || null, max_people, is_public }
+export async function updatePot(potId, { meal_time, end_time, title, menu, memo, max_people, is_public, icon }, lastModifiedBy = null) {
+  const patch = { meal_time, end_time: end_time || null, title, menu: menu || null, memo: memo || null, max_people, is_public, icon: icon || null }
   if (lastModifiedBy) { patch.last_modified_by = lastModifiedBy; patch.last_modified_at = new Date().toISOString() }
   const { error } = await supabase.from('meal_pots').update(patch).eq('id', potId)
   if (error) throw error
@@ -1242,24 +1248,28 @@ export async function getGroupDefaultPotConfigs(groupId) {
   return data ?? []
 }
 
-export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+export async function insertGroupDefaultPotConfig({ groupId, slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, repeat_days, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .insert({
       group_id: groupId, slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
+      repeat_days: repeat_days ?? [1, 2, 3, 4, 5],
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+      icon: icon || null,
     })
   if (error) throw error
 }
 
-export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, lastModifiedBy }) {
+export async function updateGroupDefaultPotConfig(id, { slot, meal_time, end_time, title, memo, max_people, is_public, effective_from, repeat_days, lastModifiedBy, icon }) {
   const { error } = await supabase
     .from('group_default_pot_configs')
     .update({
       slot, meal_time, end_time: end_time || null,
       title, memo: memo || null, max_people, is_public, effective_from,
+      repeat_days: repeat_days ?? [1, 2, 3, 4, 5],
       last_modified_by: lastModifiedBy, updated_at: new Date().toISOString(),
+      icon: icon || null,
     })
     .eq('id', id)
   if (error) throw error
@@ -1294,7 +1304,8 @@ export async function deleteGroupDefaultPotConfig(id, fromDate) {
 // 기본팟 설정이 있는데 해당 날짜에 아직 팟이 없으면 자동 생성 (config_id 기준으로 중복 방지)
 export async function ensureDefaultPots(groupId, date, configs) {
   if (!configs || configs.length === 0) return
-  const applicable = configs.filter(c => c.effective_from <= date)
+  const weekday = new Date(`${date}T00:00:00`).getDay()
+  const applicable = configs.filter(c => c.effective_from <= date && (c.repeat_days ?? [1, 2, 3, 4, 5]).includes(weekday))
   if (applicable.length === 0) return
 
   const { data: existing } = await supabase
@@ -1312,6 +1323,7 @@ export async function ensureDefaultPots(groupId, date, configs) {
     is_default: true, created_by: null,
     last_modified_by: c.last_modified_by,
     config_id: c.id,
+    icon: c.icon || null,
   }))
   // 유니크 제약(config_id+date) 위반 시 무시 (동시 요청 경합 방지)
   for (const row of rows) {
@@ -1414,44 +1426,273 @@ export async function setPotMomentScope(potId, scope) {
   if (error) throw error
 }
 
-const MOMENT_POT_SELECT = '*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), pot_comments(count)'
+// 목록 렌더링(MomentCard)에 실제로 쓰는 컬럼만 명시 — '*'로 memo 등 불필요한 컬럼까지
+// 매번 끌어오지 않도록 함.
+const MOMENT_POT_SELECT = 'id, group_id, date, slot, meal_time, end_time, title, menu, moment_scope, ' +
+  'pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), pot_comments(count)'
+
+// 커서 기반 페이지네이션 페이지 크기. 한 번에 이 개수만큼만 가져오고, 화면에서
+// 스크롤이 끝에 닿으면 마지막으로 받은 날짜를 커서 삼아 다음 페이지를 더 가져온다.
+const MOMENT_PAGE_SIZE = 20
 
 // "내 그룹" 모먼트 피드: 내 그룹에 방송된(그룹공유·전체공유) 밥팟 + 범위와 무관하게
 // 내가 직접 참여했던 밥팟을 합쳐서 반환한다 (참여자만 범위여도 본인에게는 보임).
-// todayStr 이하 날짜(오늘 포함)까지 가져오고, 오늘 밥팟 중 아직 안 끝난 건 호출부(isPotEnded)에서 걸러낸다.
-export async function getGroupMomentPots(groupIds, userId, todayStr) {
-  if (!groupIds || groupIds.length === 0) return []
+// cursorDate가 없으면 todayStr 이하(오늘 포함)부터, 있으면 그 날짜보다 이전 것부터 최대
+// MOMENT_PAGE_SIZE건 가져온다. 오늘 밥팟 중 아직 안 끝난 건 호출부(isPotEnded)에서 걸러낸다.
+// 반환값의 nextCursor로 다음 페이지를, hasMore로 더 가져올 게 남았는지 확인한다.
+export async function getGroupMomentPots(groupIds, userId, todayStr, cursorDate = null) {
+  if (!groupIds || groupIds.length === 0) return { pots: [], nextCursor: null, hasMore: false }
+
+  let broadcastQuery = supabase
+    .from('meal_pots')
+    .select(MOMENT_POT_SELECT)
+    .in('group_id', groupIds)
+    .in('moment_scope', ['group', 'public'])
+  broadcastQuery = cursorDate ? broadcastQuery.lt('date', cursorDate) : broadcastQuery.lte('date', todayStr)
+
+  let ownQuery = supabase
+    .from('pot_members')
+    .select(`meal_pots!inner(${MOMENT_POT_SELECT})`)
+    .eq('user_id', userId)
+    .in('meal_pots.group_id', groupIds)
+  ownQuery = cursorDate ? ownQuery.lt('meal_pots.date', cursorDate) : ownQuery.lte('meal_pots.date', todayStr)
+
   const [broadcastRes, ownRes] = await Promise.all([
-    supabase
-      .from('meal_pots')
-      .select(MOMENT_POT_SELECT)
-      .in('group_id', groupIds)
-      .in('moment_scope', ['group', 'public'])
-      .lte('date', todayStr),
-    supabase
-      .from('pot_members')
-      .select(`meal_pots!inner(${MOMENT_POT_SELECT})`)
-      .eq('user_id', userId)
-      .in('meal_pots.group_id', groupIds)
-      .lte('meal_pots.date', todayStr),
+    broadcastQuery.order('date', { ascending: false }).limit(MOMENT_PAGE_SIZE),
+    ownQuery.order('date', { ascending: false, referencedTable: 'meal_pots' }).limit(MOMENT_PAGE_SIZE),
   ])
   if (broadcastRes.error) throw broadcastRes.error
   if (ownRes.error) throw ownRes.error
 
+  const rawDates = [...broadcastRes.data.map(p => p.date), ...ownRes.data.map(r => r.meal_pots.date)]
   const byId = new Map()
   for (const pot of broadcastRes.data) byId.set(pot.id, pot)
   for (const row of ownRes.data) byId.set(row.meal_pots.id, row.meal_pots)
-  return [...byId.values()].sort((a, b) => b.date.localeCompare(a.date))
+  const pots = [...byId.values()].sort((a, b) => b.date.localeCompare(a.date))
+
+  // 두 소스 중 하나라도 페이지 꽉 채워 왔으면 더 남았을 가능성 있음 (보수적으로 잡음).
+  const hasMore = broadcastRes.data.length === MOMENT_PAGE_SIZE || ownRes.data.length === MOMENT_PAGE_SIZE
+  // 다음 커서는 이번에 받은 원본 로우들(중복 제거 전) 중 가장 오래된 날짜 — 경계에서 항목이
+  // 씹히지 않도록 병합·중복제거된 pots가 아니라 rawDates 기준으로 잡는다.
+  const nextCursor = hasMore && rawDates.length > 0 ? rawDates.reduce((a, b) => (a < b ? a : b)) : null
+
+  return { pots, nextCursor, hasMore: hasMore && nextCursor !== null }
 }
 
 // "전체" 모먼트 피드: 그룹 소속과 무관하게 전체공유로 설정된 밥팟을 앱 전체에서 조회.
-export async function getPublicMomentPots(todayStr) {
-  const { data, error } = await supabase
+export async function getPublicMomentPots(todayStr, cursorDate = null) {
+  let query = supabase
     .from('meal_pots')
     .select(`${MOMENT_POT_SELECT}, groups(name)`)
     .eq('moment_scope', 'public')
-    .lte('date', todayStr)
-    .order('date', { ascending: false })
+  query = cursorDate ? query.lt('date', cursorDate) : query.lte('date', todayStr)
+
+  const { data, error } = await query.order('date', { ascending: false }).limit(MOMENT_PAGE_SIZE)
+  if (error) throw error
+
+  const hasMore = data.length === MOMENT_PAGE_SIZE
+  const nextCursor = hasMore ? data[data.length - 1].date : null
+  return { pots: data, nextCursor, hasMore }
+}
+
+// ── 가고 싶은 식당 (내 계정 > 가고 싶은데...) ──────────────
+// 지금은 본인 것만 조회/작성 가능(RLS). wish_place_shares로 그룹별 공개 범위를 함께 가져온다.
+export async function getWishPlaces(userId) {
+  const { data, error } = await supabase
+    .from('wish_places')
+    .select('*, wish_place_shares(group_id)')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+// 위시 항목의 그룹 공개 범위를 통째로 교체한다. groupIds가 비어있으면 나만 보기(비공개).
+export async function setWishPlaceShares(wishPlaceId, groupIds) {
+  const { error: delError } = await supabase
+    .from('wish_place_shares')
+    .delete()
+    .eq('wish_place_id', wishPlaceId)
+  if (delError) throw delError
+
+  if (groupIds.length > 0) {
+    const { error: insError } = await supabase
+      .from('wish_place_shares')
+      .insert(groupIds.map(group_id => ({ wish_place_id: wishPlaceId, group_id })))
+    if (insError) throw insError
+  }
+}
+
+export async function addWishPlace(userId, content, category = 'like') {
+  const { data: last, error: lastError } = await supabase
+    .from('wish_places')
+    .select('sort_order')
+    .eq('user_id', userId)
+    .order('sort_order', { ascending: false })
+    .limit(1)
+  if (lastError) throw lastError
+  const nextOrder = (last?.[0]?.sort_order ?? -1) + 1
+
+  const { data, error } = await supabase
+    .from('wish_places')
+    .insert({ user_id: userId, content, category, sort_order: nextOrder })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateWishPlace(id, content, category) {
+  const { error } = await supabase
+    .from('wish_places')
+    .update({ content, category })
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function deleteWishPlace(id) {
+  const { error } = await supabase
+    .from('wish_places')
+    .delete()
+    .eq('id', id)
+  if (error) throw error
+}
+
+export async function updateWishPlaceOrder(userId, orders) {
+  // orders: [{ id, sort_order, content, category }, ...] — content/category도 함께 보내야 한다.
+  // upsert는 충돌 여부와 무관하게 NOT NULL 컬럼이 빠지면 insert 시도 단계에서 바로 실패한다.
+  if (orders.length === 0) return
+  const { error } = await supabase
+    .from('wish_places')
+    .upsert(orders.map(({ id, sort_order, content, category }) => ({ id, sort_order, content, category, user_id: userId })))
+  if (error) throw error
+}
+
+// 친구 관리 화면에서 상대방의 위시 리스트를 볼 때 사용. wish_places RLS는 본인만
+// 허용하므로 friend_requests(accepted)/같은 그룹 여부(+ 그룹 제한)를 확인하는 RPC를 거친다.
+// 좋아요/댓글 집계(like_count, liked_by_me, comment_count)도 함께 반환한다.
+export async function getFriendWishPlaces(targetUserId) {
+  const { data, error } = await supabase.rpc('get_friend_wish_places', { target_user_id: targetUserId })
+  if (error) throw error
+  return data
+}
+
+async function notifyWishPlaceOwner({ wishPlaceId, fromUserId, insertPayload, title, bodyPrefix }) {
+  const ownerId = await supabase.rpc('wish_place_owner', { p_wish_place_id: wishPlaceId }).then(r => r.data)
+  if (!ownerId || ownerId === fromUserId) return // 본인 항목에는 알림을 보내지 않는다
+
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  const { data: wishContent } = await supabase.rpc('get_wish_place_content', { p_wish_place_id: wishPlaceId })
+  const shortContent = wishContent ? (wishContent.length > 20 ? `${wishContent.slice(0, 20)}…` : wishContent) : '가고 싶은 곳'
+  const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" ${bodyPrefix}`
+  const url = '/account?tab=wish'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: ownerId, title, body, url, ...insertPayload,
+  })
+  if (notifError) console.error('wish place 알림 insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [ownerId], title, body, url },
+  })
+  if (pushError) console.warn('wish place send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('wish place send-push 일부 실패:', pushResult.failures)
+}
+
+// 친구의 위시 항목에 하트를 남긴다. 소유자 본인이 아니면 알림/푸시도 함께 보낸다.
+export async function likeWishPlace(wishPlaceId, userId) {
+  const { data: like, error } = await supabase
+    .from('wish_place_likes')
+    .insert({ wish_place_id: wishPlaceId, user_id: userId })
+    .select()
+    .single()
+  if (error) throw error
+
+  await notifyWishPlaceOwner({
+    wishPlaceId, fromUserId: userId,
+    insertPayload: { wish_place_like_id: like.id, event_type: 'wish_like' },
+    title: '가고 싶은 곳에 하트를 받았어요', bodyPrefix: '좋아해요.',
+  })
+
+  return like
+}
+
+export async function unlikeWishPlace(wishPlaceId, userId) {
+  const { error } = await supabase
+    .from('wish_place_likes')
+    .delete()
+    .eq('wish_place_id', wishPlaceId)
+    .eq('user_id', userId)
+  if (error) throw error
+}
+
+// 위시 항목에 좋아요 남긴 사람 목록. users RLS를 우회하는 RPC를 거친다(get_wish_place_likes).
+export async function getWishPlaceLikers(wishPlaceId) {
+  const { data, error } = await supabase.rpc('get_wish_place_likes', { p_wish_place_id: wishPlaceId })
+  if (error) throw error
+  return data
+}
+
+// 위시 항목 댓글 목록. users RLS를 우회하는 RPC를 거친다(get_wish_place_comments).
+export async function getWishPlaceComments(wishPlaceId) {
+  const { data, error } = await supabase.rpc('get_wish_place_comments', { p_wish_place_id: wishPlaceId })
+  if (error) throw error
+  return data
+}
+
+// mentionedUserId를 넘기면 댓글 등록 후 그 사용자에게 별도로 멘션 알림/푸시를 보낸다
+// (게시물 소유자 알림과는 별개 — 예: owner가 자기 글에 남긴 댓글에서 다른 사람을 멘션한 경우).
+export async function addWishPlaceComment(wishPlaceId, userId, content, mentionedUserId = null) {
+  const { data: comment, error } = await supabase
+    .from('wish_place_comments')
+    .insert({ wish_place_id: wishPlaceId, user_id: userId, content })
+    .select()
+    .single()
+  if (error) throw error
+
+  await notifyWishPlaceOwner({
+    wishPlaceId, fromUserId: userId,
+    insertPayload: { wish_place_comment_id: comment.id, event_type: 'wish_comment' },
+    title: '가고 싶은 곳에 댓글이 달렸어요', bodyPrefix: '에 댓글을 남겼어요.',
+  })
+
+  if (mentionedUserId && mentionedUserId !== userId) {
+    await notifyWishPlaceMention({ commentId: comment.id, wishPlaceId, fromUserId: userId, mentionedUserId })
+  }
+
+  const { data: from } = await supabase.from('users').select('nickname, avatar_url').eq('id', userId).single()
+  return { ...comment, nickname: from?.nickname, avatar_url: from?.avatar_url }
+}
+
+async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, mentionedUserId }) {
+  const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
+  const { data: wishContent } = await supabase.rpc('get_wish_place_content', { p_wish_place_id: wishPlaceId })
+  const shortContent = wishContent ? (wishContent.length > 20 ? `${wishContent.slice(0, 20)}…` : wishContent) : '가고 싶은 곳'
+  const title = '댓글에서 나를 언급했어요'
+  const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" 댓글에서 나를 언급했어요.`
+  const url = '/account?tab=wish'
+
+  const { error: notifError } = await supabase.from('notifications').insert({
+    user_id: mentionedUserId, title, body, url,
+    wish_place_mention_comment_id: commentId, event_type: 'wish_mention',
+  })
+  if (notifError) console.error('wish mention 알림 insert 실패:', notifError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [mentionedUserId], title, body, url },
+  })
+  if (pushError) console.warn('wish mention send-push 실패:', pushError)
+  else if (pushResult?.failed > 0) console.warn('wish mention send-push 일부 실패:', pushResult.failures)
+}
+
+export async function deleteWishPlaceComment(id) {
+  const { error } = await supabase.from('wish_place_comments').delete().eq('id', id)
+  if (error) throw error
+}
+
+// 내 계정 화면에서 내 위시 항목들의 좋아요/댓글 수를 한 번에 조회.
+export async function getMyWishPlaceReactions() {
+  const { data, error } = await supabase.rpc('get_my_wish_place_reactions')
   if (error) throw error
   return data
 }

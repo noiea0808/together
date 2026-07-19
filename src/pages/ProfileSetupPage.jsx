@@ -157,7 +157,7 @@ export default function ProfileSetupPage() {
         {error && <p style={styles.error}>{error}</p>}
 
         <button
-          style={{ ...styles.btn, opacity: canSubmit ? 1 : 0.4 }}
+          style={{ ...PRIMARY_ACTION_BUTTON, marginTop: 4, opacity: canSubmit ? 1 : 0.4 }}
           onClick={handleSubmit}
           disabled={!canSubmit}
         >
@@ -171,7 +171,7 @@ export default function ProfileSetupPage() {
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <span style={styles.modalTitle}>{viewTerm.title}</span>
-              <button style={styles.modalClose} onClick={() => setViewTerm(null)}>✕</button>
+              <button style={styles.modalClose} onClick={() => setViewTerm(null)} aria-label="닫기">✕</button>
             </div>
             <div style={styles.modalBody}>{viewTerm.content || '내용이 등록되지 않았습니다.'}</div>
             <button
@@ -220,7 +220,7 @@ const styles = {
     fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--color-text-muted)',
   },
   chipActive: {
-    borderColor: 'var(--color-primary)', background: 'var(--color-primary)18',
+    borderColor: 'var(--color-primary)', background: 'var(--color-primary-a10)',
     color: 'var(--color-primary)', fontWeight: 700,
   },
   terms: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 'var(--spacing-md)' },
@@ -253,11 +253,6 @@ const styles = {
     textDecoration: 'underline', padding: 4,
   },
   error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 },
-  btn: {
-    width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer', marginTop: 4,
-  },
   modalOverlay: {
     position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',

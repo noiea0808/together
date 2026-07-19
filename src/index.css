@@ -5,15 +5,33 @@
   padding: 0;
 }
 
+/* 로고/헤더 대제목 전용 서체 */
+@font-face {
+  font-family: 'GmarketSansBold';
+  src: url('https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2001@1.1/GmarketSansBold.woff') format('woff');
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===== 디자인 토큰 ===== */
 :root {
   --color-primary: #FF6B35;
   --color-primary-light: #FF8C5A;
   --color-primary-dark: #E05520;
+  /* var(--color-primary)18 형태(토큰 뒤에 hex 알파를 이어붙이는 표기)는 유효한 CSS가
+     아니라 배경이 투명 처리됨 — 대신 이 알파 변형 토큰들을 쓴다. */
+  --color-primary-a05: rgba(255, 107, 53, 0.05);
+  --color-primary-a07: rgba(255, 107, 53, 0.07);
+  --color-primary-a08: rgba(255, 107, 53, 0.08);
+  --color-primary-a10: rgba(255, 107, 53, 0.10);
+  --color-primary-a20: rgba(255, 107, 53, 0.20);
+  --color-primary-a27: rgba(255, 107, 53, 0.27);
 
   --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
   --color-surface-2: #F5F0EB;
+  --color-tray: #F0E3CF;
 
   --color-text: #1A1A1A;
   --color-text-muted: #857B72;
@@ -59,6 +77,8 @@
   --spacing-xl: 32px;
 
   --max-width: 430px;
+
+  --font-title: 'GmarketSansBold', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
 }
 
 /* ===== 기본 타이포 & 바디 ===== */
@@ -111,50 +131,41 @@ body {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* 나의 상태 카드 전환: 이전 카드와 다음 카드를 나란히 붙인 트랙을 밀어, 이전 카드가
+   밀려나가는 동안 다음 카드가 뒤따라 등장하게 한다 (TodayPage 메인 상태 카드). */
+@keyframes slotTrackNext {
+  from { transform: translateX(0%); }
+  to   { transform: translateX(-50%); }
+}
+@keyframes slotTrackPrev {
+  from { transform: translateX(-50%); }
+  to   { transform: translateX(0%); }
+}
+
+/* 나의 상태 카드가 스와이프 가능하다는 걸 몸으로 알려주는 최초 1회 넛지 — 왼쪽으로 밀렸다
+   오른쪽으로 살짝 더 밀렸다 제자리로. (TodayPage, localStorage로 1회만 재생) */
+@keyframes statusCardSwipeHint {
+  0%   { transform: translateX(0); }
+  28%  { transform: translateX(-16px); }
+  60%  { transform: translateX(8px); }
+  100% { transform: translateX(0); }
+}
+
+/* 날짜 전환 시 페이지 콘텐츠 전체가 넘어가는 방향으로 슬라이드-인 (TodayPage) */
+@keyframes pageSlideNext {
+  from { transform: translateX(28px); opacity: 0; }
+  to   { transform: translateX(0);    opacity: 1; }
+}
+@keyframes pageSlidePrev {
+  from { transform: translateX(-28px); opacity: 0; }
+  to   { transform: translateX(0);     opacity: 1; }
+}
 
 /* ===== 공통 유틸 ===== */
 .page {
   flex: 1;
   padding: var(--spacing-md);
   padding-bottom: calc(var(--spacing-xl) + env(safe-area-inset-bottom));
-}
-
-.btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: var(--spacing-xs);
-  padding: 14px var(--spacing-lg);
-  border: none;
-  border-radius: var(--radius-full);
-  font-size: var(--font-size-base);
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.15s, transform 0.1s;
-  -webkit-tap-highlight-color: transparent;
-  user-select: none;
-}
-
-.btn:active {
-  transform: scale(0.97);
-  opacity: 0.9;
-}
-
-.btn-primary {
-  background: var(--color-primary);
-  color: #fff;
-  width: 100%;
-}
-
-.btn-secondary {
-  background: var(--color-surface-2);
-  color: var(--color-text);
-  width: 100%;
-}
-
-.btn-ghost {
-  background: transparent;
-  color: var(--color-primary);
 }
 
 .card {
@@ -184,8 +195,19 @@ body {
 .text-muted { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .text-center { text-align: center; }
 
+button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
+
+.thin-scrollbar { scrollbar-width: thin; }
+.thin-scrollbar::-webkit-scrollbar { width: 4px; }
+.thin-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.thin-scrollbar::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.2); border-radius: 2px; }
+.thin-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(0, 0, 0, 0.3); }
 
 .mt-sm { margin-top: var(--spacing-sm); }
 .mt-md { margin-top: var(--spacing-md); }

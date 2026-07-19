@@ -4,6 +4,8 @@ import { signUp, signIn, signInWithGoogle, signInWithKakao } from '../lib/db'
 import { useUser } from '../lib/UserContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import InstallAppPrompt from '../components/InstallAppPrompt'
+import { MailIcon } from '../components/GroupIcons'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const ERROR_MESSAGES = {
   'Invalid login credentials': '이메일 또는 비밀번호가 올바르지 않아요.',
@@ -18,6 +20,8 @@ function parseError(e) {
 
 // 진입 화면: 소셜 / 이메일 선택
 function LoginSelect({ onEmail, hasPendingInvite }) {
+  const [error, setError] = useState(null)
+
   return (
     <div style={styles.selectGroup}>
       {hasPendingInvite && (
@@ -25,16 +29,17 @@ function LoginSelect({ onEmail, hasPendingInvite }) {
           🎉 초대 링크로 오셨군요! 로그인하면 바로 입장됩니다.
         </div>
       )}
-      <button style={{ ...styles.socialBtn, ...styles.googleBtn }} onClick={async () => { try { await signInWithGoogle() } catch (e) { alert('구글 로그인 실패: ' + e.message) } }}>
+      {error && <p style={styles.error}>{error}</p>}
+      <button style={{ ...styles.socialBtn, ...styles.googleBtn }} onClick={async () => { setError(null); try { await signInWithGoogle() } catch { setError('구글 로그인에 실패했어요. 다시 시도해주세요.') } }}>
         <GoogleIcon />
         <span>Google로 계속하기</span>
       </button>
-      <button style={{ ...styles.socialBtn, ...styles.kakaoBtn }} onClick={async () => { try { await signInWithKakao() } catch (e) { alert('카카오 로그인 실패: ' + e.message) } }}>
+      <button style={{ ...styles.socialBtn, ...styles.kakaoBtn }} onClick={async () => { setError(null); try { await signInWithKakao() } catch { setError('카카오 로그인에 실패했어요. 다시 시도해주세요.') } }}>
         <KakaoIcon />
         <span>카카오로 계속하기</span>
       </button>
       <button style={{ ...styles.socialBtn, ...styles.emailBtn }} onClick={onEmail}>
-        <span style={styles.emailIcon}>✉️</span>
+        <MailIcon size={18} strokeWidth={2} />
         <span>이메일로 계속하기</span>
       </button>
     </div>
@@ -104,7 +109,7 @@ function EmailForm({ hasPendingInvite, onBack }) {
         </div>
       )}
       <div style={styles.emailFormHeader}>
-        <button style={styles.backBtn} onClick={onBack}>←</button>
+        <button style={styles.backBtn} onClick={onBack} aria-label="뒤로가기">←</button>
         <div style={styles.tabs}>
           <button
             style={{ ...styles.tab, ...(tab === 'login' ? styles.tabActive : {}) }}
@@ -167,7 +172,8 @@ function EmailForm({ hasPendingInvite, onBack }) {
 
       <button
         style={{
-          ...styles.btn,
+          ...PRIMARY_ACTION_BUTTON,
+          marginTop: 4,
           opacity: (tab === 'signup'
             ? form.email && form.password && form.passwordConfirm
             : form.email && form.password) && !loading ? 1 : 0.4,
@@ -232,7 +238,7 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 56, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-2xl)', fontWeight: 900, marginBottom: 8 },
+  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-2xl)', fontWeight: 900, marginBottom: 8 },
   sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', whiteSpace: 'pre-line', lineHeight: 1.6 },
   card: {
     width: '100%', background: 'var(--color-surface)',
@@ -252,7 +258,6 @@ const styles = {
   googleBtn: { background: '#fff', color: '#3c4043' },
   kakaoBtn: { background: '#FEE500', color: '#3C1E1E', border: '1.5px solid #FEE500' },
   emailBtn: { background: 'var(--color-surface-2)', color: 'var(--color-text)' },
-  emailIcon: { fontSize: 18, lineHeight: 1 },
   emailFormHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   backBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 4px', flexShrink: 0 },
   tabs: { display: 'flex', gap: 8, flex: 1 },
@@ -264,7 +269,7 @@ const styles = {
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    borderColor: 'var(--color-primary)', background: 'var(--color-primary)18',
+    borderColor: 'var(--color-primary)', background: 'var(--color-primary-a10)',
     color: 'var(--color-primary)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
@@ -276,15 +281,9 @@ const styles = {
   },
   hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
   error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 },
-  btn: {
-    width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer',
-    marginTop: 4,
-  },
   installSection: {
     width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',
   },
-  inviteBanner: { background: 'var(--color-primary)12', border: '1px solid var(--color-primary)33', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },
+  inviteBanner: { background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a20)', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },
 }

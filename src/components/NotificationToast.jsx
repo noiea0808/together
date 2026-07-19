@@ -1,18 +1,21 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { supabase } from '../lib/supabase'
+import { useNotificationSync } from '../lib/NotificationSyncContext'
 import { acceptFriendRequest, declineFriendRequest } from '../lib/db'
 
 const AUTO_DISMISS_MS = 5000
 
 // 앱이 켜져 있는 동안 새 알림(notifications INSERT)이 오면 화면 상단에 토스트로 띄운다.
 // 벨 아이콘 빨간 점은 Header.jsx가 별도로 처리 — 이 컴포넌트는 포그라운드 즉시 알림 전용.
+// 실시간 구독 자체는 NotificationSyncProvider(App.jsx)가 앱 전체에서 한 번만 하고,
+// 새 알림이 INSERT될 때마다 여기로 lastInsert를 넘겨준다.
 //
 // 친구 요청(friend_request)은 다른 알림과 달리 그 자리에서 바로 수락/거절할 수 있는
 // 액션 버튼을 붙이고, 실수로 놓치지 않도록 자동으로 사라지지 않게 한다.
 export default function NotificationToast() {
   const { user } = useUser()
+  const { lastInsert } = useNotificationSync()
   const navigate = useNavigate()
   const [toasts, setToasts] = useState([])
   const [actingId, setActingId] = useState(null)
@@ -25,25 +28,20 @@ export default function NotificationToast() {
   }, [])
 
   useEffect(() => {
-    if (!user || user.is_guest) return
+    if (!lastInsert) return
+    const n = lastInsert.row
+    setToasts(prev => [...prev, n])
+    if (n.event_type !== 'friend_request') {
+      timers.current[n.id] = setTimeout(() => dismiss(n.id), AUTO_DISMISS_MS)
+    }
+  }, [lastInsert, dismiss])
 
-    const channel = supabase
-      .channel(`notification_toast_${user.id}`)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, (payload) => {
-        const n = payload.new
-        setToasts(prev => [...prev, n])
-        if (n.event_type !== 'friend_request') {
-          timers.current[n.id] = setTimeout(() => dismiss(n.id), AUTO_DISMISS_MS)
-        }
-      })
-      .subscribe()
-
+  useEffect(() => {
     return () => {
-      supabase.removeChannel(channel)
       Object.values(timers.current).forEach(clearTimeout)
       timers.current = {}
     }
-  }, [user, dismiss])
+  }, [])
 
   const handleClick = (t) => {
     dismiss(t.id)

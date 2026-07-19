@@ -14,8 +14,10 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
+import PotIcon from '../components/PotIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { extractFirstUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
@@ -26,10 +28,9 @@ const STATUS_SUBTEXT = {
   closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
   skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
 }
-const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot} 상태를 정해보세요`
+const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot}은 어떻게 할까요?`
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
-const SLOT_EMOJI = { '아침': '🌅', '점심': '☀️', '저녁': '🌙', '오전간식': '☕', '오후간식': '🍵', '야식': '🌃' }
 
 // 슬롯별 분위기에 어울리는 상태 카드 배경 — 아침(새벽 노을)/오전간식(커피)/점심(한낮 햇살)/오후간식(녹차)/저녁(노을)/야식(밤)
 const SLOT_THEME = {
@@ -39,6 +40,17 @@ const SLOT_THEME = {
   '오후간식': { bg: '#EAF5E4', border: '#C8E6B9' },
   '저녁':    { bg: '#F7E6EE', border: '#E7C2D8' },
   '야식':    { bg: '#E6E9F5', border: '#C3CAE8' },
+}
+
+// 밥팟별 보기의 슬롯 칩용 — SLOT_THEME과 같은 색상 계열(연한 배경/테두리)에 읽히는
+// 텍스트 색만 더해 재사용. 같은 슬롯이 화면마다 다른 색으로 보이지 않도록 통일.
+const SLOT_CHIP_COLOR = {
+  '아침':    { ...SLOT_THEME['아침'],    text: '#C2703A' },
+  '오전간식': { ...SLOT_THEME['오전간식'], text: '#8B6B3D' },
+  '점심':    { ...SLOT_THEME['점심'],    text: '#A67C00' },
+  '오후간식': { ...SLOT_THEME['오후간식'], text: '#4C8C3C' },
+  '저녁':    { ...SLOT_THEME['저녁'],    text: '#B0568C' },
+  '야식':    { ...SLOT_THEME['야식'],    text: '#5C63B0' },
 }
 
 const SLOT_TIME_PRESETS = {
@@ -56,6 +68,32 @@ function toDateStr(date) {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
+
+// 지금 시각에 가장 가까운 슬롯 — 각 슬롯의 첫 프리셋 시각을 기준으로, 그 시각을 지난 슬롯 중 가장 늦은 것을 고른다.
+// (예: 11시 → 점심, 아침 시작 07:00 이전 새벽 시간대는 기본값인 아침으로 유지)
+function getTimeBasedSlot(date = new Date()) {
+  const nowMin = date.getHours() * 60 + date.getMinutes()
+  const toMin = t => { const [h, m] = t.split(':').map(Number); return h * 60 + m }
+  let result = SLOT_ORDER[0]
+  for (const slot of SLOT_ORDER) {
+    if (nowMin >= toMin(SLOT_TIME_PRESETS[slot][0])) result = slot
+  }
+  return result
+}
+
+// 오늘 안에서 직접 고른 슬롯이 있으면 그걸, 없으면(하루가 바뀌었거나 처음 진입) 시간대 기본값을 보여준다.
+function getDefaultSlot() {
+  try {
+    const stored = JSON.parse(localStorage.getItem('lastSelectedSlot') || 'null')
+    if (stored?.slot && stored.date === toDateStr(new Date())) return stored.slot
+  } catch {}
+  return getTimeBasedSlot()
+}
+
+function rememberSlot(slot) {
+  localStorage.setItem('lastSelectedSlot', JSON.stringify({ slot, date: toDateStr(new Date()) }))
+}
+
 function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
@@ -96,9 +134,7 @@ export default function TodayPage() {
     return TODAY
   })()
   const [currentDate, setCurrentDate] = useState(initialDate)
-  const [selectedSlot, setSelectedSlot] = useState(
-    () => localStorage.getItem('lastSelectedSlot') || '점심'
-  )
+  const [selectedSlot, setSelectedSlot] = useState(getDefaultSlot)
   const [viewMode, setViewMode] = useState(
     () => localStorage.getItem('lastViewMode') || 'group'
   )
@@ -109,6 +145,71 @@ export default function TodayPage() {
     const el = subSlotRowRef.current
     if (!el) return
     el.scrollLeft += dir * 200
+  }
+  const subSlotBtnRefs = useRef({})
+  const [slideDir, setSlideDir] = useState('next')
+  // 전환 중 함께 화면에 걸쳐두는 "밀려나가는" 이전 슬롯 — 트랙 애니메이션이 끝나면 null로 비운다.
+  const [prevSlot, setPrevSlot] = useState(null)
+  const slotTransitionTimer = useRef(null)
+  useEffect(() => () => clearTimeout(slotTransitionTimer.current), [])
+  const swipeStart = useRef(null)
+  // 나의 상태 카드가 스와이프된다는 걸 처음 진입한 사용자에게만 몸으로 알려주는 1회성 넛지.
+  const [showSwipeHint, setShowSwipeHint] = useState(() => !localStorage.getItem('statusCardSwipeHintShown'))
+  const dismissSwipeHint = () => { localStorage.setItem('statusCardSwipeHintShown', '1'); setShowSwipeHint(false) }
+
+  // 선택된 슬롯 버튼을 서브탭 행 중앙으로 — 위 스크롤과 같은 이유로 scrollLeft 직접 대입
+  const centerSubSlot = (slot) => {
+    const container = subSlotRowRef.current
+    const btn = subSlotBtnRefs.current[slot]
+    if (!container || !btn) return
+    container.scrollLeft = Math.max(0, btn.offsetLeft - (container.clientWidth - btn.clientWidth) / 2)
+  }
+
+  // 메인 상태 카드 스와이프·서브탭 클릭 공용 슬롯 전환 — 방향에 따라 슬라이드 애니메이션 결정
+  const goToSlot = (slot) => {
+    if (slot === selectedSlot) return
+    setSlideDir(SLOT_ORDER.indexOf(slot) > SLOT_ORDER.indexOf(selectedSlot) ? 'next' : 'prev')
+    setPrevSlot(selectedSlot)
+    setSelectedSlot(slot)
+    rememberSlot(slot)
+    clearTimeout(slotTransitionTimer.current)
+    slotTransitionTimer.current = setTimeout(() => setPrevSlot(null), 280)
+  }
+
+  // 메인 상태 카드 위의 스와이프는 슬롯 전환 전담 — 페이지 레벨 날짜 스와이프로 버블링되지 않도록 막는다.
+  const handleCardSwipeStart = (e) => { e.stopPropagation(); swipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleCardSwipeEnd = (e) => {
+    if (!swipeStart.current) return
+    e.stopPropagation()
+    const dx = e.clientX - swipeStart.current.x
+    const dy = e.clientY - swipeStart.current.y
+    swipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    const idx = SLOT_ORDER.indexOf(selectedSlot)
+    if (dx < 0 && idx < SLOT_ORDER.length - 1) goToSlot(SLOT_ORDER[idx + 1])
+    else if (dx > 0 && idx > 0) goToSlot(SLOT_ORDER[idx - 1])
+  }
+
+  // 날짜 전환 시 페이지 전체가 밀려나는 방향 — next(내일 방향)/prev(어제 방향)
+  const [dateSlideDir, setDateSlideDir] = useState('next')
+  const goToDate = (updater) => {
+    setCurrentDate(d => {
+      const next = updater(d)
+      setDateSlideDir(next > d ? 'next' : 'prev')
+      return next
+    })
+  }
+
+  // 메인 상태 카드를 제외한 나머지 화면 영역 스와이프 — 전후 날짜로 이동
+  const pageSwipeStart = useRef(null)
+  const handlePageSwipeStart = (e) => { pageSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handlePageSwipeEnd = (e) => {
+    if (!pageSwipeStart.current) return
+    const dx = e.clientX - pageSwipeStart.current.x
+    const dy = e.clientY - pageSwipeStart.current.y
+    pageSwipeStart.current = null
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return
+    goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
@@ -250,6 +351,8 @@ export default function TodayPage() {
     }
   }, [user, dateStr, applySnapshot])
 
+  useEffect(() => { centerSubSlot(selectedSlot) }, [selectedSlot])
+
   useEffect(() => { loadData() }, [loadData])
 
   // 실시간 구독 — 상태/밥팟 변경 시 영향받는 그룹만, 디바운스로 묶어서 재로드
@@ -264,6 +367,8 @@ export default function TodayPage() {
 
     // 단일 그룹 재조회 (실시간 변경분 반영 + 캐시 무효화)
     const reloadGroup = async (groupId) => {
+      const configs = await getGroupDefaultPotConfigs(groupId)
+      await ensureDefaultPots(groupId, dateStr, configs) // 다른 기기의 기본팟 설정 변경분 재생성
       const [statuses, pots] = await Promise.all([
         getGroupStatuses(groupId, dateStr),
         getGroupPots(groupId, dateStr),
@@ -341,6 +446,20 @@ export default function TodayPage() {
         if (status !== 'SUBSCRIBED') console.log('[realtime] pot_changes', status, err ?? '')
       })
 
+    const defaultPotConfigSub = supabase
+      .channel(`default_pot_configs_${user.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'group_default_pot_configs' },
+        (payload) => {
+          const groupId = payload.new?.group_id ?? payload.old?.group_id
+          if (groupId && groupsRef.current.some(g => g.id === groupId)) {
+            scheduleReload([groupId])
+          }
+        }
+      )
+      .subscribe((status, err) => {
+        if (status !== 'SUBSCRIBED') console.log('[realtime] default_pot_configs', status, err ?? '')
+      })
+
     const shareSub = supabase
       .channel(`share_settings_${user.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'group_share_settings' },
@@ -367,6 +486,7 @@ export default function TodayPage() {
       if (timer) clearTimeout(timer)
       supabase.removeChannel(statusSub)
       supabase.removeChannel(potSub)
+      supabase.removeChannel(defaultPotConfigSub)
       supabase.removeChannel(shareSub)
     }
   }, [user, dateStr])
@@ -579,7 +699,6 @@ export default function TodayPage() {
 
     return {
       key: displayOpt?.key ?? null,
-      emoji: displayOpt?.emoji ?? SLOT_EMOJI[slot],
       label: displayOpt?.label ?? null,
       color: displayOpt?.color ?? '#ADA59B',
       bg: isPastDate ? '#F0EEEB' : (displayOpt?.bg ?? 'var(--color-surface)'),
@@ -599,57 +718,110 @@ export default function TodayPage() {
   return (
     <div style={styles.wrap}>
     <Header hidden={headerHidden} />
-    <div style={styles.page}>
+    <div
+      style={styles.page}
+      onPointerDown={handlePageSwipeStart}
+      onPointerUp={handlePageSwipeEnd}
+      onPointerCancel={() => { pageSwipeStart.current = null }}
+    >
       {/* 날짜 네비 — sticky 고정, 헤더가 접히면 그 자리(top:0)까지 따라 올라간다 */}
-      <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 44 }}>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>
+      <div
+        style={{ ...styles.dateNav, top: headerHidden ? 0 : 44, touchAction: 'pan-y' }}
+      >
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
           {!isToday && (
-            <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
+            <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, 1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7.5 7.5L1.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
       </div>
 
+      {/* 날짜 전환 시 페이지 콘텐츠 전체가 방향에 맞춰 슬라이드-인 — 날짜만 바뀌고 끝나는
+          허전함을 없애는 전환 연출. key가 dateStr이라 날짜가 바뀔 때마다 애니메이션이 재생된다. */}
+      <div
+        key={dateStr}
+        style={{
+          display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
+          animation: `${dateSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out`,
+        }}
+      >
       {/* 나의 상태 — 독립된 핵심 카드 하나 + 슬림한 슬롯 네비게이션 */}
       {(() => {
         const sectionInfo = getSlotInfo(selectedSlot)
         const sectionTheme = sectionInfo.isPastDate
           ? { bg: '#EFE6D6' }
           : SLOT_THEME[selectedSlot]
+        const prevInfo = prevSlot ? getSlotInfo(prevSlot) : null
+        // 카드 한 장을 그린다 — paired=true면 트랙 안에서 옆 카드와 나란히 절반씩 차지한다.
+        const renderStatusCard = (slot, info, paired) => (
+          <div key={slot} style={{ ...styles.mainStatusCard, width: undefined, minWidth: 0, flex: paired ? '0 0 50%' : '0 0 100%' }}>
+            <div style={styles.mainStatusHeaderRow}>
+              <span style={styles.mainStatusTitle}>내 {slot}</span>
+              {!info.isPastDate && (
+                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(slot)}>변경</button>
+              )}
+            </div>
+            <div style={styles.mainStatusBody}>
+              <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
+                {info.key
+                  ? <StatusIcon statusKey={info.key} size={112} style={styles.mainStatusIconImg} />
+                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} />}
+              </div>
+              <div style={styles.mainStatusTextCol}>
+                {info.label ? (
+                  <>
+                    <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
+                    {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](slot)}</span>}
+                    {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
+                    {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
+                  </>
+                ) : (
+                  <span style={styles.mainStatusEmpty}>
+                    {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(slot)}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )
+        const trackCards = prevSlot
+          ? (slideDir === 'next'
+              ? [renderStatusCard(prevSlot, prevInfo, true), renderStatusCard(selectedSlot, sectionInfo, true)]
+              : [renderStatusCard(selectedSlot, sectionInfo, true), renderStatusCard(prevSlot, prevInfo, true)])
+          : [renderStatusCard(selectedSlot, sectionInfo, false)]
         return (
       <div style={{ ...styles.myStatusSection, background: sectionTheme.bg }}>
         {/* 핵심 카드: 항상 흰 배경, 상태는 텍스트 색상으로만 강조 */}
-        <div style={styles.mainStatusCard}>
-          <div style={styles.mainStatusHeaderRow}>
-            <span style={styles.mainStatusTitle}>내 {selectedSlot} 상태</span>
-            {!sectionInfo.isPastDate && (
-              <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(selectedSlot)}>변경</button>
-            )}
-          </div>
-          <div style={styles.mainStatusBody}>
-            <div style={{ ...styles.mainStatusIconWrap, opacity: sectionInfo.isPastDate ? 0.6 : 1 }}>
-              {sectionInfo.key ? <StatusIcon statusKey={sectionInfo.key} size={72} /> : <SlotIcon slot={selectedSlot} size={72} />}
-            </div>
-            <div style={styles.mainStatusTextCol}>
-              {sectionInfo.label ? (
-                <>
-                  <span style={{ ...styles.mainStatusLabel, color: sectionInfo.color }}>{sectionInfo.label}</span>
-                  {STATUS_SUBTEXT[sectionInfo.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[sectionInfo.key](selectedSlot)}</span>}
-                  {sectionInfo.timeStr && <span style={styles.mainStatusMeta}>{sectionInfo.timeStr}</span>}
-                  {sectionInfo.desc && <span style={styles.mainStatusDesc}>{sectionInfo.desc}</span>}
-                </>
-              ) : (
-                <span style={styles.mainStatusEmpty}>
-                  {sectionInfo.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(selectedSlot)}
-                </span>
-              )}
+        {/* 바깥 래퍼: 스와이프 제스처 캡처 + 최초 1회 넛지 전담. 슬롯이 바뀌어도 리마운트되지
+            않아야 넛지 애니메이션이 재생 중 다시 트리거되지 않는다. */}
+        <div
+          style={{ touchAction: 'pan-y', animation: showSwipeHint ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined }}
+          onPointerDown={handleCardSwipeStart}
+          onPointerUp={handleCardSwipeEnd}
+          onPointerCancel={() => { swipeStart.current = null }}
+          onAnimationEnd={dismissSwipeHint}
+        >
+          {/* 뷰포트: 트랙 폭(전환 중엔 200%)만큼 넘치는 부분을 가려, 카드 한 장 너비만 보이게 한다. */}
+          <div style={{ overflow: 'hidden', borderRadius: 16 }}>
+            {/* 트랙: 전환 중엔 이전 카드 + 다음 카드를 나란히 붙여 렌더링하고, 트랙 자체를
+                translateX로 밀어 이전 카드가 빠져나가는 동안 다음 카드가 뒤따라 들어오게 한다. */}
+            <div
+              key={prevSlot ? `${prevSlot}->${selectedSlot}` : selectedSlot}
+              style={{
+                display: 'flex',
+                width: prevSlot ? '200%' : '100%',
+                pointerEvents: prevSlot ? 'none' : 'auto',
+                animation: prevSlot ? `${slideDir === 'next' ? 'slotTrackNext' : 'slotTrackPrev'} 0.26s ease-out forwards` : undefined,
+              }}
+            >
+              {trackCards}
             </div>
           </div>
         </div>
@@ -666,19 +838,17 @@ export default function TodayPage() {
               return (
                 <button
                   key={slot}
+                  ref={el => { subSlotBtnRefs.current[slot] = el }}
                   style={{
                     ...styles.subSlotBtn,
                     borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
                     background: '#fff',
                     opacity: info.isPastDate ? 0.65 : 1,
                   }}
-                  onClick={() => {
-                    setSelectedSlot(slot)
-                    localStorage.setItem('lastSelectedSlot', slot)
-                  }}
+                  onClick={() => goToSlot(slot)}
                 >
                   <span style={styles.subSlotEmojiWrap}>
-                    <SlotIcon slot={slot} size={28} muted={!isSelected} />
+                    <SlotIcon slot={slot} size={34} muted={!isSelected} style={styles.subSlotEmojiImg} />
                   </span>
                   <span style={styles.subSlotTextCol}>
                     <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
@@ -693,10 +863,15 @@ export default function TodayPage() {
           </button>
         </div>
 
-        {/* 초기화 — 핵심 카드 밖, 보조 텍스트 링크로 */}
-        <div style={styles.resetLinkRow}>
-          <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>↺ 하루 초기화</button>
-        </div>
+        {/* 초기화 — 핵심 카드 밖, 보조 텍스트 링크로. resetAll이 지우는 대상(명시적 상태 또는
+            참여 중인 밥팟)이 하나라도 있을 때만 노출 */}
+        {(SLOT_ORDER.some(slot => mySlots[slot]) || Object.values(potsMap).flat().some(p => p.pot_members?.some(pm => pm.user_id === user.id))) && (
+          <div style={styles.resetLinkRow}>
+            <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
+              <UndoIcon size={13} strokeWidth={2.2} /> 오늘 상태 초기화
+            </button>
+          </div>
+        )}
       </div>
         )
       })()}
@@ -709,11 +884,11 @@ export default function TodayPage() {
             <button
               style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
               onClick={() => { setViewMode('pot'); localStorage.setItem('lastViewMode', 'pot') }}
-            >밥팟별 보기</button>
+            >밥팟으로 보기</button>
             <button
               style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
               onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
-            >그룹별 보기</button>
+            >그룹으로 보기</button>
           </div>
         )}
 
@@ -792,6 +967,7 @@ export default function TodayPage() {
           <span style={styles.secondaryLinkDivider}>·</span>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
         </div>
+      </div>
       </div>
     </div>
     <BottomNav />
@@ -885,31 +1061,35 @@ export default function TodayPage() {
                       : pot.meal_time.slice(0, 5)
                     : null
                   return (
-                    <div key={pot.id} style={styles.potInfoCard}>
-                      {groupName && (
+                    <div key={pot.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={styles.potInfoCard}>
+                        {groupName && (
+                          <div style={styles.potInfoRow}>
+                            <span style={styles.potInfoLabel}>그룹</span>
+                            <span style={styles.potInfoValue}>{groupName}</span>
+                          </div>
+                        )}
                         <div style={styles.potInfoRow}>
-                          <span style={styles.potInfoLabel}>그룹</span>
-                          <span style={styles.potInfoValue}>{groupName}</span>
+                          <span style={styles.potInfoLabel}>밥팟</span>
+                          <span style={styles.potInfoValue}>{pot.title}</span>
                         </div>
-                      )}
-                      <div style={styles.potInfoRow}>
-                        <span style={styles.potInfoLabel}>밥팟</span>
-                        <span style={styles.potInfoValue}>{pot.title}</span>
-                      </div>
-                      {timeStr && (
+                        {timeStr && (
+                          <div style={styles.potInfoRow}>
+                            <span style={styles.potInfoLabel}>시간</span>
+                            <span style={styles.potInfoValue}>{timeStr}</span>
+                          </div>
+                        )}
                         <div style={styles.potInfoRow}>
-                          <span style={styles.potInfoLabel}>시간</span>
-                          <span style={styles.potInfoValue}>{timeStr}</span>
+                          <span style={styles.potInfoLabel}>인원</span>
+                          <span style={styles.potInfoValue}>{pot.pot_members?.length ?? 0}명 참여 중</span>
                         </div>
-                      )}
-                      <div style={styles.potInfoRow}>
-                        <span style={styles.potInfoLabel}>인원</span>
-                        <span style={styles.potInfoValue}>{pot.pot_members?.length ?? 0}명 참여 중</span>
                       </div>
                       {currentDate >= TODAY && (
-                        <button style={styles.potLeaveBtn} onClick={() => setLeavePotConfirm(pot)}>
-                          밥팟 나가기
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button style={styles.potLeaveBtn} onClick={() => setLeavePotConfirm(pot)}>
+                            밥팟 나가기
+                          </button>
+                        </div>
                       )}
                     </div>
                   )
@@ -1297,7 +1477,7 @@ export default function TodayPage() {
     {showResetConfirm && (
       <div style={styles.overlay}>
         <div style={styles.dialog}>
-          <div style={{ fontSize: 36 }}>↺</div>
+          <UndoIcon size={36} strokeWidth={1.8} style={{ color: 'var(--color-text)' }} />
           <div style={styles.dialogTitle}>하루 상태 초기화</div>
           <p style={styles.dialogDesc}>
             {formatDate(currentDate)}의 모든 슬롯 상태를 초기화합니다.{'\n'}
@@ -1576,8 +1756,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               onClick={handleToggleSharing}
             >{isShared ? '공유중' : '비공유'}</button>
           )}
-          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
-          <button style={{ ...styles.groupHeaderIconBtn, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
+          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }} aria-label="그룹 설정">
+            <SlidersIcon size={15} strokeWidth={2} />
+          </button>
+          <button style={{ ...styles.groupHeaderIconBtn, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)} aria-label={collapsed ? '펼치기' : '접기'}>
+            <ChevronDownIcon size={15} strokeWidth={2.4} style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
         </div>
       </div>
 
@@ -1597,10 +1781,11 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             {/* 타이틀 */}
             <div style={{ ...styles.sheetTitleRow, justifyContent: 'center' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
                 <div style={styles.sheetTitle}>{group.name}</div>
                 <div style={styles.sheetMaster}>
-                  👑 {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
+                  <CrownIcon size={13} />
+                  {isMaster ? '나 (방장)' : (members.find(m => m.id === group.created_by)?.nickname ?? '?')} 방장
                 </div>
               </div>
             </div>
@@ -1610,7 +1795,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             {/* 1. 그룹명 변경 (방장만) */}
             {isMaster && (
               <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
-                <span>✏️</span>
+                <span style={styles.sheetRowIcon}><PencilIcon size={17} /></span>
                 <span style={styles.sheetRowLabel}>그룹명 변경</span>
                 <span style={styles.sheetRowChevron}>›</span>
               </button>
@@ -1618,7 +1803,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             {/* 2. 그룹내 닉네임 변경 */}
             <button style={styles.sheetRow} onClick={handleEditNicknameOpen}>
-              <span>👤</span>
+              <span style={styles.sheetRowIcon}><UserIcon size={17} /></span>
               <span style={styles.sheetRowLabel}>
                 그룹내 닉네임 변경
                 {myMember?.group_nickname && (
@@ -1631,7 +1816,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
             {/* 3. 멤버 관리 (방장만) */}
             {isMaster && (
               <button style={styles.sheetRow} onClick={() => setShowMemberManage(true)}>
-                <span>👥</span>
+                <span style={styles.sheetRowIcon}><UsersIcon size={17} /></span>
                 <span style={styles.sheetRowLabel}>멤버 관리</span>
                 <span style={styles.sheetRowChevron}>›</span>
               </button>
@@ -1639,19 +1824,20 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             {/* 4. 기본 밥팟 추가 */}
             <button style={styles.sheetRow} onClick={() => { setShowSettings(false); onNavigate(`/group/${group.id}/settings`) }}>
-              <RiceBowlIcon size={20} /><span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
+              <span style={styles.sheetRowIcon}><RiceBowlIcon size={18} /></span>
+              <span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
             </button>
 
             {/* 5. 그룹 초대하기 */}
             <button style={styles.sheetRow} onClick={() => { setShowInvite(true); setInviteTab('friend') }}>
-              <span>📨</span>
+              <span style={styles.sheetRowIcon}><SendIcon size={16} /></span>
               <span style={styles.sheetRowLabel}>그룹 초대하기</span>
               <span style={styles.sheetRowChevron}>›</span>
             </button>
 
             {/* 6. 그룹 나가기 */}
             <button style={{ ...styles.sheetRow, color: 'var(--color-danger)' }} onClick={() => setConfirmLeave(true)}>
-              <span>🚪</span>
+              <span style={{ ...styles.sheetRowIcon, background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}><LogOutIcon size={17} /></span>
               <span style={styles.sheetRowLabel}>그룹 나가기</span>
             </button>
 
@@ -1667,7 +1853,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {editingName && (
         <div style={styles.overlay} onClick={() => { setEditingName(false); setNameValue(group.name) }}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 36 }}>✏️</div>
+            <div style={styles.dialogIconBadge}><PencilIcon size={24} /></div>
             <div style={styles.dialogTitle}>그룹명 변경</div>
             <input
               style={styles.dialogInput}
@@ -1690,7 +1876,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {editingNickname && (
         <div style={styles.overlay} onClick={() => setEditingNickname(false)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 36 }}>👤</div>
+            <div style={styles.dialogIconBadge}><UserIcon size={24} /></div>
             <div style={styles.dialogTitle}>그룹내 닉네임 변경</div>
             <p style={styles.dialogDesc}>기본 닉네임: {myMember?.default_nickname}</p>
             <input
@@ -1719,7 +1905,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {showMemberManage && (
         <div style={styles.overlay} onClick={() => setShowMemberManage(false)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 36 }}>👥</div>
+            <div style={styles.dialogIconBadge}><UsersIcon size={24} /></div>
             <div style={styles.dialogTitle}>멤버 관리</div>
             <div style={styles.memberManageList}>
               {members.filter(m => m.id !== myUserId).length === 0 && (
@@ -1753,7 +1939,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {showInvite && (
         <div style={styles.overlay} onClick={() => setShowInvite(false)}>
           <div style={styles.shareDialog} onClick={e => e.stopPropagation()}>
-            <div style={styles.dialogTitle}>📨 그룹 초대하기</div>
+            <div style={styles.dialogIconBadge}><SendIcon size={22} /></div>
+            <div style={styles.dialogTitle}>그룹 초대하기</div>
 
             <div style={styles.shareTabs}>
               <button style={{ ...styles.shareTabBtn, ...(inviteTab === 'friend' ? styles.shareTabBtnActive : {}) }} onClick={() => setInviteTab('friend')}>친구 선택</button>
@@ -1818,7 +2005,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {confirmLeave && (
         <div style={styles.overlay} onClick={() => setConfirmLeave(false)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
-            <div style={{ fontSize: 36 }}>🚪</div>
+            <div style={{ ...styles.dialogIconBadge, background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}><LogOutIcon size={24} /></div>
             <div style={styles.dialogTitle}>{group.name} 나가기</div>
             <p style={styles.dialogDesc}>정말 이 그룹을 나가시겠어요?{'\n'}나가면 그룹의 일정 현황을 볼 수 없게 돼요.</p>
             <div style={styles.dialogBtns}>
@@ -1979,7 +2166,7 @@ function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
         <RiceBowlIcon size={36} />
         <div style={{ fontWeight: 700 }}>오늘 열린 밥팟이 없어요</div>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
-          그룹별 보기에서 밥팟을 만들어보세요.
+          그룹으로 보기에서 밥팟을 만들어보세요.
         </p>
       </div>
     )
@@ -2018,15 +2205,24 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
       {/* 슬롯만 색 배지로 강조하고 그룹명은 텍스트로 낮춰, 두 정보가 같은 무게로 경쟁하지 않게 함 */}
       {showMeta && (
         <div style={potListStyles.metaRow}>
-          <span style={potListStyles.slotBadge}>{SLOT_EMOJI[pot.slot]} {pot.slot}</span>
+          <span style={{
+            ...potListStyles.slotBadge,
+            color: SLOT_CHIP_COLOR[pot.slot]?.text ?? potListStyles.slotBadge.color,
+            background: SLOT_CHIP_COLOR[pot.slot]?.bg ?? potListStyles.slotBadge.background,
+            border: `1px solid ${SLOT_CHIP_COLOR[pot.slot]?.border ?? 'transparent'}`,
+          }}>
+            {pot.slot}
+          </span>
           <span style={potListStyles.groupNameText}>{groupName}</span>
         </div>
       )}
 
       <div style={potListStyles.mainRow}>
-        {/* 밥공기 썸네일 — 밥팟 카드의 시작점 역할 */}
-        <div style={pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
-          {pot.is_default ? <SlotIcon slot="점심" size={52} /> : <span style={{ fontSize: 26 }}>🎉</span>}
+        {/* 썸네일 — 밥팟 카드의 시작점 역할. 사용자가 고른 아이콘이 있으면 그걸, 없으면 예전 방식대로 대체 */}
+        <div style={pot.icon || pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
+          {pot.icon
+            ? <PotIcon icon={pot.icon} size={60} />
+            : pot.is_default ? <RiceBowlIcon size={46} /> : <span style={{ fontSize: 30 }}>🎉</span>}
         </div>
 
         <div style={potListStyles.contentCol}>
@@ -2103,7 +2299,7 @@ const potListStyles = {
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   mainRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  iconThumb: { width: 52, height: 52, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  iconThumb: { width: 60, height: 60, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' },
   contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
   row1: { display: 'flex', alignItems: 'baseline', gap: 6 },
   title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
@@ -2136,14 +2332,14 @@ const potListStyles = {
   slotBadge: {
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-dark)',
     background: 'rgba(255,107,53,0.08)', borderRadius: 'var(--radius-full)',
-    padding: '2px 8px', whiteSpace: 'nowrap',
+    padding: '3px 10px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3,
   },
   groupNameText: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
 }
 
 const styles = {
   wrap: { flex: 1, display: 'flex', flexDirection: 'column' },
-  page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80 },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 80, touchAction: 'pan-y' },
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8 },
   emptyGroup: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', border: '1.5px dashed var(--color-border)' },
   emptyBtn: { marginTop: 4, padding: '12px 28px', background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.32)' },
@@ -2157,7 +2353,7 @@ const styles = {
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
   resetLinkRow: { display: 'flex', justifyContent: 'flex-end' },
-  resetAllBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
+  resetAllBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
@@ -2183,12 +2379,16 @@ const styles = {
   potInfoRow: { display: 'flex', alignItems: 'center', gap: 8 },
   potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
   potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
-  potLeaveBtn: { alignSelf: 'flex-start', marginTop: 2, padding: '4px 10px', background: 'none', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-full)', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
+  potLeaveBtn: { padding: '6px 12px', background: 'none', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-full)', color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
   slotPopupBtns: { display: 'flex', gap: 8 },
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
-  dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
+  dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
+  dialogIconBadge: {
+    width: 52, height: 52, borderRadius: '50%', background: 'var(--color-surface-2)', color: 'var(--color-primary)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
@@ -2199,7 +2399,13 @@ const styles = {
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
-  mainStatusIconWrap: { width: 75, height: 75, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  // 아이콘 원본 png에 연한 받침 원이 같이 그려져 있어, 확대 후 원형으로 잘라내 여백을 줄이고 흰 테두리로 마무리한다.
+  mainStatusIconWrap: {
+    width: 86, height: 86, borderRadius: '50%', overflow: 'hidden', flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    border: '3px solid #fff', boxShadow: '0 0 0 1px rgba(0,0,0,0.06)',
+  },
+  mainStatusIconImg: { width: 112, height: 112, flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
   mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },
@@ -2208,9 +2414,13 @@ const styles = {
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
   subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', flex: 1, minWidth: 0 },
+  subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1, minWidth: 0 },
   subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
-  subSlotEmojiWrap: { width: 30, height: 30, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  subSlotEmojiWrap: {
+    width: 34, height: 34, flexShrink: 0,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
+  subSlotEmojiImg: { flexShrink: 0 },
   subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
   subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
@@ -2248,16 +2458,26 @@ const styles = {
   toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
   toggleLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap' },
-  sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4 },
+  sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
+  sheet: { width: '100%', maxWidth: 'var(--max-width)', background: 'var(--color-surface)', borderRadius: '20px 20px 0 0', boxShadow: '0 -8px 28px rgba(26,20,15,0.14)', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 6 },
   sheetTitleRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 4 },
   sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
-  sheetMaster: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' },
-  sheetDivider: { height: 1, background: 'var(--color-border)', margin: '4px 0 8px' },
-  sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '13px var(--spacing-sm)', background: 'none', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
+  sheetMaster: {
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)',
+    background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.25)',
+    borderRadius: 'var(--radius-full)', padding: '3px 11px',
+  },
+  sheetDivider: { height: 1, background: 'var(--color-border)', margin: '8px 0 6px' },
+  sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--color-bg)', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
+  sheetRowIcon: {
+    width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+    background: 'var(--color-surface-2)', color: 'var(--color-text)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+  },
   sheetRowLabel: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
   sheetRowChevron: { fontSize: 10, color: 'var(--color-text-muted)' },
-  sheetClose: { width: '100%', padding: 12, marginTop: 8, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
+  sheetClose: { width: '100%', padding: 12, marginTop: 10, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
   sheetMemberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' },
   sheetMemberName: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
@@ -2265,9 +2485,9 @@ const styles = {
   sheetResetNicknameBtn: { padding: '6px 0', background: 'none', border: 'none', fontSize: 'var(--font-size-sm)', color: '#9E9E9E', cursor: 'pointer', textDecoration: 'underline', textAlign: 'left' },
   memberManageList: { width: '100%', display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' },
 
-  dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
+  dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
 
-  shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
+  shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },
   shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
   shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'rgba(255,107,53,0.09)', color: 'var(--color-primary)' },

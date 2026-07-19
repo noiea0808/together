@@ -2,10 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMomentPots, getPublicMomentPots } from '../lib/db'
-import { invalidateCache } from '../lib/cache'
+import { getCache, setCache, invalidateCache } from '../lib/cache'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
+import { MoreHorizontalIcon } from '../components/GroupIcons'
+
+const MOMENT_CACHE_MAX_AGE_MS = 30000
+
+const SCOPE_CHIP_LABEL = { participants: '참여자 공개', group: '그룹 공개', public: '전체 공개' }
 
 function toDateStr(date) {
   const year = date.getFullYear()
@@ -61,7 +66,7 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
         {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
         {canPost && (
           <div style={{ position: 'relative' }}>
-            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)}>⋯</button>
+            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
             {menuOpen && (
               <>
                 <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
@@ -83,18 +88,18 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
 
   return (
     <div style={S.potCard}>
+      <span style={S.scopeChip}>{SCOPE_CHIP_LABEL[pot.moment_scope] ?? SCOPE_CHIP_LABEL.participants}</span>
       <div style={S.potHeaderText} onClick={() => onOpenDetail(pot.id)}>
         <div style={S.groupTitleRow}>
           <span style={S.groupLabel}>{groupName}</span>
           <span style={S.potTitle}>{pot.title}</span>
-          {pot.moment_scope === 'participants' && <span style={S.scopeChip}>참여자만</span>}
         </div>
         <div style={S.potMeta}>
           {pot.menu && <span style={S.menuText}>{pot.menu}</span>}
           <span style={S.metaSub}>{dateLabel} · {pot.slot}{timeStr !== '미정' ? ` · ${timeStr}` : ''}</span>
         </div>
       </div>
-      <PotSocialSection ref={socialRef} potId={pot.id} currentUserId={currentUserId} canPost={canPost} onChange={onChange} compact footer={footer} />
+      <PotSocialSection ref={socialRef} potId={pot.id} currentUserId={currentUserId} canPost={canPost} onChange={onChange} compact lazy footer={footer} />
     </div>
   )
 }
@@ -108,23 +113,56 @@ export default function MomentPage() {
   const [publicPots, setPublicPots] = useState(null)
   const [mineLoading, setMineLoading] = useState(true)
   const [publicLoading, setPublicLoading] = useState(false)
+  const [mineCursor, setMineCursor] = useState(null)
+  const [mineHasMore, setMineHasMore] = useState(false)
+  const [mineLoadingMore, setMineLoadingMore] = useState(false)
+  const [publicCursor, setPublicCursor] = useState(null)
+  const [publicHasMore, setPublicHasMore] = useState(false)
+  const [publicLoadingMore, setPublicLoadingMore] = useState(false)
+  const groupIdsRef = useRef([])
+  const sentinelRef = useRef(null)
 
   const invalidateBoard = () => {
-    if (user) invalidateCache(`board:${user.id}:`, { prefix: true })
+    if (!user) return
+    invalidateCache(`board:${user.id}:`, { prefix: true })
+    invalidateCache(`moment:mine:${user.id}`)
+    invalidateCache('moment:public')
   }
 
+  // 캐시 우선(stale-while-revalidate): 캐시가 있으면 즉시 첫 페이지를 반영하고, 오래됐을 때만
+  // 백그라운드로 재검증한다. 모먼트 피드는 탭 전환·재방문이 잦아 매번 풀 리페치하면 낭비가 큼.
+  // (커서 상태는 캐시하지 않음 — 재검증 결과가 항상 최신 첫 페이지가 되도록)
   useEffect(() => {
     if (!user) return
     let cancelled = false
-    setMineLoading(true)
+    const key = `moment:mine:${user.id}`
+
+    const cached = getCache(key, MOMENT_CACHE_MAX_AGE_MS)
+    if (cached) {
+      setGroupNames(cached.data.groupNames)
+      setMinePots(cached.data.pots)
+      setMineCursor(cached.data.nextCursor)
+      setMineHasMore(cached.data.hasMore)
+      setMineLoading(false)
+      if (!cached.stale) return
+    } else {
+      setMineLoading(true)
+    }
+
     getMyGroups(user.id)
       .then(async myGroups => {
         if (cancelled) return
-        setGroupNames(Object.fromEntries(myGroups.map(g => [g.id, g.name])))
+        const groupNamesData = Object.fromEntries(myGroups.map(g => [g.id, g.name]))
         const groupIds = myGroups.map(g => g.id)
-        const data = await getGroupMomentPots(groupIds, user.id, toDateStr(new Date()))
+        groupIdsRef.current = groupIds
+        const { pots: rawPots, nextCursor, hasMore } = await getGroupMomentPots(groupIds, user.id, toDateStr(new Date()))
         if (cancelled) return
-        setMinePots(data.filter(isPotEnded))
+        const pots = rawPots.filter(isPotEnded)
+        setGroupNames(groupNamesData)
+        setMinePots(pots)
+        setMineCursor(nextCursor)
+        setMineHasMore(hasMore)
+        setCache(key, { groupNames: groupNamesData, pots, nextCursor, hasMore })
       })
       .catch(e => console.error(e))
       .finally(() => { if (!cancelled) setMineLoading(false) })
@@ -132,19 +170,79 @@ export default function MomentPage() {
   }, [user])
 
   useEffect(() => {
-    if (tab !== 'public' || publicPots !== null) return
+    if (tab !== 'public') return
     let cancelled = false
-    setPublicLoading(true)
+    const key = 'moment:public'
+
+    const cached = getCache(key, MOMENT_CACHE_MAX_AGE_MS)
+    if (cached) {
+      setPublicPots(cached.data.pots)
+      setPublicCursor(cached.data.nextCursor)
+      setPublicHasMore(cached.data.hasMore)
+      setPublicLoading(false)
+      if (!cached.stale) return
+    } else {
+      setPublicLoading(true)
+    }
+
     getPublicMomentPots(toDateStr(new Date()))
-      .then(data => { if (!cancelled) setPublicPots(data.filter(isPotEnded)) })
+      .then(({ pots: rawPots, nextCursor, hasMore }) => {
+        if (cancelled) return
+        const pots = rawPots.filter(isPotEnded)
+        setPublicPots(pots)
+        setPublicCursor(nextCursor)
+        setPublicHasMore(hasMore)
+        setCache(key, { pots, nextCursor, hasMore })
+      })
       .catch(e => console.error(e))
       .finally(() => { if (!cancelled) setPublicLoading(false) })
     return () => { cancelled = true }
-  }, [tab, publicPots])
+  }, [tab])
+
+  const loadMoreMine = async () => {
+    if (mineLoadingMore || !mineHasMore || !mineCursor || !user) return
+    setMineLoadingMore(true)
+    try {
+      const { pots: rawPots, nextCursor, hasMore } = await getGroupMomentPots(groupIdsRef.current, user.id, toDateStr(new Date()), mineCursor)
+      setMinePots(prev => [...(prev ?? []), ...rawPots.filter(isPotEnded)])
+      setMineCursor(nextCursor)
+      setMineHasMore(hasMore)
+    } catch (e) { console.error(e) }
+    finally { setMineLoadingMore(false) }
+  }
+
+  const loadMorePublic = async () => {
+    if (publicLoadingMore || !publicHasMore || !publicCursor) return
+    setPublicLoadingMore(true)
+    try {
+      const { pots: rawPots, nextCursor, hasMore } = await getPublicMomentPots(toDateStr(new Date()), publicCursor)
+      setPublicPots(prev => [...(prev ?? []), ...rawPots.filter(isPotEnded)])
+      setPublicCursor(nextCursor)
+      setPublicHasMore(hasMore)
+    } catch (e) { console.error(e) }
+    finally { setPublicLoadingMore(false) }
+  }
 
   const pots = tab === 'mine' ? minePots : publicPots
   const isLoading = tab === 'mine' ? mineLoading : publicLoading
+  const isLoadingMore = tab === 'mine' ? mineLoadingMore : publicLoadingMore
+  const hasMore = tab === 'mine' ? mineHasMore : publicHasMore
   const openDetail = (potId) => navigate(`/pot/${potId}`)
+
+  // 목록 맨 아래 sentinel이 화면에 걸리면 다음 페이지를 미리 불러온다(200px 여유).
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || isLoading || !hasMore) return
+    const observer = new IntersectionObserver(
+      entries => {
+        if (!entries[0].isIntersecting) return
+        if (tab === 'mine') loadMoreMine(); else loadMorePublic()
+      },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [tab, isLoading, hasMore, mineCursor, publicCursor])
 
   const items = (pots ?? []).reduce((acc, pot) => {
     acc.items.push({ pot, showDateHeader: acc.lastDate !== pot.date })
@@ -175,18 +273,24 @@ export default function MomentPage() {
                 : "공유 범위가 '전체공유'인 밥팟이 여기 모여요."}
             </p>
           </div>
-        ) : items.map(({ pot, showDateHeader }) => (
-          <div key={pot.id}>
-            {showDateHeader && <div style={S.dateHeader}>{dateSectionLabel(pot.date)}</div>}
-            <MomentCard
-              pot={pot}
-              groupName={tab === 'mine' ? (groupNames[pot.group_id] ?? '') : (pot.groups?.name ?? '')}
-              currentUserId={user.id}
-              onChange={invalidateBoard}
-              onOpenDetail={openDetail}
-            />
-          </div>
-        ))}
+        ) : (
+          <>
+            {items.map(({ pot, showDateHeader }) => (
+              <div key={pot.id}>
+                {showDateHeader && <div style={S.dateHeader}>{dateSectionLabel(pot.date)}</div>}
+                <MomentCard
+                  pot={pot}
+                  groupName={tab === 'mine' ? (groupNames[pot.group_id] ?? '') : (pot.groups?.name ?? '')}
+                  currentUserId={user.id}
+                  onChange={invalidateBoard}
+                  onOpenDetail={openDetail}
+                />
+              </div>
+            ))}
+            {hasMore && <div ref={sentinelRef} style={S.sentinel} />}
+            {isLoadingMore && <div style={S.loadingMoreState}><RiceBowlIcon size={24} /></div>}
+          </>
+        )}
       </div>
 
       <BottomNav />
@@ -197,11 +301,12 @@ export default function MomentPage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
-    padding: '18px 20px 12px', position: 'sticky', top: 0,
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
     background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', gap: 10,
   },
-  headerTitle: { fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
   tabRow: { display: 'flex', gap: 6 },
   tabBtn: {
     padding: '6px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
@@ -212,18 +317,20 @@ const S = {
 
   list: { flex: 1, overflowY: 'auto', padding: '4px 16px 80px', display: 'flex', flexDirection: 'column', gap: 12 },
   loadingState: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
+  loadingMoreState: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0' },
+  sentinel: { height: 1 },
   emptyState: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, padding: '60px 24px', textAlign: 'center' },
   emptyDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', margin: 0, whiteSpace: 'pre-line', lineHeight: 1.6 },
 
   dateHeader: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', padding: '6px 2px' },
 
-  potCard: { background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
-  potHeaderText: { minWidth: 0, cursor: 'pointer' },
+  potCard: { position: 'relative', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
+  potHeaderText: { minWidth: 0, cursor: 'pointer', paddingRight: 68 },
   groupTitleRow: { display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 },
   groupLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', flexShrink: 0 },
   potTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   scopeChip: {
-    flexShrink: 0, padding: '2px 7px', borderRadius: 'var(--radius-full)',
+    position: 'absolute', top: 12, right: 12, flexShrink: 0, padding: '2px 7px', borderRadius: 'var(--radius-full)',
     background: 'var(--color-surface)', border: '1px solid var(--color-border)',
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
   },

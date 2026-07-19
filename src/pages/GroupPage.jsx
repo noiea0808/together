@@ -1,12 +1,14 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend } from '../lib/db'
-import { SLOT_KEYS, SLOT_EMOJI } from '../lib/potConstants'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
+import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import SlotIcon from '../components/SlotIcon'
 import FriendsSearchModal from '../components/FriendsSearchModal'
+import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -57,7 +59,28 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
   const [currentDate, setCurrentDate] = useState(TODAY)
+  // 날짜 네비 바 좌우 스와이프로 날짜 이동
+  const dateSwipeStart = useRef(null)
+  const handleDateSwipeStart = (e) => { dateSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleDateSwipeEnd = (e) => {
+    if (!dateSwipeStart.current) return
+    const dx = e.clientX - dateSwipeStart.current.x
+    const dy = e.clientY - dateSwipeStart.current.y
+    dateSwipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
+  }
+  const [friendGroupFilter, setFriendGroupFilter] = useState(null) // null = 전체, 아니면 group.id
   const [selectedFriendId, setSelectedFriendId] = useState(null)
+  const [friendSheetTab, setFriendSheetTab] = useState('status') // 'status' | 'wish'
+  const [friendWishPlaces, setFriendWishPlaces] = useState([])
+  const [friendWishLoading, setFriendWishLoading] = useState(false)
+  const [wishLikeBusyId, setWishLikeBusyId] = useState(null)
+  const [openWishCommentsId, setOpenWishCommentsId] = useState(null)
+  const [wishCommentsMap, setWishCommentsMap] = useState({}) // wish_place_id -> comments[]
+  const [wishCommentsLoading, setWishCommentsLoading] = useState(false)
+  const [newWishCommentText, setNewWishCommentText] = useState('')
+  const [wishCommentSending, setWishCommentSending] = useState(false)
   const [proposeSlot, setProposeSlot] = useState(null)
   const [proposeGroupId, setProposeGroupId] = useState(null)
   const [proposeMenu, setProposeMenu] = useState('')
@@ -139,7 +162,79 @@ export default function GroupPage() {
     setProposeMenu('')
     setProposeError(null)
     setProposeGroupId(null)
+    setFriendSheetTab('status')
+    setOpenWishCommentsId(null)
+    setNewWishCommentText('')
   }, [selectedFriendId])
+
+  useEffect(() => {
+    if (friendSheetTab !== 'wish' || !selectedFriendId) return
+    setFriendWishLoading(true)
+    getFriendWishPlaces(selectedFriendId)
+      .then(setFriendWishPlaces)
+      .catch(e => console.error(e))
+      .finally(() => setFriendWishLoading(false))
+  }, [friendSheetTab, selectedFriendId])
+
+  const toggleWishLike = async (place) => {
+    if (wishLikeBusyId) return
+    setWishLikeBusyId(place.id)
+    const wasLiked = place.liked_by_me
+    setFriendWishPlaces(prev => prev.map(p => p.id === place.id
+      ? { ...p, liked_by_me: !wasLiked, like_count: p.like_count + (wasLiked ? -1 : 1) }
+      : p))
+    try {
+      if (wasLiked) await unlikeWishPlace(place.id, user.id)
+      else await likeWishPlace(place.id, user.id)
+    } catch (e) {
+      console.error(e)
+      setFriendWishPlaces(prev => prev.map(p => p.id === place.id
+        ? { ...p, liked_by_me: wasLiked, like_count: p.like_count + (wasLiked ? 1 : -1) }
+        : p))
+    } finally {
+      setWishLikeBusyId(null)
+    }
+  }
+
+  const toggleWishComments = (place) => {
+    const next = openWishCommentsId === place.id ? null : place.id
+    setOpenWishCommentsId(next)
+    setNewWishCommentText('')
+    if (next && !wishCommentsMap[next]) {
+      setWishCommentsLoading(true)
+      getWishPlaceComments(next)
+        .then(comments => setWishCommentsMap(prev => ({ ...prev, [next]: comments })))
+        .catch(e => console.error(e))
+        .finally(() => setWishCommentsLoading(false))
+    }
+  }
+
+  const sendWishComment = async (place) => {
+    const content = newWishCommentText.trim()
+    if (!content || wishCommentSending) return
+    setWishCommentSending(true)
+    try {
+      const comment = await addWishPlaceComment(place.id, user.id, content)
+      setWishCommentsMap(prev => ({ ...prev, [place.id]: [...(prev[place.id] ?? []), comment] }))
+      setFriendWishPlaces(prev => prev.map(p => p.id === place.id ? { ...p, comment_count: p.comment_count + 1 } : p))
+      setNewWishCommentText('')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setWishCommentSending(false)
+    }
+  }
+
+  const removeWishComment = async (place, commentId) => {
+    setWishCommentsMap(prev => ({ ...prev, [place.id]: (prev[place.id] ?? []).filter(c => c.id !== commentId) }))
+    setFriendWishPlaces(prev => prev.map(p => p.id === place.id ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p))
+    try {
+      await deleteWishPlaceComment(commentId)
+    } catch (e) {
+      console.error(e)
+      getWishPlaceComments(place.id).then(comments => setWishCommentsMap(prev => ({ ...prev, [place.id]: comments }))).catch(() => {})
+    }
+  }
 
   const selectProposeSlot = (friend, slot) => {
     if (hasPendingInvitation(friend.id, slot)) return
@@ -214,6 +309,10 @@ export default function GroupPage() {
     .map(f => ({ ...f, statusMap: mergeFriendStatuses(f.id, f.groups) }))
     .sort((a, b) => a.nickname.localeCompare(b.nickname, 'ko'))
 
+  const displayedFriends = friendGroupFilter
+    ? friends.filter(f => f.groups.some(g => g.id === friendGroupFilter))
+    : friends
+
   const selectedFriend = friends.find(f => f.id === selectedFriendId) ?? null
   const relLabel = getRelativeLabel(currentDate)
 
@@ -222,27 +321,19 @@ export default function GroupPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <span style={styles.headerTitle}>친구 관리</span>
-          <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-            친구 찾기
-          </button>
-        </div>
-        <div style={styles.summary}>
-          <div style={styles.summaryItem}>
-            <div style={styles.summaryNum}>{friends.length}</div>
-            <div style={styles.summaryLabel}>함께하는 친구</div>
-          </div>
-          <div style={styles.summaryDivider} />
-          <div style={styles.summaryItem}>
-            <div style={styles.summaryNum}>{groups.length}</div>
-            <div style={styles.summaryLabel}>참여 그룹</div>
-          </div>
-        </div>
+        <span style={styles.headerTitle}>친구</span>
+        <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
+          친구 찾기
+        </button>
       </div>
 
-      <div style={styles.dateNav}>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>‹</button>
+      <div
+        style={{ ...styles.dateNav, touchAction: 'pan-y' }}
+        onPointerDown={handleDateSwipeStart}
+        onPointerUp={handleDateSwipeEnd}
+        onPointerCancel={() => { dateSwipeStart.current = null }}
+      >
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           <span style={{ ...styles.relBadge, background: relLabel.color }}>{relLabel.label}</span>
@@ -250,23 +341,58 @@ export default function GroupPage() {
             <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))}>›</button>
+        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
       </div>
 
       <div style={styles.body}>
 
+        {/* 그룹별 필터 칩 — 그룹이 하나라도 있어야 의미가 있으므로 없으면 숨긴다 */}
+        {groups.length > 0 && friends.length > 0 && (
+          <div className="no-scrollbar" style={styles.friendGroupFilterRow}>
+            <button
+              style={{ ...styles.friendGroupFilterChip, ...(friendGroupFilter === null ? styles.friendGroupFilterChipActive : {}) }}
+              onClick={() => setFriendGroupFilter(null)}
+            >전체</button>
+            {groups.map(g => (
+              <button
+                key={g.id}
+                style={{ ...styles.friendGroupFilterChip, ...(friendGroupFilter === g.id ? styles.friendGroupFilterChipActive : {}) }}
+                onClick={() => setFriendGroupFilter(g.id)}
+              >{g.name}</button>
+            ))}
+          </div>
+        )}
+
         {/* 친구 목록 */}
         {friends.length === 0 ? (
           <div style={styles.empty}>
-            <div style={{ fontSize: 40 }}>👥</div>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
             <div style={{ fontWeight: 700 }}>아직 친구가 없어요</div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
               그룹 멤버이거나 친구 찾기로 추가하면{'\n'}여기 표시됩니다.
             </p>
+            <button style={{ ...styles.findFriendsBtn, marginTop: 4 }} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
+              친구 찾기
+            </button>
+          </div>
+        ) : displayedFriends.length === 0 ? (
+          <div style={styles.empty}>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            <div style={{ fontWeight: 700 }}>이 그룹엔 친구가 없어요</div>
           </div>
         ) : (
           <div style={{ ...styles.friendList, opacity: statusLoading ? 0.5 : 1 }}>
-            {friends.map(friend => {
+            {displayedFriends.map(friend => {
               const statusChips = SLOT_KEYS
                 .filter(slot => friend.statusMap[slot])
                 .map(slot => ({ slot, opt: SLOT_STATUS_OPTIONS.find(o => o.key === friend.statusMap[slot].status) }))
@@ -280,7 +406,7 @@ export default function GroupPage() {
                   <div style={styles.friendInfo}>
                     <div style={styles.friendNameRow}>
                       <span style={styles.friendName}>{friend.nickname}</span>
-                      {friend.groups.map(g => (
+                      {friendGroupFilter === null && friend.groups.map(g => (
                         <span key={g.id} style={styles.groupTag}>{g.name}</span>
                       ))}
                     </div>
@@ -304,24 +430,114 @@ export default function GroupPage() {
 
       {selectedFriend && (
         <div style={styles.sheetOverlay} onClick={() => setSelectedFriendId(null)}>
-          <div style={styles.sheet} onClick={e => e.stopPropagation()}>
+          <div className="thin-scrollbar" style={styles.sheet} onClick={e => e.stopPropagation()}>
             <div style={styles.sheetHeader}>
               {selectedFriend.avatar_url ? (
                 <img src={selectedFriend.avatar_url} alt="" style={styles.avatarLgImg} />
               ) : (
                 <div style={styles.avatarLg}>{selectedFriend.nickname[0]}</div>
               )}
-              <div style={styles.sheetName}>{selectedFriend.nickname}</div>
-              <div style={styles.friendGroups}>
-                {selectedFriend.groups.map(g => (
-                  <span key={g.id} style={styles.groupTag}>{g.name}</span>
-                ))}
+              <div style={styles.sheetHeaderInfo}>
+                <div style={styles.sheetName}>{selectedFriend.nickname}</div>
+                <div style={styles.friendGroups}>
+                  {selectedFriend.groups.map(g => (
+                    <span key={g.id} style={styles.groupTag}>{g.name}</span>
+                  ))}
+                </div>
               </div>
             </div>
 
             <div style={styles.sheetDivider} />
 
-            {selectedFriend.groups.length === 0 ? (
+            <div style={styles.sheetTabs}>
+              <button
+                style={{ ...styles.sheetTabBtn, ...(friendSheetTab === 'status' ? styles.sheetTabBtnActive : {}) }}
+                onClick={() => setFriendSheetTab('status')}
+              >오늘 상태</button>
+              <button
+                style={{ ...styles.sheetTabBtn, ...(friendSheetTab === 'wish' ? styles.sheetTabBtnActive : {}) }}
+                onClick={() => setFriendSheetTab('wish')}
+              >가고 싶은 곳</button>
+            </div>
+
+            {friendSheetTab === 'wish' ? (
+              friendWishLoading ? (
+                <p style={styles.noGroupNote}>불러오는 중...</p>
+              ) : friendWishPlaces.length === 0 ? (
+                <p style={styles.noGroupNote}>아직 등록한 곳이 없어요.</p>
+              ) : (
+                <div style={styles.friendWishList}>
+                  {friendWishPlaces.map(place => {
+                    const commentsOpen = openWishCommentsId === place.id
+                    const comments = wishCommentsMap[place.id] ?? []
+                    return (
+                      <div key={place.id} style={styles.friendWishItem}>
+                        <LinkPreviewCard text={place.content} />
+                        {(() => {
+                          const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
+                          return text && <div style={styles.friendWishText}>{text}</div>
+                        })()}
+                        <div style={styles.wishReactionRow}>
+                          <button
+                            style={{ ...styles.wishLikeBtn, ...(place.liked_by_me ? styles.wishLikeBtnActive : {}) }}
+                            onClick={() => toggleWishLike(place)}
+                            disabled={wishLikeBusyId === place.id}
+                          >
+                            {place.liked_by_me ? '❤️' : '🤍'} {place.like_count > 0 ? place.like_count : ''}
+                          </button>
+                          <button style={styles.wishCommentToggleBtn} onClick={() => toggleWishComments(place)}>
+                            💬 {place.comment_count > 0 ? place.comment_count : '댓글'}
+                          </button>
+                        </div>
+                        {commentsOpen && (
+                          <div style={styles.wishCommentsBox}>
+                            {wishCommentsLoading && comments.length === 0 ? (
+                              <p style={styles.noGroupNote}>불러오는 중...</p>
+                            ) : comments.length === 0 ? (
+                              <p style={styles.noGroupNote}>아직 댓글이 없어요.</p>
+                            ) : (
+                              <div style={styles.wishProposalsList}>
+                                {comments.map(c => (
+                                  <div key={c.id} style={styles.wishProposalRow}>
+                                    {c.avatar_url ? (
+                                      <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                                    ) : (
+                                      <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                    )}
+                                    <div style={styles.wishProposalTextCol}>
+                                      <span style={styles.wishProposalName}>{c.nickname}</span>
+                                      <span style={styles.wishProposalMessage}>{c.content}</span>
+                                    </div>
+                                    {c.user_id === user.id && (
+                                      <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                              <input
+                                style={{ ...styles.proposeInput, flex: 1 }}
+                                placeholder="댓글 달기"
+                                value={newWishCommentText}
+                                onChange={e => setNewWishCommentText(e.target.value)}
+                                maxLength={200}
+                                onKeyDown={e => { if (e.key === 'Enter') sendWishComment(place) }}
+                              />
+                              <button
+                                style={{ ...styles.wishCommentToggleBtn, opacity: newWishCommentText.trim() && !wishCommentSending ? 1 : 0.4 }}
+                                onClick={() => sendWishComment(place)}
+                                disabled={!newWishCommentText.trim() || wishCommentSending}
+                              >등록</button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )
+            ) : selectedFriend.groups.length === 0 ? (
               <p style={styles.noGroupNote}>같은 그룹이 없어서 오늘 상태를 확인하거나 제안할 수 없어요.{'\n'}그룹에 초대하면 함께 밥 약속을 잡을 수 있어요.</p>
             ) : (
               <>
@@ -346,7 +562,12 @@ export default function GroupPage() {
                         }}
                         onClick={() => selectable && selectProposeSlot(selectedFriend, slot)}
                       >
-                        <span style={styles.statusSlotName}>{SLOT_EMOJI[slot]} {slot}</span>
+                        <span style={styles.statusSlotName}>
+                          <span style={styles.slotIconWrapper}>
+                            <SlotIcon slot={slot} size={30} />
+                          </span>
+                          {slot}
+                        </span>
                         {opt ? (
                           <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
                             {opt.emoji} {opt.label}
@@ -447,24 +668,27 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: { padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
-  headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
-  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
+  header: {
+    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
+    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
+    borderBottom: '1px solid var(--color-border)',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  },
+  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
-  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
 
-  summary: { display: 'flex', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', marginTop: 10 },
-  summaryItem: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
-  summaryNum: { fontSize: 'var(--font-size-xl)', fontWeight: 900, color: 'var(--color-primary)' },
-  summaryLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
-  summaryDivider: { width: 1, background: 'var(--color-border)', margin: '8px 0' },
+  friendGroupFilterRow: { display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, marginBottom: 4 },
+  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  friendGroupFilterChipActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a10)', border: '1px solid var(--color-primary)' },
 
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)' },
 
@@ -476,23 +700,44 @@ const styles = {
   friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
-  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary)18', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
+  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   statusChipRow: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 },
   miniChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', whiteSpace: 'nowrap' },
 
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '80vh', overflowY: 'auto' },
-  sheetHeader: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, paddingBottom: 6 },
-  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)' },
-  avatarLgImg: { width: 56, height: 56, borderRadius: '50%', objectFit: 'cover' },
+  sheetHeader: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingBottom: 6 },
+  sheetHeaderInfo: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1, paddingTop: 4 },
+  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  avatarLgImg: { width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   sheetName: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
+  sheetTabs: { display: 'flex', gap: 6, marginBottom: 12 },
+  sheetTabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  sheetTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
   sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
+  friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
+  friendWishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
+  wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
+  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishLikeBtnActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-primary-a27)' },
+  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishCommentsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
+  wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
+  wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
-  statusCellSelected: { background: 'var(--color-primary)18', border: '1.5px solid var(--color-primary)' },
-  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },
+  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 },
+  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0 },
   statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
   statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
   statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
@@ -504,7 +749,7 @@ const styles = {
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
   proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },
   groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  groupPickTagActive: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
   proposeInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },

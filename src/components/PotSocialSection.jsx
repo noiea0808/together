@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 're
 import { getPotComments, addPotComment, deletePotComment, getPotPhotos, addPotPhoto, deletePotPhoto } from '../lib/db'
 import { resizeImageFile } from '../lib/resizeImage'
 import PhotoAdjustModal from './PhotoAdjustModal'
+import { MoreHorizontalIcon } from './GroupIcons'
 
 function avBg(name) {
   const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
@@ -24,7 +25,9 @@ function timeAgo(iso) {
 // compact: 카드 테두리·"사진"/"코멘트" 라벨 없이 이어붙는 형태로 렌더링(모먼트 피드용).
 //          사진 등록 버튼은 숨기고 openPhotoPicker()를 ref로 노출해 바깥(⋯ 메뉴)에서 파일 선택창을 열 수 있게 한다.
 // footer: 사진과 코멘트 사이에 끼워 넣을 요소(모먼트 피드의 아바타·댓글수·⋯메뉴 액션바 용도).
-const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, onChange, compact = false, footer = null }, ref) {
+// lazy: true면 화면에 실제로 보이기 전까지 사진/코멘트 쿼리를 미룬다(모먼트 피드처럼 카드가
+//       한 번에 여러 개 렌더링되는 화면에서 N+1 쿼리가 전부 즉시 발사되는 걸 막기 위함).
+const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, onChange, compact = false, footer = null, lazy = false }, ref) {
   const [comments, setComments] = useState([])
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
@@ -35,8 +38,11 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const [batchUploading, setBatchUploading] = useState(null) // { done, total } | null
   const [photoMenuOpenId, setPhotoMenuOpenId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState(null)
   const photoInputRef = useRef(null)
   const photoScrollRef = useRef(null)
+  const rootRef = useRef(null)
+  const [visible, setVisible] = useState(!lazy)
 
   const handlePhotoScroll = () => {
     const el = photoScrollRef.current
@@ -55,7 +61,25 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
     try { setPhotos(await getPotPhotos(potId)) } catch (e) { console.error(e) }
   }
 
-  useEffect(() => { loadComments(); loadPhotos() }, [potId])
+  // lazy가 아니면 바로 로드. lazy면 카드가 뷰포트 근처(200px)에 들어올 때 한 번만 로드.
+  useEffect(() => {
+    setConfirmDeleteCommentId(null)
+    if (!lazy) { loadComments(); loadPhotos(); return }
+    setVisible(false)
+    const el = rootRef.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      entries => { if (entries[0].isIntersecting) { setVisible(true); observer.disconnect() } },
+      { rootMargin: '200px' }
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [potId, lazy])
+
+  useEffect(() => {
+    if (!visible) return
+    loadComments(); loadPhotos()
+  }, [visible, potId])
 
   const handlePostComment = async () => {
     if (!commentText.trim() || postingComment) return
@@ -70,6 +94,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   }
 
   const handleDeleteComment = async (commentId) => {
+    setConfirmDeleteCommentId(null)
     setComments(prev => prev.filter(c => c.id !== commentId))
     try {
       await deletePotComment(commentId, currentUserId)
@@ -124,7 +149,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const cardStyle = compact ? S.cardCompact : S.card
 
   return (
-    <>
+    <div ref={rootRef}>
       {/* Photos */}
       <div style={cardStyle}>
         {!compact && (
@@ -140,14 +165,15 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
             <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll}>
               {photos.map(p => (
                 <div key={p.id} style={S.photoItem}>
-                  <img src={p.photo_url} alt="" style={S.photoImg} />
+                  <img src={p.photo_url} alt="" style={S.photoImg} loading="lazy" decoding="async" />
                   {p.user_id === currentUserId && (
                     <div style={S.photoMenuWrap}>
                       <button
                         style={S.photoEditBtn}
                         onClick={() => { setPhotoMenuOpenId(id => id === p.id ? null : p.id); setConfirmDeleteId(null) }}
+                        aria-label="사진 메뉴"
                       >
-                        ⋯
+                        <MoreHorizontalIcon size={14} />
                       </button>
                       {photoMenuOpenId === p.id && (
                         <>
@@ -186,7 +212,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
               onClick={() => photoInputRef.current?.click()}
               disabled={uploadingPhoto || !!batchUploading}
             >
-              {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록 (여러 장 선택 가능)'}
+              {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록'}
             </button>
           </div>
         )}
@@ -208,15 +234,15 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
       {footer}
 
       {/* Comments */}
-      <div style={cardStyle}>
+      <div style={{ ...cardStyle, ...(!compact ? S.commentsCard : {}) }}>
         {!compact && (
           <div style={S.header}>
-            <span style={S.title}>코멘트</span>
+            <span style={S.title}>한마디 남기기</span>
             <span style={S.count}>{comments.length}개</span>
           </div>
         )}
         <div style={S.commentsList}>
-          {comments.length === 0 && !compact && <p style={S.empty}>아직 코멘트가 없어요.</p>}
+          {comments.length === 0 && !compact && <p style={S.empty}>아직 한마디도 없어요.</p>}
           {comments.map(c => (
             <div key={c.id} style={S.commentItem}>
               <div style={{ ...S.commentAvatar, background: avBg(c.users?.nickname ?? '?') }}>
@@ -232,7 +258,15 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                 <div style={S.commentText}>{c.content}</div>
               </div>
               {c.user_id === currentUserId && (
-                <button style={S.commentDeleteBtn} onClick={() => handleDeleteComment(c.id)}>삭제</button>
+                confirmDeleteCommentId === c.id ? (
+                  <div style={S.commentConfirmRow}>
+                    <span style={S.commentConfirmText}>삭제할까요?</span>
+                    <button style={S.commentConfirmDanger} onClick={() => handleDeleteComment(c.id)}>삭제</button>
+                    <button style={S.commentDeleteBtn} onClick={() => setConfirmDeleteCommentId(null)}>취소</button>
+                  </div>
+                ) : (
+                  <button style={S.commentDeleteBtn} onClick={() => setConfirmDeleteCommentId(c.id)}>삭제</button>
+                )
               )}
             </div>
           ))}
@@ -241,7 +275,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           <div style={{ ...S.commentInputRow, ...(compact ? S.commentInputRowCompact : {}) }}>
             <input
               style={S.commentInput}
-              placeholder="코멘트 남기기"
+              placeholder="한마디 남기기"
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handlePostComment()}
@@ -266,7 +300,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           onConfirm={handleConfirmPhoto}
         />
       )}
-    </>
+    </div>
   )
 })
 
@@ -275,6 +309,7 @@ export default PotSocialSection
 const S = {
   card: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 18, padding: 16 },
   cardCompact: {},
+  commentsCard: { marginTop: 16 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   title: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   count: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
@@ -326,6 +361,9 @@ const S = {
   commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
   commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
+  commentConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
+  commentConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
   commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
   commentInputRowCompact: { marginTop: 10, paddingTop: 10 },
   commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
