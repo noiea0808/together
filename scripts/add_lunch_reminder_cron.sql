@@ -4,7 +4,7 @@
 -- 사전 준비:
 --   1. supabase functions deploy lunch-reminder 로 Edge Function을 먼저 배포하세요.
 --   2. Supabase 대시보드 → Database → Extensions 에서 pg_cron, pg_net 을 활성화하세요.
---   3. 아래 <PROJECT_REF>, <SERVICE_ROLE_KEY> 를 실제 값으로 바꾼 뒤 실행하세요.
+--   3. 아래 <SERVICE_ROLE_KEY> 를 실제 값으로 바꾼 뒤 실행하세요. (PROJECT_REF는 이미 채워둠)
 --      (SERVICE_ROLE_KEY는 대시보드 Settings → API 에서 확인 — 절대 커밋하지 마세요.)
 --
 -- 동작 방식: 어드민에서 설정한 발송 시각(lunch_reminder_config.send_time, 기본 09:30 KST)은
@@ -24,7 +24,7 @@ SELECT cron.schedule(
   '*/10 23,0,1 * * *',  -- 매일 UTC 23,0,1시대 10분 간격 = 매일 KST 08:00~10:59. 평일 판단은 함수 내부에서.
   $$
   SELECT net.http_post(
-    url := 'https://<PROJECT_REF>.supabase.co/functions/v1/lunch-reminder',
+    url := 'https://lxpbfgsoijpcwxabqela.supabase.co/functions/v1/lunch-reminder',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
       'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
