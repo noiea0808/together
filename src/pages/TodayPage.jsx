@@ -1061,31 +1061,35 @@ export default function TodayPage() {
                       : pot.meal_time.slice(0, 5)
                     : null
                   return (
-                    <div key={pot.id} style={styles.potInfoCard}>
-                      {groupName && (
+                    <div key={pot.id} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                      <div style={styles.potInfoCard}>
+                        {groupName && (
+                          <div style={styles.potInfoRow}>
+                            <span style={styles.potInfoLabel}>그룹</span>
+                            <span style={styles.potInfoValue}>{groupName}</span>
+                          </div>
+                        )}
                         <div style={styles.potInfoRow}>
-                          <span style={styles.potInfoLabel}>그룹</span>
-                          <span style={styles.potInfoValue}>{groupName}</span>
+                          <span style={styles.potInfoLabel}>밥팟</span>
+                          <span style={styles.potInfoValue}>{pot.title}</span>
                         </div>
-                      )}
-                      <div style={styles.potInfoRow}>
-                        <span style={styles.potInfoLabel}>밥팟</span>
-                        <span style={styles.potInfoValue}>{pot.title}</span>
-                      </div>
-                      {timeStr && (
+                        {timeStr && (
+                          <div style={styles.potInfoRow}>
+                            <span style={styles.potInfoLabel}>시간</span>
+                            <span style={styles.potInfoValue}>{timeStr}</span>
+                          </div>
+                        )}
                         <div style={styles.potInfoRow}>
-                          <span style={styles.potInfoLabel}>시간</span>
-                          <span style={styles.potInfoValue}>{timeStr}</span>
+                          <span style={styles.potInfoLabel}>인원</span>
+                          <span style={styles.potInfoValue}>{pot.pot_members?.length ?? 0}명 참여 중</span>
                         </div>
-                      )}
-                      <div style={styles.potInfoRow}>
-                        <span style={styles.potInfoLabel}>인원</span>
-                        <span style={styles.potInfoValue}>{pot.pot_members?.length ?? 0}명 참여 중</span>
                       </div>
                       {currentDate >= TODAY && (
-                        <button style={styles.potLeaveBtn} onClick={() => setLeavePotConfirm(pot)}>
-                          밥팟 나가기
-                        </button>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                          <button style={styles.potLeaveBtn} onClick={() => setLeavePotConfirm(pot)}>
+                            밥팟 나가기
+                          </button>
+                        </div>
                       )}
                     </div>
                   )
@@ -2375,7 +2379,7 @@ const styles = {
   potInfoRow: { display: 'flex', alignItems: 'center', gap: 8 },
   potInfoLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', width: 32, flexShrink: 0 },
   potInfoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
-  potLeaveBtn: { alignSelf: 'flex-start', marginTop: 2, padding: '4px 10px', background: 'none', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-full)', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
+  potLeaveBtn: { padding: '6px 12px', background: 'none', border: '1px solid var(--color-danger)', borderRadius: 'var(--radius-full)', color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
   slotPopupBtns: { display: 'flex', gap: 8 },
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },

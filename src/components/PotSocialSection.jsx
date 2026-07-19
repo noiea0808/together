@@ -212,7 +212,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
               onClick={() => photoInputRef.current?.click()}
               disabled={uploadingPhoto || !!batchUploading}
             >
-              {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록 (여러 장 선택 가능)'}
+              {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록'}
             </button>
           </div>
         )}
