@@ -31,6 +31,39 @@ function resolveFetchUrl(target) {
   return target
 }
 
+// 유튜브는 서버(특히 Vercel 같은 데이터센터 IP)에서 페이지 HTML을 긁으면 영상별 og 태그
+// 없이 빈 제목(" - YouTube")만 있는 껍데기를 내려주는 경우가 많다. 쇼츠→/watch 우회로도
+// 완전히 해결되지 않아(youtu.be 링크도 /watch로 리다이렉트되지만 같은 증상), 영상 링크는
+// HTML 대신 공식 oEmbed API로 제목/채널명/썸네일을 가져온다. 실패하면 HTML 방식으로 폴백.
+function youtubeVideoId(target) {
+  const h = target.hostname
+  if (h === 'youtu.be') {
+    return target.pathname.match(/^\/([\w-]+)\/?$/)?.[1] || null
+  }
+  if (h === 'www.youtube.com' || h === 'm.youtube.com' || h === 'youtube.com' || h === 'music.youtube.com') {
+    if (target.pathname === '/watch') return target.searchParams.get('v')
+    return target.pathname.match(/^\/(?:shorts|live|embed)\/([\w-]+)\/?$/)?.[1] || null
+  }
+  return null
+}
+
+async function fetchYoutubePreview(target, signal) {
+  const id = youtubeVideoId(target)
+  if (!id || !/^[\w-]+$/.test(id)) return null
+  const oembedUrl = `https://www.youtube.com/oembed?url=${encodeURIComponent(`https://www.youtube.com/watch?v=${id}`)}&format=json`
+  const response = await fetch(oembedUrl, { signal })
+  if (!response.ok) return null
+  const data = await response.json()
+  if (!data?.title) return null
+  return {
+    url: target.href,
+    title: data.title,
+    description: data.author_name || null,
+    image: data.thumbnail_url || `https://i.ytimg.com/vi/${id}/hqdefault.jpg`,
+    siteName: 'YouTube',
+  }
+}
+
 function extractMeta(html) {
   const pick = (re) => html.match(re)?.[1]
 
@@ -68,6 +101,14 @@ export default async function handler(req, res) {
   const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS)
 
   try {
+    const youtube = await fetchYoutubePreview(target, controller.signal).catch(() => null)
+    if (youtube) {
+      clearTimeout(timer)
+      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800')
+      res.status(200).json(youtube)
+      return
+    }
+
     const response = await safeFetch(fetchUrl, {
       signal: controller.signal,
       headers: {
