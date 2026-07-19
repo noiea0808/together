@@ -14,7 +14,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon } from '../components/GroupIcons'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SettingsIcon, UndoIcon, ChevronDownIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import PotIcon from '../components/PotIcon'
@@ -176,9 +176,11 @@ export default function TodayPage() {
     slotTransitionTimer.current = setTimeout(() => setPrevSlot(null), 280)
   }
 
-  const handleCardSwipeStart = (e) => { swipeStart.current = { x: e.clientX, y: e.clientY } }
+  // 메인 상태 카드 위의 스와이프는 슬롯 전환 전담 — 페이지 레벨 날짜 스와이프로 버블링되지 않도록 막는다.
+  const handleCardSwipeStart = (e) => { e.stopPropagation(); swipeStart.current = { x: e.clientX, y: e.clientY } }
   const handleCardSwipeEnd = (e) => {
     if (!swipeStart.current) return
+    e.stopPropagation()
     const dx = e.clientX - swipeStart.current.x
     const dy = e.clientY - swipeStart.current.y
     swipeStart.current = null
@@ -186,6 +188,18 @@ export default function TodayPage() {
     const idx = SLOT_ORDER.indexOf(selectedSlot)
     if (dx < 0 && idx < SLOT_ORDER.length - 1) goToSlot(SLOT_ORDER[idx + 1])
     else if (dx > 0 && idx > 0) goToSlot(SLOT_ORDER[idx - 1])
+  }
+
+  // 메인 상태 카드를 제외한 나머지 화면 영역 스와이프 — 전후 날짜로 이동
+  const pageSwipeStart = useRef(null)
+  const handlePageSwipeStart = (e) => { pageSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handlePageSwipeEnd = (e) => {
+    if (!pageSwipeStart.current) return
+    const dx = e.clientX - pageSwipeStart.current.x
+    const dy = e.clientY - pageSwipeStart.current.y
+    pageSwipeStart.current = null
+    if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return
+    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
   const [editingSlot, setEditingSlot] = useState(null)   // 팝업 열린 슬롯
   const [draftData, setDraftData] = useState({})          // 팝업 임시 입력값
@@ -694,7 +708,12 @@ export default function TodayPage() {
   return (
     <div style={styles.wrap}>
     <Header hidden={headerHidden} />
-    <div style={styles.page}>
+    <div
+      style={styles.page}
+      onPointerDown={handlePageSwipeStart}
+      onPointerUp={handlePageSwipeEnd}
+      onPointerCancel={() => { pageSwipeStart.current = null }}
+    >
       {/* 날짜 네비 — sticky 고정, 헤더가 접히면 그 자리(top:0)까지 따라 올라간다 */}
       <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 44 }}>
         <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))}>
@@ -823,10 +842,15 @@ export default function TodayPage() {
           </button>
         </div>
 
-        {/* 초기화 — 핵심 카드 밖, 보조 텍스트 링크로 */}
-        <div style={styles.resetLinkRow}>
-          <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>↺ 오늘 상태 초기화</button>
-        </div>
+        {/* 초기화 — 핵심 카드 밖, 보조 텍스트 링크로. resetAll이 지우는 대상(명시적 상태 또는
+            참여 중인 밥팟)이 하나라도 있을 때만 노출 */}
+        {(SLOT_ORDER.some(slot => mySlots[slot]) || Object.values(potsMap).flat().some(p => p.pot_members?.some(pm => pm.user_id === user.id))) && (
+          <div style={styles.resetLinkRow}>
+            <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
+              <UndoIcon size={13} strokeWidth={2.2} /> 오늘 상태 초기화
+            </button>
+          </div>
+        )}
       </div>
         )
       })()}
@@ -1427,7 +1451,7 @@ export default function TodayPage() {
     {showResetConfirm && (
       <div style={styles.overlay}>
         <div style={styles.dialog}>
-          <div style={{ fontSize: 36 }}>↺</div>
+          <UndoIcon size={36} strokeWidth={1.8} style={{ color: 'var(--color-text)' }} />
           <div style={styles.dialogTitle}>하루 상태 초기화</div>
           <p style={styles.dialogDesc}>
             {formatDate(currentDate)}의 모든 슬롯 상태를 초기화합니다.{'\n'}
@@ -1706,8 +1730,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               onClick={handleToggleSharing}
             >{isShared ? '공유중' : '비공유'}</button>
           )}
-          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }}>⚙️</button>
-          <button style={{ ...styles.groupHeaderIconBtn, fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)}>{collapsed ? '▸' : '▾'}</button>
+          <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }} aria-label="그룹 설정">
+            <SettingsIcon size={15} strokeWidth={2} />
+          </button>
+          <button style={{ ...styles.groupHeaderIconBtn, color: 'var(--color-text)' }} onClick={() => setCollapsed(v => !v)} aria-label={collapsed ? '펼치기' : '접기'}>
+            <ChevronDownIcon size={15} strokeWidth={2.4} style={{ transform: collapsed ? 'rotate(-90deg)' : 'none', transition: 'transform 0.15s ease' }} />
+          </button>
         </div>
       </div>
 
@@ -2299,7 +2327,7 @@ const styles = {
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
   resetLinkRow: { display: 'flex', justifyContent: 'flex-end' },
-  resetAllBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
+  resetAllBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },

@@ -1,6 +1,11 @@
 import PotIcon from './PotIcon'
 import { POT_ICON_KEYS } from '../lib/potConstants'
 
+const ICON_LABELS = {
+  together: '같이', tray: '식판', chat: '대화', salad: '샐러드', ready: '준비완료',
+  party: '파티', care: '케어', map: '지도', delivery: '배달', random: '랜덤',
+}
+
 // 밥팟 열기/수정 화면에서 공용으로 쓰는 아이콘 선택 UI. 선택된 아이콘은 목록 안에서 크게 강조된다.
 // 같은 아이콘을 다시 누르면 선택 해제된다.
 export default function PotIconPicker({ value, onChange }) {
@@ -20,6 +25,7 @@ export default function PotIconPicker({ value, onChange }) {
                 ...(active ? S.btnActive : {}),
               }}
               onClick={() => onChange(active ? null : key)}
+              aria-label={`${ICON_LABELS[key] ?? key} 아이콘${active ? ' 선택됨' : ''}`}
             >
               <PotIcon icon={key} size={iconSize} />
             </button>

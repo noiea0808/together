@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 're
 import { getPotComments, addPotComment, deletePotComment, getPotPhotos, addPotPhoto, deletePotPhoto } from '../lib/db'
 import { resizeImageFile } from '../lib/resizeImage'
 import PhotoAdjustModal from './PhotoAdjustModal'
+import { MoreHorizontalIcon } from './GroupIcons'
 
 function avBg(name) {
   const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
@@ -170,8 +171,9 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                       <button
                         style={S.photoEditBtn}
                         onClick={() => { setPhotoMenuOpenId(id => id === p.id ? null : p.id); setConfirmDeleteId(null) }}
+                        aria-label="사진 메뉴"
                       >
-                        ⋯
+                        <MoreHorizontalIcon size={14} />
                       </button>
                       {photoMenuOpenId === p.id && (
                         <>

@@ -13,6 +13,7 @@ import BottomNav from '../components/BottomNav'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AutoTextarea from '../components/AutoTextarea'
+import { MoreHorizontalIcon, ChevronDownIcon } from '../components/GroupIcons'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import WishCategoryIcon from '../components/WishCategoryIcon'
 import WishCategoryPicker from '../components/WishCategoryPicker'
@@ -88,6 +89,7 @@ export default function MyAccountPage() {
   const [wishLikersLoading, setWishLikersLoading] = useState(false)
   const [showAddWishModal, setShowAddWishModal] = useState(false)
   const [openWishMenuId, setOpenWishMenuId] = useState(null)
+  const [confirmDeleteWishCommentId, setConfirmDeleteWishCommentId] = useState(null)
 
   useEffect(() => {
     if (!isPushSupported()) return
@@ -112,6 +114,7 @@ export default function MyAccountPage() {
     setOpenWishCommentsId(next)
     setNewWishCommentText('')
     setMentionTarget(null)
+    setConfirmDeleteWishCommentId(null)
     if (next && !wishCommentsMap[next]) {
       setWishCommentsLoading(true)
       getWishPlaceComments(next)
@@ -122,6 +125,7 @@ export default function MyAccountPage() {
   }
 
   const removeWishComment = async (place, commentId) => {
+    setConfirmDeleteWishCommentId(null)
     setWishCommentsMap(prev => ({ ...prev, [place.id]: (prev[place.id] ?? []).filter(c => c.id !== commentId) }))
     setWishReactionsMap(prev => ({
       ...prev,
@@ -405,7 +409,7 @@ export default function MyAccountPage() {
   return (
     <div style={styles.page}>
       <div style={styles.header}>
-        <span style={styles.headerTitle}>MY</span>
+        <span style={styles.headerTitle}>내 계정</span>
         <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
       </div>
 
@@ -580,7 +584,7 @@ export default function MyAccountPage() {
                     </div>
                   </div>
                   <div style={{ position: 'relative' }}>
-                    <button style={styles.wishMenuBtn} onClick={() => setOpenWishMenuId(openWishMenuId === place.id ? null : place.id)}>⋯</button>
+                    <button style={styles.wishMenuBtn} onClick={() => setOpenWishMenuId(openWishMenuId === place.id ? null : place.id)} aria-label="더보기"><MoreHorizontalIcon size={15} /></button>
                     {openWishMenuId === place.id && (
                       <>
                         <div style={styles.wishMenuBackdrop} onClick={() => setOpenWishMenuId(null)} />
@@ -616,10 +620,14 @@ export default function MyAccountPage() {
                             onClick={() => toggleWishLikers(place)}
                             disabled={likeCount === 0}
                           >
-                            {likeCount > 0 ? `❤️ ${likeCount}` : '🤍 0'} {likeCount > 0 ? (isLikersExpanded ? '▴' : '▾') : ''}
+                            {likeCount > 0 ? `❤️ ${likeCount}` : '🤍 0'}
+                            {likeCount > 0 && (
+                              <ChevronDownIcon size={11} strokeWidth={2.4} style={{ verticalAlign: 'middle', marginLeft: 3, transform: isLikersExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
+                            )}
                           </button>
                           <button style={styles.wishProposalsToggle} onClick={() => toggleWishComments(place)}>
-                            💬 {commentCount > 0 ? `${commentCount}개의 댓글` : '댓글'} {isExpanded ? '▴' : '▾'}
+                            💬 {commentCount > 0 ? `${commentCount}개의 댓글` : '댓글'}
+                            <ChevronDownIcon size={11} strokeWidth={2.4} style={{ verticalAlign: 'middle', marginLeft: 3, transform: isExpanded ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s ease' }} />
                           </button>
                         </div>
                         {showOrderBtns && (
@@ -676,7 +684,17 @@ export default function MyAccountPage() {
                                     <button style={styles.wishProposalNameBtn} onClick={() => insertMention(c)}>{c.nickname}</button>
                                     <span style={styles.wishProposalMessage}>{c.content}</span>
                                   </div>
-                                  <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                  {c.user_id === user.id && (
+                                    confirmDeleteWishCommentId === c.id ? (
+                                      <div style={styles.wishProposalConfirmRow}>
+                                        <span style={styles.wishProposalConfirmText}>삭제할까요?</span>
+                                        <button style={styles.wishProposalConfirmDanger} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                        <button style={styles.wishProposalDismiss} onClick={() => setConfirmDeleteWishCommentId(null)}>취소</button>
+                                      </div>
+                                    ) : (
+                                      <button style={styles.wishProposalDismiss} onClick={() => setConfirmDeleteWishCommentId(c.id)}>삭제</button>
+                                    )
+                                  )}
                                 </div>
                               ))}
                             </div>
@@ -903,7 +921,7 @@ const styles = {
 
   tabs: { display: 'flex', gap: 6, padding: '10px var(--spacing-md) 0', flexShrink: 0 },
   tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
 
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
@@ -920,7 +938,7 @@ const styles = {
   wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
   groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-primary)18', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  groupPickTagActive: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
   wishCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
   wishScopeBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
@@ -957,6 +975,9 @@ const styles = {
   wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishProposalConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
+  wishProposalConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  wishProposalConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishCommentInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 },
   wishCommentInput: { flex: 1, padding: '8px 12px', fontSize: 'var(--font-size-2xs)' },
 

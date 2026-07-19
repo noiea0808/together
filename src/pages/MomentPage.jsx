@@ -6,6 +6,7 @@ import { getCache, setCache, invalidateCache } from '../lib/cache'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
+import { MoreHorizontalIcon } from '../components/GroupIcons'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -65,7 +66,7 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
         {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
         {canPost && (
           <div style={{ position: 'relative' }}>
-            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)}>⋯</button>
+            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
             {menuOpen && (
               <>
                 <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />

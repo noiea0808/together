@@ -136,7 +136,7 @@ export default function NotificationsPage() {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
+        <button style={S.backBtn} onClick={() => navigate(-1)} aria-label="뒤로가기">‹</button>
         <span style={S.headerTitle}>알림</span>
         <div style={{ width: 34 }} />
       </div>
@@ -322,6 +322,6 @@ const S = {
 
   declineChipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   declineChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)14', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
   declineInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 }

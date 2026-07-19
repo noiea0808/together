@@ -226,7 +226,7 @@ export default function GroupSettingsPage() {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
+        <button style={S.backBtn} onClick={() => navigate(-1)} aria-label="뒤로가기">‹</button>
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={S.headerTitle}>{isFutureEdit ? '기본 밥팟 수정' : '기본 밥팟 추가'}</div>
           <div style={S.headerSub}>{form.slot}</div>
@@ -321,9 +321,9 @@ export default function GroupSettingsPage() {
           <div style={{ ...S.section, ...S.sectionRow }}>
             <div style={S.sectionLabel}>👥 몇 명까지?</div>
             <div style={S.stepper}>
-              <button style={S.stepperBtn} onClick={() => set('max_people', Math.max(2, form.max_people - 1))}>−</button>
+              <button style={S.stepperBtn} onClick={() => set('max_people', Math.max(2, form.max_people - 1))} aria-label="인원 줄이기">−</button>
               <span style={S.stepperNum}>{form.max_people}명</span>
-              <button style={S.stepperBtn} onClick={() => set('max_people', Math.min(10, form.max_people + 1))}>+</button>
+              <button style={S.stepperBtn} onClick={() => set('max_people', Math.min(10, form.max_people + 1))} aria-label="인원 늘리기">+</button>
             </div>
           </div>
 

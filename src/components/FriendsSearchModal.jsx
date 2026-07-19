@@ -200,7 +200,7 @@ const S = {
   title: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   tabs: { display: 'flex', gap: 6 },
   tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18', color: 'var(--color-primary)' },
+  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
   panel: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 120 },
   searchRow: { display: 'flex', gap: 8 },
   searchInput: { flex: 1, padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },

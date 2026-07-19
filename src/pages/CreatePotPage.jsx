@@ -7,7 +7,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS, POT_ICON_KEYS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import AutoTextarea from '../components/AutoTextarea'
 import PotIconPicker from '../components/PotIconPicker'
@@ -62,7 +62,7 @@ export default function CreatePotPage() {
     memo: '',
     max_people: 4,
     is_public: false,
-    icon: null,
+    icon: POT_ICON_KEYS[0],
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -169,7 +169,7 @@ export default function CreatePotPage() {
   return (
     <div style={S.page}>
       <div style={S.header}>
-        <button style={S.backBtn} onClick={() => navigate(-1)}>‹</button>
+        <button style={S.backBtn} onClick={() => navigate(-1)} aria-label="뒤로가기">‹</button>
         <div style={S.headerTitle}>밥팟 열기</div>
         <div style={{ width: 34 }} />
       </div>
@@ -284,9 +284,9 @@ export default function CreatePotPage() {
           <div style={{ ...S.section, ...S.sectionRow }}>
             <div style={S.sectionLabel}>👥 몇 명까지?</div>
             <div style={S.stepper}>
-              <button style={S.stepperBtn} onClick={() => stepPeople(-1)} disabled={form.max_people <= MIN_PEOPLE}>−</button>
+              <button style={S.stepperBtn} onClick={() => stepPeople(-1)} disabled={form.max_people <= MIN_PEOPLE} aria-label="인원 줄이기">−</button>
               <span style={S.stepperNum}>{form.max_people}명</span>
-              <button style={S.stepperBtn} onClick={() => stepPeople(1)} disabled={form.max_people >= MAX_PEOPLE}>+</button>
+              <button style={S.stepperBtn} onClick={() => stepPeople(1)} disabled={form.max_people >= MAX_PEOPLE} aria-label="인원 늘리기">+</button>
             </div>
           </div>
 

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { useUser } from '../lib/UserContext'
 import { invalidateCache } from '../lib/cache'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 export default function GroupSetupPage() {
   const navigate = useNavigate()
@@ -83,7 +84,7 @@ export default function GroupSetupPage() {
             />
             {error && <p style={styles.error}>{error}</p>}
             <button
-              style={{ ...styles.btn, opacity: groupName.trim() && !loading ? 1 : 0.4 }}
+              style={{ ...PRIMARY_ACTION_BUTTON, marginTop: 4, opacity: groupName.trim() && !loading ? 1 : 0.4 }}
               onClick={handleCreate}
               disabled={loading}
             >
@@ -105,7 +106,7 @@ export default function GroupSetupPage() {
             />
             {error && <p style={styles.error}>{error}</p>}
             <button
-              style={{ ...styles.btn, opacity: inviteCode.trim().length === 6 && !loading ? 1 : 0.4 }}
+              style={{ ...PRIMARY_ACTION_BUTTON, marginTop: 4, opacity: inviteCode.trim().length === 6 && !loading ? 1 : 0.4 }}
               onClick={handleJoin}
               disabled={loading}
             >
@@ -141,7 +142,7 @@ const styles = {
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary)18',
+    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)',
     color: 'var(--color-primary)',
   },
   card: {
@@ -157,12 +158,6 @@ const styles = {
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
   error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)' },
-  btn: {
-    width: '100%', padding: 14, background: 'var(--color-primary)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-base)', fontWeight: 700, cursor: 'pointer',
-    marginTop: 4,
-  },
   skipBtn: {
     background: 'none', border: 'none',
     fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)',
