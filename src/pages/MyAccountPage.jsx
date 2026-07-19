@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import {
-  updateNickname, uploadAvatar, deleteAccount, setDiscoverable,
+  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled,
   getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
@@ -61,6 +61,8 @@ export default function MyAccountPage() {
   const [pushError, setPushError] = useState(null)
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
+  const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
+  const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
 
   const [tab, setTab] = useState(() => searchParams.get('tab') === 'wish' ? 'wish' : 'info') // 'info' | 'wish'
   const [wishPlaces, setWishPlaces] = useState([])
@@ -379,6 +381,21 @@ export default function MyAccountPage() {
     }
   }
 
+  const handleToggleLunchReminder = async () => {
+    if (lunchReminderLoading) return
+    setLunchReminderLoading(true)
+    try {
+      const next = !lunchReminderEnabled
+      await setLunchReminderEnabled(user.id, next)
+      setLunchReminderState(next)
+      login({ ...user, notify_lunch_reminder: next })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setLunchReminderLoading(false)
+    }
+  }
+
   const handleLogout = async () => {
     await logout()
     navigate('/onboarding')
@@ -466,19 +483,29 @@ export default function MyAccountPage() {
           <p style={styles.installDesc}>끄면 다른 사람이 이메일이나 닉네임으로 나를 찾을 수 없어요.</p>
         </div>
 
-        {/* 알림 받기 */}
+        {/* 알림 */}
         {isPushSupported() && (
           <div style={styles.section}>
+            <span style={styles.sectionLabel}>알림</span>
             {isIOS && !isInstalled ? (
               <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
             ) : (
-              <>
+              <div style={styles.notifList}>
                 <div style={styles.infoRow}>
                   <span style={styles.infoValue}>알림 받기</span>
                   <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="알림 받기" />
                 </div>
                 <p style={styles.installDesc}>밥팟 초대, 참여, 댓글 소식을 알려드려요.</p>
-              </>
+                {pushEnabled && (
+                  <div style={styles.notifSubItem}>
+                    <div style={styles.infoRow}>
+                      <span style={styles.infoValue}>점심 상태 리마인드</span>
+                      <ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />
+                    </div>
+                    <p style={styles.installDesc}>평일 점심시간 전에 상태를 안 정하면 한 번 알려드려요.</p>
+                  </div>
+                )}
+              </div>
             )}
             {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
           </div>
@@ -885,6 +912,9 @@ const styles = {
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 
   section: { display: 'flex', flexDirection: 'column', gap: 8 },
+  sectionLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  notifList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  notifSubItem: { display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid var(--color-border)' },
   infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   editBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },

@@ -309,6 +309,11 @@ export async function setDiscoverable(userId, value) {
   if (error) throw error
 }
 
+export async function setLunchReminderEnabled(userId, value) {
+  const { error } = await supabase.from('users').update({ notify_lunch_reminder: value }).eq('id', userId)
+  if (error) throw error
+}
+
 // 친구 목록/요청은 users 테이블 RLS(같은 밥팟 참여자만 조회 가능)를 우회해야 해서
 // SECURITY DEFINER RPC를 거친다 — 친구가 반드시 같은 밥팟에 있으리란 보장이 없기 때문.
 export async function getMyFriends() {

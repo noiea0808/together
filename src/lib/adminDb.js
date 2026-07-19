@@ -49,3 +49,43 @@ export async function deleteUserAdmin(userId) {
   if (error) throw error
   if (data?.error) throw new Error(data.error)
 }
+
+// ── 점심 상태 리마인드 알림 설정 ──────────────────────
+export async function getLunchReminderConfig() {
+  const { data, error } = await adminSupabase.from('lunch_reminder_config').select('*').eq('id', true).single()
+  if (error) throw error
+  return data
+}
+
+export async function updateLunchReminderConfig(patch) {
+  const { data, error } = await adminSupabase
+    .from('lunch_reminder_config')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', true)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getHolidays(year) {
+  const { data, error } = await adminSupabase
+    .from('holidays')
+    .select('*')
+    .gte('date', `${year}-01-01`)
+    .lte('date', `${year}-12-31`)
+    .order('date', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+export async function addHoliday(date, name) {
+  const { data, error } = await adminSupabase.from('holidays').insert({ date, name }).select().single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteHoliday(date) {
+  const { error } = await adminSupabase.from('holidays').delete().eq('date', date)
+  if (error) throw error
+}

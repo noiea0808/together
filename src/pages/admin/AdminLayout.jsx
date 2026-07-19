@@ -16,6 +16,7 @@ const NAV_SECTIONS = [
       { to: '/admin/terms',    label: '약관',     icon: '📜' },
       { to: '/admin/users',    label: '사용자',   icon: '👤' },
       { to: '/admin/icons',    label: '아이콘',   icon: '🎨' },
+      { to: '/admin/notifications', label: '알림', icon: '🔔' },
       { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
       { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },
     ],
