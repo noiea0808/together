@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, proposeWishPlace, getMySentWishProposals } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
 import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
@@ -64,12 +64,12 @@ export default function GroupPage() {
   const [friendSheetTab, setFriendSheetTab] = useState('status') // 'status' | 'wish'
   const [friendWishPlaces, setFriendWishPlaces] = useState([])
   const [friendWishLoading, setFriendWishLoading] = useState(false)
-  const [mySentWishProposals, setMySentWishProposals] = useState([])
-  const [wishProposeTargetId, setWishProposeTargetId] = useState(null)
-  const [wishProposeGroupId, setWishProposeGroupId] = useState(null)
-  const [wishProposeMessage, setWishProposeMessage] = useState('')
-  const [wishProposeSending, setWishProposeSending] = useState(false)
-  const [wishProposeError, setWishProposeError] = useState(null)
+  const [wishLikeBusyId, setWishLikeBusyId] = useState(null)
+  const [openWishCommentsId, setOpenWishCommentsId] = useState(null)
+  const [wishCommentsMap, setWishCommentsMap] = useState({}) // wish_place_id -> comments[]
+  const [wishCommentsLoading, setWishCommentsLoading] = useState(false)
+  const [newWishCommentText, setNewWishCommentText] = useState('')
+  const [wishCommentSending, setWishCommentSending] = useState(false)
   const [proposeSlot, setProposeSlot] = useState(null)
   const [proposeGroupId, setProposeGroupId] = useState(null)
   const [proposeMenu, setProposeMenu] = useState('')
@@ -152,51 +152,76 @@ export default function GroupPage() {
     setProposeError(null)
     setProposeGroupId(null)
     setFriendSheetTab('status')
-    setWishProposeTargetId(null)
-    setWishProposeGroupId(null)
-    setWishProposeMessage('')
-    setWishProposeError(null)
+    setOpenWishCommentsId(null)
+    setNewWishCommentText('')
   }, [selectedFriendId])
 
   useEffect(() => {
     if (friendSheetTab !== 'wish' || !selectedFriendId) return
     setFriendWishLoading(true)
-    Promise.all([getFriendWishPlaces(selectedFriendId), getMySentWishProposals(selectedFriendId)])
-      .then(([places, sent]) => {
-        setFriendWishPlaces(places)
-        setMySentWishProposals(sent)
-      })
+    getFriendWishPlaces(selectedFriendId)
+      .then(setFriendWishPlaces)
       .catch(e => console.error(e))
       .finally(() => setFriendWishLoading(false))
   }, [friendSheetTab, selectedFriendId])
 
-  const openWishPropose = (place, friend) => {
-    setWishProposeTargetId(place.id)
-    setWishProposeMessage('')
-    setWishProposeError(null)
-    const eligibleGroups = place.restricted
-      ? friend.groups.filter(g => place.eligible_group_ids?.includes(g.id))
-      : friend.groups
-    setWishProposeGroupId(eligibleGroups.length === 1 ? eligibleGroups[0].id : null)
-  }
-
-  const sendWishPropose = async (place) => {
-    if (!selectedFriend || wishProposeSending) return
-    setWishProposeSending(true)
-    setWishProposeError(null)
+  const toggleWishLike = async (place) => {
+    if (wishLikeBusyId) return
+    setWishLikeBusyId(place.id)
+    const wasLiked = place.liked_by_me
+    setFriendWishPlaces(prev => prev.map(p => p.id === place.id
+      ? { ...p, liked_by_me: !wasLiked, like_count: p.like_count + (wasLiked ? -1 : 1) }
+      : p))
     try {
-      await proposeWishPlace({
-        wishPlaceId: place.id, fromUserId: user.id, toUserId: selectedFriend.id,
-        groupId: wishProposeGroupId, message: wishProposeMessage.trim() || null,
-      })
-      setMySentWishProposals(prev => [...prev, { wish_place_id: place.id, group_id: wishProposeGroupId }])
-      setWishProposeTargetId(null)
-      setWishProposeMessage('')
+      if (wasLiked) await unlikeWishPlace(place.id, user.id)
+      else await likeWishPlace(place.id, user.id)
     } catch (e) {
       console.error(e)
-      setWishProposeError('제안을 보내지 못했어요.')
+      setFriendWishPlaces(prev => prev.map(p => p.id === place.id
+        ? { ...p, liked_by_me: wasLiked, like_count: p.like_count + (wasLiked ? 1 : -1) }
+        : p))
     } finally {
-      setWishProposeSending(false)
+      setWishLikeBusyId(null)
+    }
+  }
+
+  const toggleWishComments = (place) => {
+    const next = openWishCommentsId === place.id ? null : place.id
+    setOpenWishCommentsId(next)
+    setNewWishCommentText('')
+    if (next && !wishCommentsMap[next]) {
+      setWishCommentsLoading(true)
+      getWishPlaceComments(next)
+        .then(comments => setWishCommentsMap(prev => ({ ...prev, [next]: comments })))
+        .catch(e => console.error(e))
+        .finally(() => setWishCommentsLoading(false))
+    }
+  }
+
+  const sendWishComment = async (place) => {
+    const content = newWishCommentText.trim()
+    if (!content || wishCommentSending) return
+    setWishCommentSending(true)
+    try {
+      const comment = await addWishPlaceComment(place.id, user.id, content)
+      setWishCommentsMap(prev => ({ ...prev, [place.id]: [...(prev[place.id] ?? []), comment] }))
+      setFriendWishPlaces(prev => prev.map(p => p.id === place.id ? { ...p, comment_count: p.comment_count + 1 } : p))
+      setNewWishCommentText('')
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setWishCommentSending(false)
+    }
+  }
+
+  const removeWishComment = async (place, commentId) => {
+    setWishCommentsMap(prev => ({ ...prev, [place.id]: (prev[place.id] ?? []).filter(c => c.id !== commentId) }))
+    setFriendWishPlaces(prev => prev.map(p => p.id === place.id ? { ...p, comment_count: Math.max(0, p.comment_count - 1) } : p))
+    try {
+      await deleteWishPlaceComment(commentId)
+    } catch (e) {
+      console.error(e)
+      getWishPlaceComments(place.id).then(comments => setWishCommentsMap(prev => ({ ...prev, [place.id]: comments }))).catch(() => {})
     }
   }
 
@@ -325,7 +350,12 @@ export default function GroupPage() {
         {/* 친구 목록 */}
         {friends.length === 0 ? (
           <div style={styles.empty}>
-            <div style={{ fontSize: 40 }}>👥</div>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
             <div style={{ fontWeight: 700 }}>아직 친구가 없어요</div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
               그룹 멤버이거나 친구 찾기로 추가하면{'\n'}여기 표시됩니다.
@@ -333,7 +363,12 @@ export default function GroupPage() {
           </div>
         ) : displayedFriends.length === 0 ? (
           <div style={styles.empty}>
-            <div style={{ fontSize: 40 }}>👥</div>
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
             <div style={{ fontWeight: 700 }}>이 그룹엔 친구가 없어요</div>
           </div>
         ) : (
@@ -352,7 +387,7 @@ export default function GroupPage() {
                   <div style={styles.friendInfo}>
                     <div style={styles.friendNameRow}>
                       <span style={styles.friendName}>{friend.nickname}</span>
-                      {friend.groups.map(g => (
+                      {friendGroupFilter === null && friend.groups.map(g => (
                         <span key={g.id} style={styles.groupTag}>{g.name}</span>
                       ))}
                     </div>
@@ -412,11 +447,8 @@ export default function GroupPage() {
               ) : (
                 <div style={styles.friendWishList}>
                   {friendWishPlaces.map(place => {
-                    const alreadySent = mySentWishProposals.some(p => p.wish_place_id === place.id)
-                    const isProposing = wishProposeTargetId === place.id
-                    const eligibleGroups = place.restricted
-                      ? selectedFriend.groups.filter(g => place.eligible_group_ids?.includes(g.id))
-                      : selectedFriend.groups
+                    const commentsOpen = openWishCommentsId === place.id
+                    const comments = wishCommentsMap[place.id] ?? []
                     return (
                       <div key={place.id} style={styles.friendWishItem}>
                         <LinkPreviewCard text={place.content} />
@@ -424,42 +456,60 @@ export default function GroupPage() {
                           const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                           return text && <div style={styles.friendWishText}>{text}</div>
                         })()}
-                        {alreadySent ? (
-                          <span style={styles.statusInvitedTag}>제안함 ✓</span>
-                        ) : isProposing ? (
-                          <div style={styles.proposePanel}>
-                            {eligibleGroups.length > 1 && (
-                              <div style={styles.friendGroups}>
-                                {eligibleGroups.map(g => (
-                                  <button
-                                    key={g.id}
-                                    style={{ ...styles.groupPickTag, ...(wishProposeGroupId === g.id ? styles.groupPickTagActive : {}) }}
-                                    onClick={() => setWishProposeGroupId(g.id)}
-                                  >{g.name}</button>
+                        <div style={styles.wishReactionRow}>
+                          <button
+                            style={{ ...styles.wishLikeBtn, ...(place.liked_by_me ? styles.wishLikeBtnActive : {}) }}
+                            onClick={() => toggleWishLike(place)}
+                            disabled={wishLikeBusyId === place.id}
+                          >
+                            {place.liked_by_me ? '❤️' : '🤍'} {place.like_count > 0 ? place.like_count : ''}
+                          </button>
+                          <button style={styles.wishCommentToggleBtn} onClick={() => toggleWishComments(place)}>
+                            💬 {place.comment_count > 0 ? place.comment_count : '댓글'}
+                          </button>
+                        </div>
+                        {commentsOpen && (
+                          <div style={styles.wishCommentsBox}>
+                            {wishCommentsLoading && comments.length === 0 ? (
+                              <p style={styles.noGroupNote}>불러오는 중...</p>
+                            ) : comments.length === 0 ? (
+                              <p style={styles.noGroupNote}>아직 댓글이 없어요.</p>
+                            ) : (
+                              <div style={styles.wishProposalsList}>
+                                {comments.map(c => (
+                                  <div key={c.id} style={styles.wishProposalRow}>
+                                    {c.avatar_url ? (
+                                      <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
+                                    ) : (
+                                      <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                    )}
+                                    <div style={styles.wishProposalTextCol}>
+                                      <span style={styles.wishProposalName}>{c.nickname}</span>
+                                      <span style={styles.wishProposalMessage}>{c.content}</span>
+                                    </div>
+                                    {c.user_id === user.id && (
+                                      <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                    )}
+                                  </div>
                                 ))}
                               </div>
                             )}
-                            <input
-                              style={styles.proposeInput}
-                              placeholder="메뉴나 한마디 (선택)"
-                              value={wishProposeMessage}
-                              onChange={e => setWishProposeMessage(e.target.value)}
-                              maxLength={40}
-                            />
-                            {wishProposeError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{wishProposeError}</p>}
-                            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                            <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
+                              <input
+                                style={{ ...styles.proposeInput, flex: 1 }}
+                                placeholder="댓글 달기"
+                                value={newWishCommentText}
+                                onChange={e => setNewWishCommentText(e.target.value)}
+                                maxLength={200}
+                                onKeyDown={e => { if (e.key === 'Enter') sendWishComment(place) }}
+                              />
                               <button
-                                style={{ ...styles.proposeMainBtn, marginTop: 0, flex: 1, opacity: wishProposeSending || (eligibleGroups.length > 0 && !wishProposeGroupId) ? 0.5 : 1 }}
-                                onClick={() => sendWishPropose(place)}
-                                disabled={wishProposeSending || (eligibleGroups.length > 0 && !wishProposeGroupId)}
-                              >
-                                {wishProposeSending ? '보내는 중...' : '제안 보내기'}
-                              </button>
-                              <button style={styles.wishProposeCancelBtn} onClick={() => setWishProposeTargetId(null)} disabled={wishProposeSending}>취소</button>
+                                style={{ ...styles.wishCommentToggleBtn, opacity: newWishCommentText.trim() && !wishCommentSending ? 1 : 0.4 }}
+                                onClick={() => sendWishComment(place)}
+                                disabled={!newWishCommentText.trim() || wishCommentSending}
+                              >등록</button>
                             </div>
                           </div>
-                        ) : (
-                          <button style={styles.wishProposeBtn} onClick={() => openWishPropose(place, selectedFriend)}>🍚 같이 가고 싶어요</button>
                         )}
                       </div>
                     )
@@ -603,7 +653,7 @@ const styles = {
     borderBottom: '1px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
-  headerTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
   findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)12', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
@@ -648,8 +698,19 @@ const styles = {
   friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   friendWishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
-  wishProposeBtn: { alignSelf: 'flex-start', marginTop: 4, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary)14', border: '1px solid var(--color-primary)44', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
-  wishProposeCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '0 4px', fontFamily: 'inherit' },
+  wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
+  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishLikeBtnActive: { color: 'var(--color-primary)', background: 'var(--color-primary)14', border: '1px solid var(--color-primary)44' },
+  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishCommentsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
+  wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8 },
+  wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
+  wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary)18', border: '1.5px solid var(--color-primary)' },

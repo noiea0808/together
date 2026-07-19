@@ -28,6 +28,8 @@ const EVENT_META = {
   invite: { label: '초대', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
   invite_new: { label: '제안', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
   invite_declined: { label: '거절', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
+  wish_like: { label: '하트', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
+  wish_comment: { label: '댓글', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
 }
 
 const DECLINE_REASON_PRESETS = ['선약이 있어요', '오늘은 혼자 먹을게요', '컨디션이 안 좋아요', '다음에 같이 해요']
@@ -281,7 +283,7 @@ const S = {
     color: 'var(--color-text-muted)', fontSize: 20, cursor: 'pointer', display: 'flex',
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0, lineHeight: 1,
   },
-  headerTitle: { flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
   list: { flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 40 },
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
