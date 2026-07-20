@@ -1,5 +1,7 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
+import { useNotificationSync } from '../lib/NotificationSyncContext'
+import { useNavBadges } from '../lib/NavBadgeContext'
 
 export function HomeIcon({ active }) {
   return active ? (
@@ -88,6 +90,14 @@ export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user } = useUser()
+  const { unreadCount } = useNotificationSync()
+  const { momentsGroup, momentsPublic, friendsWish } = useNavBadges()
+
+  const showDot = {
+    '/today': unreadCount > 0,
+    '/moment': momentsGroup || momentsPublic,
+    '/group': friendsWish,
+  }
 
   return (
     <nav style={styles.nav}>
@@ -100,19 +110,22 @@ export default function BottomNav() {
             onClick={() => navigate(path)}
             aria-label={label}
           >
-            {path === '/account' && user?.avatar_url ? (
-              <img
-                src={user.avatar_url}
-                alt=""
-                style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-primary)' : '2px solid transparent' }}
-              />
-            ) : path === '/account' && user?.nickname ? (
-              <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-primary)' : '2px solid var(--color-border)' }}>
-                {user.nickname[0]}
-              </div>
-            ) : (
-              <Icon active={active} />
-            )}
+            <span style={styles.iconWrap}>
+              {path === '/account' && user?.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt=""
+                  style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-primary)' : '2px solid transparent' }}
+                />
+              ) : path === '/account' && user?.nickname ? (
+                <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-primary)' : '2px solid var(--color-border)' }}>
+                  {user.nickname[0]}
+                </div>
+              ) : (
+                <Icon active={active} />
+              )}
+              {showDot[path] && <span style={styles.navDot} />}
+            </span>
           </button>
         )
       })}
@@ -135,6 +148,11 @@ const styles = {
     padding: '14px 0',
     background: 'none', border: 'none', cursor: 'pointer',
     WebkitTapHighlightColor: 'transparent',
+  },
+  iconWrap: { position: 'relative', display: 'inline-flex', alignItems: 'center', justifyContent: 'center' },
+  navDot: {
+    position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: '50%',
+    background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)',
   },
   avatarIcon: { width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', boxSizing: 'border-box' },
   avatarInitial: {

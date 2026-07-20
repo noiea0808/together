@@ -1016,6 +1016,30 @@ export async function markAllNotificationsRead(userId) {
   if (error) throw error
 }
 
+// ── 네비 메뉴 레드닷 (모먼트/친구) ──────────────────────────
+// 실시간 구독 없이, 앱 진입 시 "마지막으로 본 시각 이후 새 항목이 있는가"만 1회 조회한다.
+export async function getNavBadges() {
+  const { data, error } = await supabase.rpc('get_nav_badges')
+  if (error) throw error
+  const row = data?.[0]
+  return {
+    momentsGroup: row?.moments_group ?? false,
+    momentsPublic: row?.moments_public ?? false,
+    friendsWish: row?.friends_wish ?? false,
+    friendIdsWithNewWish: row?.friend_ids_with_new_wish ?? [],
+  }
+}
+
+export async function markMomentsSeen(scope) {
+  const { error } = await supabase.rpc('mark_moments_seen', { p_scope: scope })
+  if (error) throw error
+}
+
+export async function markFriendsWishSeen() {
+  const { error } = await supabase.rpc('mark_friends_wish_seen')
+  if (error) throw error
+}
+
 export async function joinPot(potId, userId) {
   const { error } = await supabase
     .from('pot_members')

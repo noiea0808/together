@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import './index.css'
 import { UserProvider, useUser } from './lib/UserContext'
 import { NotificationSyncProvider } from './lib/NotificationSyncContext'
+import { NavBadgeProvider } from './lib/NavBadgeContext'
 import OnboardingPage from './pages/OnboardingPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import TodayPage from './pages/TodayPage'
@@ -69,10 +70,12 @@ function ConsumerApp() {
   return (
     <UserProvider>
       <NotificationSyncProvider>
-        <NotificationToast />
-        <GroupInviteModal />
-        <DailyTipModal />
-        <ConsumerRoutes />
+        <NavBadgeProvider>
+          <NotificationToast />
+          <GroupInviteModal />
+          <DailyTipModal />
+          <ConsumerRoutes />
+        </NavBadgeProvider>
       </NotificationSyncProvider>
     </UserProvider>
   )
