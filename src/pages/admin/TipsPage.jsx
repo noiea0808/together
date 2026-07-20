@@ -106,7 +106,6 @@ export default function TipsPage() {
           <h1 style={s.title}>오늘의 팁 관리</h1>
           {tab.subtitle && <p style={s.subtitle}>{tab.subtitle}</p>}
         </div>
-        <button style={s.addBtn} onClick={openNew}>{tab.addLabel}</button>
       </div>
 
       <div style={s.tabRow}>
@@ -119,6 +118,7 @@ export default function TipsPage() {
             {t.label}
           </button>
         ))}
+        <button style={s.addBtn} onClick={openNew}>{tab.addLabel}</button>
       </div>
 
       {loading ? (
@@ -241,8 +241,8 @@ const s = {
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 },
   title: { fontSize: 22, fontWeight: 800, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 540, lineHeight: 1.5 },
-  addBtn: { flexShrink: 0, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  tabRow: { display: 'flex', gap: 8, marginBottom: 16 },
+  addBtn: { marginLeft: 'auto', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  tabRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 },
   tabBtn: { background: '#fff', border: '1.5px solid #E5E1DB', borderRadius: 999, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: '#8A8AA0', cursor: 'pointer' },
   tabBtnActive: { background: '#FF6B35', borderColor: '#FF6B35', color: '#fff' },
   muted: { color: '#8A8AA0', fontSize: 14 },
