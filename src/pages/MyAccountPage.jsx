@@ -426,13 +426,21 @@ export default function MyAccountPage() {
   const handleToggleLunchReminder = async () => {
     if (lunchReminderLoading) return
     setLunchReminderLoading(true)
+    setPushError(null)
     try {
       const next = !lunchReminderEnabled
+      // 리마인드는 활동 알림과 별개 항목이지만 발송에는 같은 브라우저 푸시 구독이 필요하므로,
+      // 아직 구독 전이면 켜는 시점에 대신 구독해준다.
+      if (next && !pushEnabled) {
+        await subscribeToPush(user.id)
+        setPushEnabled(true)
+      }
       await setLunchReminderEnabled(user.id, next)
       setLunchReminderState(next)
       login({ ...user, notify_lunch_reminder: next })
     } catch (e) {
       console.error(e)
+      setPushError(e.message || '알림 설정에 실패했어요.')
     } finally {
       setLunchReminderLoading(false)
     }
@@ -536,16 +544,13 @@ export default function MyAccountPage() {
                     title="활동 알림"
                     description="밥팟 초대, 참여, 댓글 소식을 알려드려요."
                     right={<ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="활동 알림" />}
-                    last={!pushEnabled}
                   />
-                  {pushEnabled && (
-                    <SettingsRow
-                      title="점심 상태 리마인드"
-                      description="평일 점심시간 전에 상태를 정하지 않으면 한 번 알려드려요."
-                      right={<ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />}
-                      last
-                    />
-                  )}
+                  <SettingsRow
+                    title="점심 상태 리마인드"
+                    description="평일 점심시간 전에 상태를 정하지 않으면 한 번 알려드려요."
+                    right={<ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />}
+                    last
+                  />
                 </>
               )}
             </SettingsSection>

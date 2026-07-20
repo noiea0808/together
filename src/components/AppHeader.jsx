@@ -43,17 +43,6 @@ export function HeaderAction({ label, onClick, ariaLabel }) {
   )
 }
 
-// 날짜 범위 이동 컨트롤(일정 화면의 중앙 영역).
-export function DateNavigator({ label, onPrev, onNext, prevLabel = '이전', nextLabel = '다음' }) {
-  return (
-    <div className="app-header-datenav">
-      <button type="button" className="app-header-datenav__btn" onClick={onPrev} aria-label={prevLabel}>‹</button>
-      <span className="app-header-datenav__label">{label}</span>
-      <button type="button" className="app-header-datenav__btn" onClick={onNext} aria-label={nextLabel}>›</button>
-    </div>
-  )
-}
-
 // 선택형 필터 컨트롤(모먼트 화면의 '내 그룹 / 전체'). dot이 true인 옵션엔 안 읽은
 // 소식이 있다는 작은 배지를 붙인다.
 export function SegmentedControl({ options, value, onChange, ariaLabel }) {

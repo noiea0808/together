@@ -6,9 +6,13 @@ import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import AppHeader, { DateNavigator } from '../components/AppHeader'
+import AppHeader from '../components/AppHeader'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
+
+function formatDate(date) {
+  return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
+}
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -40,7 +44,7 @@ export default function MySchedulePage() {
   const dates = getTwoWeekDates(weekOffset)
   const fromDate = toDateStr(dates[0])
   const toDate = toDateStr(dates[dates.length - 1])
-  const rangeLabel = `${dates[0].getMonth() + 1}.${dates[0].getDate()} - ${dates[13].getMonth() + 1}.${dates[13].getDate()}`
+  const rangeLabel = `${formatDate(dates[0])} ~ ${formatDate(dates[13])}`
 
   useEffect(() => {
     if (!user) return
@@ -67,18 +71,13 @@ export default function MySchedulePage() {
 
   return (
     <div style={S.page}>
-      <AppHeader
-        title="일정"
-        centerContent={
-          <DateNavigator
-            label={rangeLabel}
-            onPrev={() => setWeekOffset(o => o - 1)}
-            onNext={() => setWeekOffset(o => o + 1)}
-            prevLabel="이전 2주"
-            nextLabel="다음 2주"
-          />
-        }
-      />
+      <AppHeader title="일정" />
+
+      <div style={S.dateNav}>
+        <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
+        <span style={S.dateNavLabel}>{rangeLabel}</span>
+        <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
+      </div>
 
       <div style={S.list}>
         {loading ? (
@@ -145,6 +144,11 @@ export default function MySchedulePage() {
 
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
+
+  dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
+  navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
+  dateNavLabel: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+
   list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 

@@ -328,37 +328,6 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
 }
 .app-header-action:active { background: var(--color-primary-a20); transform: scale(0.96); }
 
-/* 날짜 이동 컨트롤(일정) */
-.app-header-datenav { display: flex; align-items: center; gap: 8px; }
-.app-header-datenav__btn {
-  width: 30px;
-  height: 30px;
-  border-radius: 50%;
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  color: var(--color-text-muted);
-  font-size: 15px;
-  font-weight: 700;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-  flex-shrink: 0;
-  transition: background 0.12s ease, transform 0.08s ease;
-  -webkit-tap-highlight-color: transparent;
-}
-.app-header-datenav__btn:active { background: var(--color-surface-2); transform: scale(0.9); }
-.app-header-datenav__label {
-  font-size: 14px;
-  font-weight: 600;
-  color: var(--color-text-muted);
-  white-space: nowrap;
-  min-width: 68px;
-  text-align: center;
-}
-
 /* 세그먼트 컨트롤(모먼트: 내 그룹 / 전체) — 선택/비선택이 서로 다른 버튼처럼 보이지
    않도록 트랙 하나에 옵션들을 붙여, 선택된 옵션만 배경으로 표시한다 */
 .app-header-segmented {
@@ -405,5 +374,4 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
 @media (max-width: 380px) {
   .app-header { padding: 0 var(--header-padding-x-narrow); }
   .app-header-segmented__option { min-width: 48px; padding: 0 6px; }
-  .app-header-datenav__label { min-width: 60px; }
 }
