@@ -1,6 +1,5 @@
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { useNotificationSync } from '../lib/NotificationSyncContext'
 import { useNavBadges } from '../lib/NavBadgeContext'
 
 export function HomeIcon({ active }) {
@@ -90,11 +89,11 @@ export default function BottomNav() {
   const navigate = useNavigate()
   const { pathname } = useLocation()
   const { user } = useUser()
-  const { unreadCount } = useNotificationSync()
   const { momentsGroup, momentsPublic, friendsWish } = useNavBadges()
 
+  // 오늘(알림) 탭의 점은 각 화면 헤더의 알림 벨로 옮겼다(NotificationBell 참고) —
+  // 나머지 두 개는 "그 탭 안에 새 콘텐츠가 있다"는 동일한 의미로 통일.
   const showDot = {
-    '/today': unreadCount > 0,
     '/moment': momentsGroup || momentsPublic,
     '/group': friendsWish,
   }

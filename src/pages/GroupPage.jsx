@@ -12,6 +12,9 @@ import FriendsSearchModal from '../components/FriendsSearchModal'
 import WishCategoryIcon from '../components/WishCategoryIcon'
 import { WISH_CATEGORY_OPTIONS } from '../lib/potConstants'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
+import ReportModal from '../components/ReportModal'
+import { MoreHorizontalIcon } from '../components/GroupIcons'
+import NotificationBell from '../components/NotificationBell'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -80,6 +83,8 @@ export default function GroupPage() {
   const [friendWishLoading, setFriendWishLoading] = useState(false)
   const [wishLikeBusyId, setWishLikeBusyId] = useState(null)
   const [openWishCommentsId, setOpenWishCommentsId] = useState(null)
+  const [reportTarget, setReportTarget] = useState(null) // { targetType, targetId } | null
+  const [wishMenuOpenId, setWishMenuOpenId] = useState(null)
   const [wishCommentsMap, setWishCommentsMap] = useState({}) // wish_place_id -> comments[]
   const [wishCommentsLoading, setWishCommentsLoading] = useState(false)
   const [newWishCommentText, setNewWishCommentText] = useState('')
@@ -339,9 +344,12 @@ export default function GroupPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <span style={styles.headerTitle}>친구</span>
-        <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-          친구 찾기
-        </button>
+        <div style={styles.headerRight}>
+          <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
+            친구 찾기
+          </button>
+          <NotificationBell />
+        </div>
       </div>
 
       <div
@@ -515,6 +523,28 @@ export default function GroupPage() {
                           <button style={styles.wishCommentToggleBtn} onClick={() => toggleWishComments(place)}>
                             💬 {place.comment_count > 0 ? place.comment_count : '댓글'}
                           </button>
+                          <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                            <button
+                              style={styles.wishMoreBtn}
+                              onClick={() => setWishMenuOpenId(id => id === place.id ? null : place.id)}
+                              aria-label="더보기"
+                            >
+                              <MoreHorizontalIcon size={16} />
+                            </button>
+                            {wishMenuOpenId === place.id && (
+                              <>
+                                <div style={styles.menuBackdrop} onClick={() => setWishMenuOpenId(null)} />
+                                <div style={styles.wishMoreDropdown}>
+                                  <button
+                                    style={styles.wishMoreItem}
+                                    onClick={() => { setWishMenuOpenId(null); setReportTarget({ targetType: 'wish_place', targetId: place.id }) }}
+                                  >
+                                    🚨 신고하기
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                         {commentsOpen && (
                           <div style={styles.wishCommentsBox}>
@@ -535,8 +565,15 @@ export default function GroupPage() {
                                       <span style={styles.wishProposalName}>{c.nickname}</span>
                                       <span style={styles.wishProposalMessage}>{c.content}</span>
                                     </div>
-                                    {c.user_id === user.id && (
+                                    {c.user_id === user.id ? (
                                       <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                    ) : (
+                                      <button
+                                        style={styles.wishProposalDismiss}
+                                        onClick={() => setReportTarget({ targetType: 'wish_place_comment', targetId: c.id })}
+                                      >
+                                        신고
+                                      </button>
                                     )}
                                   </div>
                                 ))}
@@ -687,6 +724,14 @@ export default function GroupPage() {
         />
       )}
 
+      {reportTarget && (
+        <ReportModal
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
+
       <BottomNav />
     </div>
   )
@@ -702,6 +747,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 6 },
   findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
@@ -768,6 +814,22 @@ const styles = {
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishMoreBtn: {
+    width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
+    color: 'var(--color-text-muted)', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+  },
+  menuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
+  wishMoreDropdown: {
+    position: 'absolute', top: '110%', right: 0, zIndex: 50, minWidth: 112,
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden',
+  },
+  wishMoreItem: {
+    width: '100%', padding: '10px 12px', background: 'none', border: 'none', textAlign: 'left',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },

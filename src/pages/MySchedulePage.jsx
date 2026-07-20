@@ -6,6 +6,7 @@ import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import NotificationBell from '../components/NotificationBell'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -68,10 +69,13 @@ export default function MySchedulePage() {
     <div style={S.page}>
       <div style={S.header}>
         <span style={S.headerTitle}>일정</span>
-        <div style={S.nav}>
-          <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
-          <span style={S.navLabel}>{rangeLabel}</span>
-          <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
+        <div style={S.headerRight}>
+          <div style={S.nav}>
+            <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
+            <span style={S.navLabel}>{rangeLabel}</span>
+            <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
+          </div>
+          <NotificationBell />
         </div>
       </div>
 
@@ -147,6 +151,7 @@ const S = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 6 },
   nav: { display: 'flex', alignItems: 'center', gap: 8 },
   navBtn: {
     width: 26, height: 26, borderRadius: '50%', border: '1px solid #EDE8E3', background: '#fff',

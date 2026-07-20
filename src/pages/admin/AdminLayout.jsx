@@ -5,21 +5,33 @@ import { useAdminAuth } from '../../lib/AdminAuthContext'
 
 const NAV_SECTIONS = [
   {
-    title: '가이드',
+    title: '운영 관리',
     items: [
-      { to: '/admin/guide/status',   label: '사용자 상태', icon: '🟢' },
+      { to: '/admin/users',    label: '사용자',     icon: '👤' },
+      { to: '/admin/reports',  label: '신고/제재',   icon: '🚨' },
+      { to: '/admin/feedback', label: '사용자 의견', icon: '💬' },
+      { to: '/admin/groups',   label: '그룹',       icon: '👥', disabled: true },
     ],
   },
   {
-    title: '서비스 관리',
+    title: '콘텐츠 관리',
     items: [
-      { to: '/admin/terms',    label: '약관',     icon: '📜' },
-      { to: '/admin/users',    label: '사용자',   icon: '👤' },
-      { to: '/admin/icons',    label: '아이콘',   icon: '🎨' },
-      { to: '/admin/notifications', label: '알림', icon: '🔔' },
       { to: '/admin/tips',     label: '오늘의 팁', icon: '💡' },
-      { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
-      { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },
+      { to: '/admin/terms',    label: '약관',     icon: '📜' },
+      { to: '/admin/notifications', label: '알림', icon: '🔔' },
+    ],
+  },
+  {
+    title: '통계',
+    items: [
+      { to: '/admin/stats',    label: '대시보드', icon: '📊', disabled: true },
+    ],
+  },
+  {
+    title: '참고자료',
+    items: [
+      { to: '/admin/guide/status', label: '사용자 상태', icon: '🟢' },
+      { to: '/admin/icons',        label: '아이콘',     icon: '🎨' },
     ],
   },
 ]
@@ -125,9 +137,9 @@ const s = {
   nav: { flex: 1, overflowY: 'auto', padding: '12px 0' },
   navSection: { marginBottom: 4 },
   navSectionTitle: {
-    fontSize: 10,
-    fontWeight: 700,
-    color: '#5A5A7A',
+    fontSize: 11,
+    fontWeight: 800,
+    color: '#A8A8C8',
     letterSpacing: 1,
     textTransform: 'uppercase',
     padding: '12px 20px 6px',

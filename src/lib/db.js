@@ -116,8 +116,21 @@ export async function getSessionUser() {
   return data
 }
 
+// 약관 동의 기록. agreedTerms: [{ id, version }] — 동의 당시의 term.version을 같이 저장해두면
+// 관리자가 이후 version을 올렸을 때(재동의 필요 약관) 이 기록만으로 "옛 버전에 동의함"을 구분할 수 있다.
+async function upsertTermAgreements(userId, agreedTerms = []) {
+  if (agreedTerms.length === 0) return
+  const rows = agreedTerms.map(t => ({
+    user_id: userId, term_id: t.id, agreed_version: t.version ?? null, agreed_at: new Date().toISOString(),
+  }))
+  const { error } = await supabase
+    .from('user_term_agreements')
+    .upsert(rows, { onConflict: 'user_id,term_id' })
+  if (error) throw error
+}
+
 // 온보딩 완료: 닉네임·생년월일·라이프스타일 저장 + 약관 동의 기록 + onboarded 처리
-export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTermIds = []) {
+export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTerms = []) {
   const { data: profile, error } = await supabase
     .from('users')
     .update({
@@ -131,24 +144,33 @@ export async function completeOnboarding(userId, { nickname, birthdate, lifestyl
     .single()
   if (error) throw error
 
-  if (agreedTermIds.length > 0) {
-    const rows = agreedTermIds.map(term_id => ({ user_id: userId, term_id }))
-    const { error: agreeError } = await supabase
-      .from('user_term_agreements')
-      .upsert(rows, { onConflict: 'user_id,term_id' })
-    if (agreeError) throw agreeError
-  }
+  await upsertTermAgreements(userId, agreedTerms)
   return profile
 }
 
+// 이미 onboarded된 사용자의 재동의(신규 필수 약관 추가 / 기존 약관 version 인상) 처리
+export async function recordTermAgreements(userId, agreedTerms = []) {
+  await upsertTermAgreements(userId, agreedTerms)
+}
+
 // ── 약관 ──────────────────────────────────────────
-// 온보딩에 노출할 활성 약관 (정렬 순)
+// 온보딩/재동의 화면에 노출할 활성 약관 (정렬 순)
 export async function getActiveTerms() {
   const { data, error } = await supabase
     .from('terms')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+// 내가 동의한 약관 이력(term_id + 동의 당시 version). 로그인 시 재동의 필요 여부 판단에 쓴다.
+export async function getMyTermAgreements(userId) {
+  const { data, error } = await supabase
+    .from('user_term_agreements')
+    .select('term_id, agreed_version')
+    .eq('user_id', userId)
   if (error) throw error
   return data
 }
@@ -1767,6 +1789,37 @@ export async function deleteWishPlaceComment(id) {
 // 내 계정 화면에서 내 위시 항목들의 좋아요/댓글 수를 한 번에 조회.
 export async function getMyWishPlaceReactions() {
   const { data, error } = await supabase.rpc('get_my_wish_place_reactions')
+  if (error) throw error
+  return data
+}
+
+// ── 신고 ──────────────────────────────────────────────
+// targetType: 'pot' | 'pot_comment' | 'wish_place' | 'wish_place_comment' | 'user'
+export async function reportContent(reporterId, targetType, targetId, reason, detail = null) {
+  const { error } = await supabase
+    .from('reports')
+    .insert({ reporter_id: reporterId, target_type: targetType, target_id: targetId, reason, detail })
+  if (error) throw error
+}
+
+// ── 사용자 의견 ────────────────────────────────────────
+// 1회성 답변 티켓: 사용자가 의견을 남기면 관리자만 확인 후 한 번 답변한다.
+export async function submitFeedback(userId, content) {
+  const { data, error } = await supabase
+    .from('feedback')
+    .insert({ user_id: userId, content })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getMyFeedback(userId) {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
   if (error) throw error
   return data
 }

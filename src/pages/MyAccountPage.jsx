@@ -7,6 +7,8 @@ import {
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
+import FeedbackModal from '../components/FeedbackModal'
+import NotificationBell from '../components/NotificationBell'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
@@ -63,6 +65,7 @@ export default function MyAccountPage() {
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
 
   const [tab, setTab] = useState(() => searchParams.get('tab') === 'wish' ? 'wish' : 'info') // 'info' | 'wish'
   const [wishPlaces, setWishPlaces] = useState([])
@@ -97,6 +100,7 @@ export default function MyAccountPage() {
     if (!isPushSupported()) return
     getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
   }, [])
+
 
   useEffect(() => {
     if (tab !== 'wish' || !user) return
@@ -427,7 +431,10 @@ export default function MyAccountPage() {
     <div style={styles.page}>
       <div style={styles.header}>
         <span style={styles.headerTitle}>내 계정</span>
-        <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
+        <div style={styles.headerRight}>
+          <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
+          <NotificationBell />
+        </div>
       </div>
 
       <div style={styles.tabs}>
@@ -517,6 +524,17 @@ export default function MyAccountPage() {
             <InstallAppPrompt hideDesc />
           </div>
         )}
+
+        {/* 사용자 의견 */}
+        <div style={styles.section}>
+          <span style={styles.sectionLabel}>의견 보내기</span>
+          <div style={styles.infoRow}>
+            <span style={styles.infoValue}>불편했던 점이나 바라는 점이 있나요?</span>
+            <button style={styles.feedbackBtn} onClick={() => setShowFeedbackModal(true)}>의견함 열기</button>
+          </div>
+        </div>
+
+        {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
 
         {/* 회원 탈퇴 · 로그아웃 — 화면 아래쪽으로 밀어 스크롤해야 보이게 해서, 실수로 누르기
             쉬운 위치(헤더)를 피한다 */}
@@ -883,6 +901,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'space-between',
   },
   headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
+  headerRight: { display: 'flex', alignItems: 'center', gap: 2 },
   headerGuideBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
   // 이 페이지는 내부 스크롤 컨테이너가 아니라 문서(페이지) 자체가 스크롤되는 구조라
   // position:sticky가 걸리지 않는다 — 그래서 fixed로 고정하고, 아래 paddingBottom을
@@ -915,6 +934,8 @@ const styles = {
   sectionLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   notifList: { display: 'flex', flexDirection: 'column', gap: 8 },
   notifSubItem: { display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid var(--color-border)' },
+
+  feedbackBtn: { flexShrink: 0, padding: '7px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
   infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   editBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },

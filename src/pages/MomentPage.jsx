@@ -8,6 +8,8 @@ import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
+import ReportModal from '../components/ReportModal'
+import NotificationBell from '../components/NotificationBell'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -52,6 +54,7 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
 
   const socialRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const footer = (
     <div style={S.footerRow}>
@@ -65,25 +68,32 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
       </div>
       <div style={S.footerRight}>
         {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
-        {canPost && (
-          <div style={{ position: 'relative' }}>
-            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
-            {menuOpen && (
-              <>
-                <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
-                <div style={S.menuDropdown}>
+        <div style={{ position: 'relative' }}>
+          <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
+          {menuOpen && (
+            <>
+              <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
+              <div style={S.menuDropdown}>
+                {canPost && (
                   <button
                     style={S.menuItem}
                     onClick={() => { setMenuOpen(false); socialRef.current?.openPhotoPicker() }}
                   >
                     📷 사진 등록
                   </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                )}
+                <button
+                  style={S.menuItem}
+                  onClick={() => { setMenuOpen(false); setReportOpen(true) }}
+                >
+                  🚨 신고하기
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+      {reportOpen && <ReportModal targetType="pot" targetId={pot.id} onClose={() => setReportOpen(false)} />}
     </div>
   )
 
@@ -279,6 +289,7 @@ export default function MomentPage() {
             전체{dotSnapshot.public && <span style={S.tabDot} />}
           </button>
         </div>
+        <NotificationBell style={{ marginLeft: 'auto' }} />
       </div>
 
       <div style={S.list}>
