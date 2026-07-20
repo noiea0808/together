@@ -959,7 +959,7 @@ export default function TodayPage() {
         <div style={styles.secondaryLinkRow}>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
           <span style={styles.secondaryLinkDivider}>·</span>
-          <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 밥팟 참여</button>
         </div>
       </div>
       </div>
@@ -2513,7 +2513,7 @@ const styles = {
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   primaryCreateBtn: { width: '100%', padding: 14, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', boxShadow: '0 3px 10px rgba(255,107,53,0.22)' },
-  secondaryLinkRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: -6 },
+  secondaryLinkRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: -6 },
   secondaryLinkBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', padding: '4px 2px', fontFamily: 'inherit' },
   secondaryLinkDivider: { color: 'var(--color-border)', fontSize: 'var(--font-size-xs)' },
 }
