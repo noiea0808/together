@@ -146,7 +146,7 @@ export default function CreatePotPage() {
         icon: form.icon,
       })
       await joinPot(pot.id, user.id)
-      await setGroupShareSetting(user.id, form.group_id, initialDate, form.slot, true).catch(() => {})
+      await setGroupShareSetting(user.id, form.group_id, initialDate, true).catch(() => {})
       invalidateCache(`board:${user.id}:`, { prefix: true })
       const today = toDateStr(new Date())
       navigate(initialDate === today ? '/today' : `/today?date=${initialDate}`)

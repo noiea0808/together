@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { getPotComments, addPotComment, deletePotComment, getPotPhotos, addPotPhoto, deletePotPhoto } from '../lib/db'
 import { resizeImageFile } from '../lib/resizeImage'
+import { useDragScroll } from '../lib/useDragScroll'
 import PhotoAdjustModal from './PhotoAdjustModal'
 import { MoreHorizontalIcon } from './GroupIcons'
 
@@ -43,6 +44,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const photoScrollRef = useRef(null)
   const rootRef = useRef(null)
   const [visible, setVisible] = useState(!lazy)
+  const dragScroll = useDragScroll()
 
   const handlePhotoScroll = () => {
     const el = photoScrollRef.current
@@ -162,7 +164,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           !compact && <p style={S.empty}>아직 등록된 사진이 없어요.</p>
         ) : (
           <>
-            <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll}>
+            <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll} {...dragScroll}>
               {photos.map(p => (
                 <div key={p.id} style={S.photoItem}>
                   <img src={p.photo_url} alt="" style={S.photoImg} loading="lazy" decoding="async" />
@@ -316,7 +318,7 @@ const S = {
   empty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
 
   /* Photos — SNS 스타일 풀폭 캐러셀 (밥팟 상세/모먼트 공용) */
-  photoScroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' },
+  photoScroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab' },
   photoItem: { position: 'relative', flex: '0 0 100%', width: '100%', aspectRatio: '1', scrollSnapAlign: 'start', scrollSnapStop: 'always', background: 'var(--color-surface-2)', overflow: 'hidden', borderRadius: 'var(--radius-md)' },
   photoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 },

@@ -189,6 +189,65 @@ export async function deleteTerm(id) {
   if (error) throw error
 }
 
+// ── 오늘의 팁 ──────────────────────────────────────
+// 로그인 직후 팝업에 노출할 활성 팁 전체 (순서는 호출부에서 랜덤으로 섞는다)
+export async function getActiveDailyTips() {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .select('*')
+    .eq('is_active', true)
+  if (error) throw error
+  return data
+}
+
+// 어드민: 전체 팁 조회
+export async function getAllDailyTips() {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function createDailyTip(tip) {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .insert(tip)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateDailyTip(id, patch) {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDailyTip(id) {
+  const { error } = await supabase.from('daily_tips').delete().eq('id', id)
+  if (error) throw error
+}
+
+// blob: resizeImageFile로 재인코딩한 JPEG 이미지 (크롭 없이 원본 비율 유지 — 스샷 등)
+export async function uploadDailyTipImage(blob) {
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const { error: uploadError } = await supabase.storage
+    .from('daily-tips')
+    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+  if (uploadError) throw uploadError
+
+  const { data: { publicUrl } } = supabase.storage.from('daily-tips').getPublicUrl(path)
+  return publicUrl
+}
+
 // ── 유저 ──────────────────────────────────────────
 export async function createUser(nickname) {
   const { data, error } = await supabase
@@ -537,7 +596,7 @@ function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenK
       }
     }
   })
-  return Object.values(map).filter(s => !hiddenKeys.has(`${s.user_id}:${s.slot}`))
+  return Object.values(map).filter(s => !hiddenKeys.has(s.user_id))
 }
 
 // 단일 그룹 상태 — 실시간 부분 갱신(reloadGroup)에서 사용
@@ -553,7 +612,7 @@ export async function getGroupStatuses(groupId, date) {
 
   const [hiddenRes, statusRes, potRes] = await Promise.all([
     supabase.from('group_share_settings')
-      .select('user_id, slot').eq('group_id', groupId).eq('date', date).eq('is_shared', false),
+      .select('user_id').eq('group_id', groupId).eq('date', date).eq('is_shared', false),
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('pot_members')
@@ -567,7 +626,7 @@ export async function getGroupStatuses(groupId, date) {
     memberIds,
     statusRows: statusRes.data ?? [],
     potParts: potRes.data ?? [],
-    hiddenKeys: new Set((hiddenRes.data ?? []).map(r => `${r.user_id}:${r.slot}`)),
+    hiddenKeys: new Set((hiddenRes.data ?? []).map(r => r.user_id)),
     date,
   })
 }
@@ -607,7 +666,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('group_share_settings')
-      .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
+      .select('group_id, user_id').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
       .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
@@ -625,10 +684,10 @@ export async function getTodayBoard(groupIds, date) {
   groupIds.forEach(gid => { potsMap[gid] = [] })
   ;(potRes.data ?? []).forEach(p => { potsMap[p.group_id]?.push(p) })
 
-  // 공유 비활성 키 (그룹별)
+  // 공유 비활성 사용자 (그룹별)
   const hiddenByGroup = {}
   groupIds.forEach(gid => { hiddenByGroup[gid] = new Set() })
-  ;(shareRes.data ?? []).forEach(r => { hiddenByGroup[r.group_id]?.add(`${r.user_id}:${r.slot}`) })
+  ;(shareRes.data ?? []).forEach(r => { hiddenByGroup[r.group_id]?.add(r.user_id) })
 
   // 상태 그룹별 파생
   const statusesMap = {}
@@ -1092,38 +1151,30 @@ export async function getMySchedule(userId, fromDate, toDate) {
   return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
 }
 
-// ── 그룹 공유 설정 (그룹 × 날짜 × 슬롯 단위) ─────────────
-// 사전 조건: Supabase에 group_share_settings 테이블 생성 필요
-// CREATE TABLE group_share_settings (
-//   user_id uuid references users(id),
-//   group_id uuid references groups(id),
-//   date date,
-//   slot text,
-//   is_shared boolean default true,
-//   primary key (user_id, group_id, date, slot)
-// );
+// ── 그룹 공유 설정 (그룹 × 날짜 단위 — 슬롯 구분 없이 그룹 전체에 적용) ─────────────
+// 사전 조건: scripts/simplify_group_share_settings.sql 실행 필요
 export async function getGroupShareSettings(userId, date) {
   const { data, error } = await supabase
     .from('group_share_settings')
-    .select('group_id, slot, is_shared')
+    .select('group_id, is_shared')
     .eq('user_id', userId)
     .eq('date', date)
   if (error) throw error
   return data
 }
 
-export async function setGroupShareSetting(userId, groupId, date, slot, isShared) {
+export async function setGroupShareSetting(userId, groupId, date, isShared) {
   const { error } = await supabase
     .from('group_share_settings')
     .upsert(
-      { user_id: userId, group_id: groupId, date, slot, is_shared: isShared },
-      { onConflict: 'user_id,group_id,date,slot' }
+      { user_id: userId, group_id: groupId, date, is_shared: isShared },
+      { onConflict: 'user_id,group_id,date' }
     )
   if (error) throw error
 }
 
 // fromDate 이후 전체 날짜에 공유 설정 적용 (60일 범위)
-export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, isShared) {
+export async function setGroupShareSettingBulk(userId, groupId, fromDate, isShared) {
   if (isShared) {
     // true(공개)로 되돌릴 때 — 레코드 삭제로 기본값(공개) 복원
     const { error } = await supabase
@@ -1131,7 +1182,6 @@ export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, 
       .delete()
       .eq('user_id', userId)
       .eq('group_id', groupId)
-      .eq('slot', slot)
       .gte('date', fromDate)
     if (error) throw error
   } else {
@@ -1140,12 +1190,12 @@ export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, 
     const d = new Date(fromDate)
     for (let i = 0; i < 60; i++) {
       const dateStr = d.toISOString().slice(0, 10)
-      rows.push({ user_id: userId, group_id: groupId, date: dateStr, slot, is_shared: false })
+      rows.push({ user_id: userId, group_id: groupId, date: dateStr, is_shared: false })
       d.setDate(d.getDate() + 1)
     }
     const { error } = await supabase
       .from('group_share_settings')
-      .upsert(rows, { onConflict: 'user_id,group_id,date,slot' })
+      .upsert(rows, { onConflict: 'user_id,group_id,date' })
     if (error) throw error
   }
 }

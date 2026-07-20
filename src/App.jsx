@@ -21,6 +21,7 @@ import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
+import DailyTipModal from './components/DailyTipModal'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 
 function ConsumerRoutes() {
@@ -70,6 +71,7 @@ function ConsumerApp() {
       <NotificationSyncProvider>
         <NotificationToast />
         <GroupInviteModal />
+        <DailyTipModal />
         <ConsumerRoutes />
       </NotificationSyncProvider>
     </UserProvider>

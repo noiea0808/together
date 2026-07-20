@@ -17,6 +17,7 @@ const NAV_SECTIONS = [
       { to: '/admin/users',    label: '사용자',   icon: '👤' },
       { to: '/admin/icons',    label: '아이콘',   icon: '🎨' },
       { to: '/admin/notifications', label: '알림', icon: '🔔' },
+      { to: '/admin/tips',     label: '오늘의 팁', icon: '💡' },
       { to: '/admin/groups',   label: '그룹',     icon: '👥', disabled: true },
       { to: '/admin/stats',    label: '통계',     icon: '📊', disabled: true },
     ],

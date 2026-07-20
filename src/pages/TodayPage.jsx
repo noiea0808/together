@@ -231,8 +231,8 @@ export default function TodayPage() {
   // 밥팟 만들기 충돌 팝업
   const [createConflict, setCreateConflict] = useState(null) // { existingPot, groupId, slot }
   // 공유 토글 범위 선택 팝업
-  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, slot, isShared }
-  // 그룹×슬롯 단위 공유 설정: { [groupId]: { [slot]: boolean } }
+  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, groupName, isShared }
+  // 그룹 단위 공유 설정: { [groupId]: boolean }
   const [shareSettingsMap, setShareSettingsMap] = useState({})
   // 밥팟 참여하기 다이얼로그
   const [showJoinPot, setShowJoinPot] = useState(false)
@@ -329,10 +329,7 @@ export default function TodayPage() {
 
       // 그룹 공유 설정
       const settingsMap = {}
-      shareRows.forEach(row => {
-        if (!settingsMap[row.group_id]) settingsMap[row.group_id] = {}
-        settingsMap[row.group_id][row.slot] = row.is_shared
-      })
+      shareRows.forEach(row => { settingsMap[row.group_id] = row.is_shared })
 
       const snap = {
         groups: myGroups,
@@ -642,32 +639,29 @@ export default function TodayPage() {
     }
   }
 
-  const applyShare = (groupId, slot, isShared) => {
-    setShareSettingsMap(prev => ({
-      ...prev,
-      [groupId]: { ...(prev[groupId] ?? {}), [slot]: isShared },
-    }))
+  const applyShare = (groupId, isShared) => {
+    setShareSettingsMap(prev => ({ ...prev, [groupId]: isShared }))
   }
 
   // 토글 클릭 → 팝업 띄우기
-  const handleToggleShare = (groupId, slot, isShared) => {
-    setShareTogglePending({ groupId, slot, isShared })
+  const handleToggleShare = (groupId, groupName, isShared) => {
+    setShareTogglePending({ groupId, groupName, isShared })
   }
 
   // 이 날짜만 적용
   const confirmShareSingle = async () => {
-    const { groupId, slot, isShared } = shareTogglePending
+    const { groupId, isShared } = shareTogglePending
     setShareTogglePending(null)
-    applyShare(groupId, slot, isShared)
-    try { await setGroupShareSetting(user.id, groupId, dateStr, slot, isShared) } catch {}
+    applyShare(groupId, isShared)
+    try { await setGroupShareSetting(user.id, groupId, dateStr, isShared) } catch {}
   }
 
   // 오늘 이후 전체 적용
   const confirmShareBulk = async () => {
-    const { groupId, slot, isShared } = shareTogglePending
+    const { groupId, isShared } = shareTogglePending
     setShareTogglePending(null)
-    applyShare(groupId, slot, isShared)
-    try { await setGroupShareSettingBulk(user.id, groupId, dateStr, slot, isShared) } catch {}
+    applyShare(groupId, isShared)
+    try { await setGroupShareSettingBulk(user.id, groupId, dateStr, isShared) } catch {}
   }
 
   // 슬롯별 현재 상태 요약 — 메인 표시창 / 서브 표시창 공용
@@ -939,8 +933,8 @@ export default function TodayPage() {
                   pots={pots}
                   myUserId={user.id}
                   mySlotData={mySlots[selectedSlot]}
-                  isShared={shareSettingsMap[group.id]?.[selectedSlot] ?? true}
-                  onToggleShare={(isShared) => handleToggleShare(group.id, selectedSlot, isShared)}
+                  isShared={shareSettingsMap[group.id] ?? true}
+                  onToggleShare={(isShared) => handleToggleShare(group.id, group.name, isShared)}
                   amIInAnyPot={amIInAnyPot}
                   allCollapsed={allCollapsed}
                   collapseKey={collapseKey}
@@ -982,7 +976,7 @@ export default function TodayPage() {
           <p style={styles.dialogDesc}>
             이후 날짜에도 모두 적용할까요?{'\n'}
             <span style={{ fontSize: 12 }}>
-              (그룹: 해당 그룹 · 슬롯: {shareTogglePending.slot})
+              ({shareTogglePending.groupName} 그룹 전체에 적용돼요)
             </span>
           </p>
           <div style={styles.dialogBtns}>

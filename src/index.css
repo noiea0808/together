@@ -111,6 +111,15 @@ body {
   flex-direction: column;
 }
 
+/* 마우스로 화면을 드래그해 스와이프(날짜/슬롯 전환, 캐러셀 넘기기)할 때, 손가락 아래
+   이미지에서 브라우저 기본 드래그(고스트 이미지 끌기)가 끼어들면서 제스처가 끊기는 문제 방지.
+   터치 스크롤/스크롤스냅 동작에는 영향 없다. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
+}
+
 /* ===== 캐러셀 롤링 애니메이션 ===== */
 @keyframes carouselUp {
   from { transform: translateY(60%); opacity: 0; }
