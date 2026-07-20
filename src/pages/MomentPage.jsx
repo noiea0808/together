@@ -9,7 +9,7 @@ import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
 import ReportModal from '../components/ReportModal'
-import NotificationBell from '../components/NotificationBell'
+import AppHeader, { SegmentedControl } from '../components/AppHeader'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -279,18 +279,20 @@ export default function MomentPage() {
 
   return (
     <div style={S.page}>
-      <div style={S.header}>
-        <span style={S.headerTitle}>모먼트</span>
-        <div style={S.tabRow}>
-          <button style={{ ...S.tabBtn, ...(tab === 'mine' ? S.tabBtnActive : {}) }} onClick={() => setTab('mine')}>
-            내 그룹{dotSnapshot.mine && <span style={S.tabDot} />}
-          </button>
-          <button style={{ ...S.tabBtn, ...(tab === 'public' ? S.tabBtnActive : {}) }} onClick={() => setTab('public')}>
-            전체{dotSnapshot.public && <span style={S.tabDot} />}
-          </button>
-        </div>
-        <NotificationBell style={{ marginLeft: 'auto' }} />
-      </div>
+      <AppHeader
+        title="모먼트"
+        centerContent={
+          <SegmentedControl
+            ariaLabel="모먼트 범위"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'mine', label: '내 그룹', dot: dotSnapshot.mine },
+              { value: 'public', label: '전체', dot: dotSnapshot.public },
+            ]}
+          />
+        }
+      />
 
       <div style={S.list}>
         {isLoading ? (
@@ -332,24 +334,6 @@ export default function MomentPage() {
 
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', gap: 10,
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
-  tabRow: { display: 'flex', gap: 6 },
-  tabBtn: {
-    position: 'relative', padding: '6px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700,
-    color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  tabBtnActive: { background: '#FFF4EF', border: '1px solid var(--color-primary)', color: 'var(--color-primary)' },
-  tabDot: {
-    position: 'absolute', top: 2, right: 4, width: 7, height: 7, borderRadius: '50%',
-    background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)',
-  },
 
   list: { flex: 1, overflowY: 'auto', padding: '4px 16px 80px', display: 'flex', flexDirection: 'column', gap: 12 },
   loadingState: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },

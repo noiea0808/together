@@ -6,7 +6,7 @@ import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import NotificationBell from '../components/NotificationBell'
+import AppHeader, { DateNavigator } from '../components/AppHeader'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -67,17 +67,18 @@ export default function MySchedulePage() {
 
   return (
     <div style={S.page}>
-      <div style={S.header}>
-        <span style={S.headerTitle}>일정</span>
-        <div style={S.headerRight}>
-          <div style={S.nav}>
-            <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
-            <span style={S.navLabel}>{rangeLabel}</span>
-            <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
-          </div>
-          <NotificationBell />
-        </div>
-      </div>
+      <AppHeader
+        title="일정"
+        centerContent={
+          <DateNavigator
+            label={rangeLabel}
+            onPrev={() => setWeekOffset(o => o - 1)}
+            onNext={() => setWeekOffset(o => o + 1)}
+            prevLabel="이전 2주"
+            nextLabel="다음 2주"
+          />
+        }
+      />
 
       <div style={S.list}>
         {loading ? (
@@ -144,21 +145,6 @@ export default function MySchedulePage() {
 
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 6 },
-  nav: { display: 'flex', alignItems: 'center', gap: 8 },
-  navBtn: {
-    width: 26, height: 26, borderRadius: '50%', border: '1px solid #EDE8E3', background: '#fff',
-    color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', lineHeight: 1,
-    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
-  },
-  navLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', minWidth: 76, textAlign: 'center' },
   list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 

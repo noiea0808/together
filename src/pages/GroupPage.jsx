@@ -14,7 +14,7 @@ import { WISH_CATEGORY_OPTIONS } from '../lib/potConstants'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import ReportModal from '../components/ReportModal'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
-import NotificationBell from '../components/NotificationBell'
+import AppHeader from '../components/AppHeader'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -342,15 +342,10 @@ export default function GroupPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>친구</span>
-        <div style={styles.headerRight}>
-          <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-            친구 찾기
-          </button>
-          <NotificationBell />
-        </div>
-      </div>
+      <AppHeader
+        title="친구"
+        action={{ label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } }}
+      />
 
       <div
         style={{ ...styles.dateNav, touchAction: 'pan-y' }}
@@ -740,14 +735,6 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
-  headerRight: { display: 'flex', alignItems: 'center', gap: 6 },
   findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
