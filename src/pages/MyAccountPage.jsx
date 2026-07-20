@@ -481,42 +481,45 @@ export default function MyAccountPage() {
           </div>
         </div>
 
-        {/* 친구 검색 노출 */}
-        <div style={styles.section}>
-          <div style={styles.infoRow}>
-            <span style={styles.infoValue}>친구 찾기에서 내 계정 표시</span>
-            <ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="검색 노출" />
+        {/* 설정 영역 (친구 검색 + 알림) */}
+        <div style={styles.settingsCard}>
+          {/* 친구 검색 노출 */}
+          <div style={styles.settingItem}>
+            <div style={styles.infoRow}>
+              <span style={styles.infoValue}>친구 찾기에서 내 계정 표시</span>
+              <ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="검색 노출" />
+            </div>
+            <p style={styles.installDesc}>끄면 다른 사람이 이메일이나 닉네임으로 나를 찾을 수 없어요.</p>
           </div>
-          <p style={styles.installDesc}>끄면 다른 사람이 이메일이나 닉네임으로 나를 찾을 수 없어요.</p>
-        </div>
 
-        {/* 알림 */}
-        {isPushSupported() && (
-          <div style={styles.section}>
-            <span style={styles.sectionLabel}>알림</span>
-            {isIOS && !isInstalled ? (
-              <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
-            ) : (
-              <div style={styles.notifList}>
-                <div style={styles.infoRow}>
-                  <span style={styles.infoValue}>알림 받기</span>
-                  <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="알림 받기" />
-                </div>
-                <p style={styles.installDesc}>밥팟 초대, 참여, 댓글 소식을 알려드려요.</p>
-                {pushEnabled && (
-                  <div style={styles.notifSubItem}>
-                    <div style={styles.infoRow}>
-                      <span style={styles.infoValue}>점심 상태 리마인드</span>
-                      <ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />
-                    </div>
-                    <p style={styles.installDesc}>평일 점심시간 전에 상태를 안 정하면 한 번 알려드려요.</p>
+          {/* 알림 */}
+          {isPushSupported() && (
+            <div style={{ ...styles.settingItem, borderBottom: 'none' }}>
+              <span style={styles.sectionLabel}>알림</span>
+              {isIOS && !isInstalled ? (
+                <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
+              ) : (
+                <div style={styles.notifList}>
+                  <div style={styles.infoRow}>
+                    <span style={styles.infoValue}>알림 받기</span>
+                    <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="알림 받기" />
                   </div>
-                )}
-              </div>
-            )}
-            {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
-          </div>
-        )}
+                  <p style={styles.installDesc}>밥팟 초대, 참여, 댓글 소식을 알려드려요.</p>
+                  {pushEnabled && (
+                    <div style={styles.notifSubItem}>
+                      <div style={styles.infoRow}>
+                        <span style={styles.infoValue}>점심 상태 리마인드</span>
+                        <ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />
+                      </div>
+                      <p style={styles.installDesc}>평일 점심시간 전에 상태를 안 정하면 한 번 알려드려요.</p>
+                    </div>
+                  )}
+                </div>
+              )}
+              {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
+            </div>
+          )}
+        </div>
 
         {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
         {!isInstalled && (
@@ -526,12 +529,12 @@ export default function MyAccountPage() {
         )}
 
         {/* 사용자 의견 */}
-        <div style={styles.section}>
-          <span style={styles.sectionLabel}>의견 보내기</span>
-          <div style={styles.infoRow}>
-            <span style={styles.infoValue}>불편했던 점이나 바라는 점이 있나요?</span>
+        <div style={{ ...styles.section, marginTop: 'calc(var(--spacing-lg) * 2)' }}>
+          <div style={styles.feedbackHeader}>
+            <span style={styles.sectionLabel}>의견 보내기</span>
             <button style={styles.feedbackBtn} onClick={() => setShowFeedbackModal(true)}>의견함 열기</button>
           </div>
+          <p style={styles.feedbackDesc}>불편했던 점이나 바라는 점이 있나요?</p>
         </div>
 
         {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
@@ -935,9 +938,15 @@ const styles = {
   notifList: { display: 'flex', flexDirection: 'column', gap: 8 },
   notifSubItem: { display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid var(--color-border)' },
 
+  settingsCard: { display: 'flex', flexDirection: 'column', gap: 0, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-border)' },
+  settingItem: { display: 'flex', flexDirection: 'column', gap: 8, padding: 'var(--spacing-md)', borderBottom: '1px solid var(--color-border)', '&:last-child': { borderBottom: 'none' } },
+  settingItem__last: { borderBottom: 'none' },
+
   feedbackBtn: { flexShrink: 0, padding: '7px 14px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
-  infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
+  feedbackHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 },
+  feedbackDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', margin: 0, fontWeight: 600, lineHeight: 1.4 },
+  infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', minHeight: 44, gap: 12 },
+  infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600, lineHeight: 1.4 },
   editBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
   savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600 },
 
