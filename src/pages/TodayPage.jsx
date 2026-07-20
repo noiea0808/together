@@ -1159,7 +1159,7 @@ export default function TodayPage() {
               }}
               onClick={() => setDraftData(prev => ({ ...prev, status: undefined }))}
             >
-              <StatusIcon statusKey={undefined} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> 미설정
+              <StatusIcon statusKey={undefined} size={47} /> 미설정
             </button>
             {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
               <button
@@ -1173,7 +1173,7 @@ export default function TodayPage() {
                 }}
                 onClick={() => setDraftData(prev => ({ ...prev, status: o.key }))}
               >
-                <StatusIcon statusKey={o.key} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {o.label}
+                <StatusIcon statusKey={o.key} size={47} /> {o.label}
               </button>
             ))}
           </div>
@@ -2356,7 +2356,10 @@ const styles = {
   slotPopup: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   slotPopupTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   slotPopupStatusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  slotPopupStatusBtn: { padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s', textAlign: 'center' },
+  slotPopupStatusBtn: {
+    padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+  },
   slotPopupFields: { display: 'flex', flexDirection: 'column', gap: 4 },
   slotPopupFieldWrap: { display: 'flex', flexDirection: 'column', gap: 4, transition: 'opacity 0.15s' },
   slotPopupFieldLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
