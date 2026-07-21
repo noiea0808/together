@@ -224,6 +224,19 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
   outline-offset: 2px;
 }
 
+/* 기능이 있는 버튼이 눌렸을 때의 공통 피드백 — 페이지마다 배경색이 인라인 스타일로
+   제각각이라 CSS로 배경색을 직접 override하기 어려우므로, 어떤 배경이든 동일하게
+   어두워지는 filter로 처리한다. 이미 자체 :active 효과(배경/스케일)를 가진 버튼
+   (.app-header-icon-btn 등)에는 이 filter가 덧붙어 눌림을 더 또렷하게 만든다.
+   disabled 버튼은 "작동하지 않는" 상태이므로 제외. */
+button:not(:disabled), [role="button"] {
+  transition: filter 0.1s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+button:not(:disabled):active, [role="button"]:active {
+  filter: brightness(0.92);
+}
+
 .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
 .no-scrollbar::-webkit-scrollbar { display: none; }
 
