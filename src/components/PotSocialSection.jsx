@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
 import { getPotComments, addPotComment, deletePotComment, getPotPhotos, addPotPhoto, deletePotPhoto } from '../lib/db'
 import { resizeImageFile } from '../lib/resizeImage'
+import { useDragScroll } from '../lib/useDragScroll'
 import PhotoAdjustModal from './PhotoAdjustModal'
 import { MoreHorizontalIcon } from './GroupIcons'
+import ReportModal from './ReportModal'
 
 function avBg(name) {
   const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
@@ -39,10 +41,13 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const [photoMenuOpenId, setPhotoMenuOpenId] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState(null)
+  const [reportCommentId, setReportCommentId] = useState(null)
+  const [commentMenuOpenId, setCommentMenuOpenId] = useState(null)
   const photoInputRef = useRef(null)
   const photoScrollRef = useRef(null)
   const rootRef = useRef(null)
   const [visible, setVisible] = useState(!lazy)
+  const dragScroll = useDragScroll()
 
   const handlePhotoScroll = () => {
     const el = photoScrollRef.current
@@ -162,7 +167,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           !compact && <p style={S.empty}>아직 등록된 사진이 없어요.</p>
         ) : (
           <>
-            <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll}>
+            <div className="no-scrollbar" style={S.photoScroll} ref={photoScrollRef} onScroll={handlePhotoScroll} {...dragScroll}>
               {photos.map(p => (
                 <div key={p.id} style={S.photoItem}>
                   <img src={p.photo_url} alt="" style={S.photoImg} loading="lazy" decoding="async" />
@@ -257,7 +262,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                 </div>
                 <div style={S.commentText}>{c.content}</div>
               </div>
-              {c.user_id === currentUserId && (
+              {c.user_id === currentUserId ? (
                 confirmDeleteCommentId === c.id ? (
                   <div style={S.commentConfirmRow}>
                     <span style={S.commentConfirmText}>삭제할까요?</span>
@@ -267,6 +272,29 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                 ) : (
                   <button style={S.commentDeleteBtn} onClick={() => setConfirmDeleteCommentId(c.id)}>삭제</button>
                 )
+              ) : (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button
+                    style={S.commentMoreBtn}
+                    onClick={() => setCommentMenuOpenId(id => id === c.id ? null : c.id)}
+                    aria-label="더보기"
+                  >
+                    <MoreHorizontalIcon size={14} />
+                  </button>
+                  {commentMenuOpenId === c.id && (
+                    <>
+                      <div style={S.menuBackdrop} onClick={() => setCommentMenuOpenId(null)} />
+                      <div style={S.commentMoreDropdown}>
+                        <button
+                          style={S.commentMoreItem}
+                          onClick={() => { setCommentMenuOpenId(null); setReportCommentId(c.id) }}
+                        >
+                          🚨 신고하기
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           ))}
@@ -300,6 +328,10 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           onConfirm={handleConfirmPhoto}
         />
       )}
+
+      {reportCommentId && (
+        <ReportModal targetType="pot_comment" targetId={reportCommentId} onClose={() => setReportCommentId(null)} />
+      )}
     </div>
   )
 })
@@ -316,7 +348,7 @@ const S = {
   empty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
 
   /* Photos — SNS 스타일 풀폭 캐러셀 (밥팟 상세/모먼트 공용) */
-  photoScroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' },
+  photoScroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab' },
   photoItem: { position: 'relative', flex: '0 0 100%', width: '100%', aspectRatio: '1', scrollSnapAlign: 'start', scrollSnapStop: 'always', background: 'var(--color-surface-2)', overflow: 'hidden', borderRadius: 'var(--radius-md)' },
   photoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 },
@@ -361,6 +393,21 @@ const S = {
   commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
   commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
+  commentMoreBtn: {
+    width: 22, height: 22, borderRadius: '50%', border: 'none', background: 'transparent',
+    color: 'var(--color-text-muted)', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+  },
+  commentMoreDropdown: {
+    position: 'absolute', top: '110%', right: 0, zIndex: 50, minWidth: 112,
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.16)', overflow: 'hidden',
+  },
+  commentMoreItem: {
+    width: '100%', padding: '10px 12px', background: 'none', border: 'none', textAlign: 'left',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  },
   commentConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
   commentConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
   commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },

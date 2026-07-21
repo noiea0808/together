@@ -4,8 +4,12 @@
 -- 사전 준비:
 --   1. supabase functions deploy lunch-reminder 로 Edge Function을 먼저 배포하세요.
 --   2. Supabase 대시보드 → Database → Extensions 에서 pg_cron, pg_net 을 활성화하세요.
---   3. 아래 <SERVICE_ROLE_KEY> 를 실제 값으로 바꾼 뒤 실행하세요. (PROJECT_REF는 이미 채워둠)
---      (SERVICE_ROLE_KEY는 대시보드 Settings → API 에서 확인 — 절대 커밋하지 마세요.)
+--   3. 아래 <SERVICE_ROLE_SECRET_KEY> 를 실제 값으로 바꾼 뒤 실행하세요. (PROJECT_REF는 이미 채워둠)
+--      (대시보드 Settings → API Keys → Secret keys 의 sb_secret_... 값을 사용 — 절대 커밋하지 마세요.
+--      레거시 JWT 형식의 service_role 키(eyJ...)를 쓰면 Edge Function 내부의
+--      SUPABASE_SERVICE_ROLE_KEY 비교와 더 이상 일치하지 않아 401이 난다 — 반드시 sb_secret_ 키를 쓸 것.
+--      치환할 때 <, > 꺾쇠괄호는 반드시 지울 것 — 괄호가 남으면 게이트웨이 단에서
+--      "Invalid JWT" 401로 막혀 함수 코드까지 요청이 도달하지 않는다.)
 --
 -- 동작 방식: 어드민에서 설정한 발송 시각(lunch_reminder_config.send_time, 기본 09:30 KST)은
 -- pg_cron 스케줄 자체를 매번 바꾸지 않고, 10분 간격으로 Edge Function을 호출해 함수 내부에서
@@ -27,7 +31,7 @@ SELECT cron.schedule(
     url := 'https://lxpbfgsoijpcwxabqela.supabase.co/functions/v1/lunch-reminder',
     headers := jsonb_build_object(
       'Content-Type', 'application/json',
-      'Authorization', 'Bearer <SERVICE_ROLE_KEY>'
+      'Authorization', 'Bearer <SERVICE_ROLE_SECRET_KEY>'
     ),
     body := '{}'::jsonb
   );

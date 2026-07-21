@@ -8,7 +8,7 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
 import BottomNav from '../components/BottomNav'
-import Header from '../components/Header'
+import AppHeader from '../components/AppHeader'
 import GroupSetupModal from '../components/GroupSetupModal'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
@@ -231,8 +231,8 @@ export default function TodayPage() {
   // 밥팟 만들기 충돌 팝업
   const [createConflict, setCreateConflict] = useState(null) // { existingPot, groupId, slot }
   // 공유 토글 범위 선택 팝업
-  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, slot, isShared }
-  // 그룹×슬롯 단위 공유 설정: { [groupId]: { [slot]: boolean } }
+  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, groupName, isShared }
+  // 그룹 단위 공유 설정: { [groupId]: boolean }
   const [shareSettingsMap, setShareSettingsMap] = useState({})
   // 밥팟 참여하기 다이얼로그
   const [showJoinPot, setShowJoinPot] = useState(false)
@@ -329,10 +329,7 @@ export default function TodayPage() {
 
       // 그룹 공유 설정
       const settingsMap = {}
-      shareRows.forEach(row => {
-        if (!settingsMap[row.group_id]) settingsMap[row.group_id] = {}
-        settingsMap[row.group_id][row.slot] = row.is_shared
-      })
+      shareRows.forEach(row => { settingsMap[row.group_id] = row.is_shared })
 
       const snap = {
         groups: myGroups,
@@ -642,32 +639,29 @@ export default function TodayPage() {
     }
   }
 
-  const applyShare = (groupId, slot, isShared) => {
-    setShareSettingsMap(prev => ({
-      ...prev,
-      [groupId]: { ...(prev[groupId] ?? {}), [slot]: isShared },
-    }))
+  const applyShare = (groupId, isShared) => {
+    setShareSettingsMap(prev => ({ ...prev, [groupId]: isShared }))
   }
 
   // 토글 클릭 → 팝업 띄우기
-  const handleToggleShare = (groupId, slot, isShared) => {
-    setShareTogglePending({ groupId, slot, isShared })
+  const handleToggleShare = (groupId, groupName, isShared) => {
+    setShareTogglePending({ groupId, groupName, isShared })
   }
 
   // 이 날짜만 적용
   const confirmShareSingle = async () => {
-    const { groupId, slot, isShared } = shareTogglePending
+    const { groupId, isShared } = shareTogglePending
     setShareTogglePending(null)
-    applyShare(groupId, slot, isShared)
-    try { await setGroupShareSetting(user.id, groupId, dateStr, slot, isShared) } catch {}
+    applyShare(groupId, isShared)
+    try { await setGroupShareSetting(user.id, groupId, dateStr, isShared) } catch {}
   }
 
   // 오늘 이후 전체 적용
   const confirmShareBulk = async () => {
-    const { groupId, slot, isShared } = shareTogglePending
+    const { groupId, isShared } = shareTogglePending
     setShareTogglePending(null)
-    applyShare(groupId, slot, isShared)
-    try { await setGroupShareSettingBulk(user.id, groupId, dateStr, slot, isShared) } catch {}
+    applyShare(groupId, isShared)
+    try { await setGroupShareSettingBulk(user.id, groupId, dateStr, isShared) } catch {}
   }
 
   // 슬롯별 현재 상태 요약 — 메인 표시창 / 서브 표시창 공용
@@ -683,7 +677,7 @@ export default function TodayPage() {
     const earliestPot = myPotsInSlot[0]
     const isInPot = potCount > 0
     const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
-    const lockedLabel = isInPot ? getJoinedStatusLabel(dateStr, earliestPot?.meal_time, earliestPot?.end_time) : null
+    const lockedLabel = isInPot ? getJoinedStatusLabel(dateStr, earliestPot?.meal_time, earliestPot?.end_time, (earliestPot?.pot_members?.length ?? 0) === 1) : null
     const lockedOpt = isInPot ? { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: lockedLabel } : null
     const displayOpt = lockedOpt ?? opt
 
@@ -717,7 +711,7 @@ export default function TodayPage() {
 
   return (
     <div style={styles.wrap}>
-    <Header hidden={headerHidden} />
+    <AppHeader brand={{ icon: <RiceBowlIcon size={24} />, label: '같이 먹자' }} hidden={headerHidden} />
     <div
       style={styles.page}
       onPointerDown={handlePageSwipeStart}
@@ -726,7 +720,7 @@ export default function TodayPage() {
     >
       {/* 날짜 네비 — sticky 고정, 헤더가 접히면 그 자리(top:0)까지 따라 올라간다 */}
       <div
-        style={{ ...styles.dateNav, top: headerHidden ? 0 : 44, touchAction: 'pan-y' }}
+        style={{ ...styles.dateNav, top: headerHidden ? 0 : 'var(--header-height)', touchAction: 'pan-y' }}
       >
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -939,8 +933,8 @@ export default function TodayPage() {
                   pots={pots}
                   myUserId={user.id}
                   mySlotData={mySlots[selectedSlot]}
-                  isShared={shareSettingsMap[group.id]?.[selectedSlot] ?? true}
-                  onToggleShare={(isShared) => handleToggleShare(group.id, selectedSlot, isShared)}
+                  isShared={shareSettingsMap[group.id] ?? true}
+                  onToggleShare={(isShared) => handleToggleShare(group.id, group.name, isShared)}
                   amIInAnyPot={amIInAnyPot}
                   allCollapsed={allCollapsed}
                   collapseKey={collapseKey}
@@ -965,7 +959,7 @@ export default function TodayPage() {
         <div style={styles.secondaryLinkRow}>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
           <span style={styles.secondaryLinkDivider}>·</span>
-          <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 참여</button>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 밥팟 참여</button>
         </div>
       </div>
       </div>
@@ -982,7 +976,7 @@ export default function TodayPage() {
           <p style={styles.dialogDesc}>
             이후 날짜에도 모두 적용할까요?{'\n'}
             <span style={{ fontSize: 12 }}>
-              (그룹: 해당 그룹 · 슬롯: {shareTogglePending.slot})
+              ({shareTogglePending.groupName} 그룹 전체에 적용돼요)
             </span>
           </p>
           <div style={styles.dialogBtns}>
@@ -1043,7 +1037,7 @@ export default function TodayPage() {
               .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
             if (myPotsInSlot.length === 0) return null
             const inPotExpired = isPotTimeExpired(dateStr, myPotsInSlot[0].end_time)
-            const lockedOpt = { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: getJoinedStatusLabel(dateStr, myPotsInSlot[0].meal_time, myPotsInSlot[0].end_time) }
+            const lockedOpt = { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: getJoinedStatusLabel(dateStr, myPotsInSlot[0].meal_time, myPotsInSlot[0].end_time, (myPotsInSlot[0].pot_members?.length ?? 0) === 1) }
             return (
               <>
                 <div style={styles.potInfoBanner}>
@@ -1165,7 +1159,7 @@ export default function TodayPage() {
               }}
               onClick={() => setDraftData(prev => ({ ...prev, status: undefined }))}
             >
-              <StatusIcon statusKey={undefined} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> 미설정
+              <StatusIcon statusKey={undefined} size={47} /> 미설정
             </button>
             {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
               <button
@@ -1179,7 +1173,7 @@ export default function TodayPage() {
                 }}
                 onClick={() => setDraftData(prev => ({ ...prev, status: o.key }))}
               >
-                <StatusIcon statusKey={o.key} size={27} style={{ verticalAlign: 'middle', marginRight: 4 }} /> {o.label}
+                <StatusIcon statusKey={o.key} size={47} /> {o.label}
               </button>
             ))}
           </div>
@@ -1744,7 +1738,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}</>}</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time, (myGroupPot?.pot_members?.length ?? 0) === 1)}</>}</span>
           ) : (
             <button
               style={{
@@ -2255,7 +2249,7 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
               <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
             </div>
             <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : (expired || isFull) ? potListStyles.joinBtnFull : {}) }}>
-              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : expired ? '종료' : isFull ? '마감' : '같이 먹기'}
+              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time, filled === 1) : expired ? '종료' : isFull ? '마감' : '같이 먹기'}
             </button>
           </div>
         </div>
@@ -2362,7 +2356,10 @@ const styles = {
   slotPopup: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   slotPopupTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   slotPopupStatusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  slotPopupStatusBtn: { padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s', textAlign: 'center' },
+  slotPopupStatusBtn: {
+    padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+  },
   slotPopupFields: { display: 'flex', flexDirection: 'column', gap: 4 },
   slotPopupFieldWrap: { display: 'flex', flexDirection: 'column', gap: 4, transition: 'opacity 0.15s' },
   slotPopupFieldLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
@@ -2519,7 +2516,7 @@ const styles = {
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   primaryCreateBtn: { width: '100%', padding: 14, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', boxShadow: '0 3px 10px rgba(255,107,53,0.22)' },
-  secondaryLinkRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginTop: -6 },
+  secondaryLinkRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: -6 },
   secondaryLinkBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', padding: '4px 2px', fontFamily: 'inherit' },
   secondaryLinkDivider: { color: 'var(--color-border)', fontSize: 'var(--font-size-xs)' },
 }

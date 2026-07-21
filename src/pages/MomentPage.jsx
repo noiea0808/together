@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMomentPots, getPublicMomentPots } from '../lib/db'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
+import { useNavBadges } from '../lib/NavBadgeContext'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
+import ReportModal from '../components/ReportModal'
+import AppHeader, { SegmentedControl } from '../components/AppHeader'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -51,6 +54,7 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
 
   const socialRef = useRef(null)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
 
   const footer = (
     <div style={S.footerRow}>
@@ -64,25 +68,32 @@ function MomentCard({ pot, groupName, currentUserId, onChange, onOpenDetail }) {
       </div>
       <div style={S.footerRight}>
         {commentCount > 0 && <span style={S.commentBadge}>💬 {commentCount}</span>}
-        {canPost && (
-          <div style={{ position: 'relative' }}>
-            <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
-            {menuOpen && (
-              <>
-                <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
-                <div style={S.menuDropdown}>
+        <div style={{ position: 'relative' }}>
+          <button style={S.menuBtn} onClick={() => setMenuOpen(o => !o)} aria-label="더보기"><MoreHorizontalIcon size={16} /></button>
+          {menuOpen && (
+            <>
+              <div style={S.menuBackdrop} onClick={() => setMenuOpen(false)} />
+              <div style={S.menuDropdown}>
+                {canPost && (
                   <button
                     style={S.menuItem}
                     onClick={() => { setMenuOpen(false); socialRef.current?.openPhotoPicker() }}
                   >
                     📷 사진 등록
                   </button>
-                </div>
-              </>
-            )}
-          </div>
-        )}
+                )}
+                <button
+                  style={S.menuItem}
+                  onClick={() => { setMenuOpen(false); setReportOpen(true) }}
+                >
+                  🚨 신고하기
+                </button>
+              </div>
+            </>
+          )}
+        </div>
       </div>
+      {reportOpen && <ReportModal targetType="pot" targetId={pot.id} onClose={() => setReportOpen(false)} />}
     </div>
   )
 
@@ -108,6 +119,22 @@ export default function MomentPage() {
   const { user } = useUser()
   const navigate = useNavigate()
   const [tab, setTab] = useState('mine') // 'mine' | 'public'
+  const { momentsGroup, momentsPublic, markMomentsSeen, loaded: badgesLoaded } = useNavBadges()
+  // 배지 데이터가 서버에서 도착한(loaded) 시점 값을 스냅샷으로 고정 — 이후 markMomentsSeen이
+  // 전역 상태를 지워도 이번 방문 동안은 탭에 달린 점이 유지된다. 다음 방문부터 반영됨.
+  // loaded 전에 스냅샷을 찍으면(새로고침 직후 이 페이지가 첫 화면일 때) 항상 빈 값으로
+  // 고정되고 seen 처리까지 먼저 나가버리는 레이스가 있어, loaded될 때까지 기다린다.
+  const [dotSnapshot, setDotSnapshot] = useState({ mine: false, public: false })
+  const snapshotTaken = useRef(false)
+  useEffect(() => {
+    if (!badgesLoaded || snapshotTaken.current) return
+    snapshotTaken.current = true
+    setDotSnapshot({ mine: momentsGroup, public: momentsPublic })
+  }, [badgesLoaded])
+  useEffect(() => {
+    if (!badgesLoaded) return
+    markMomentsSeen(tab === 'mine' ? 'group' : 'public')
+  }, [tab, badgesLoaded])
   const [groupNames, setGroupNames] = useState({})
   const [minePots, setMinePots] = useState(null)
   const [publicPots, setPublicPots] = useState(null)
@@ -252,13 +279,20 @@ export default function MomentPage() {
 
   return (
     <div style={S.page}>
-      <div style={S.header}>
-        <span style={S.headerTitle}>모먼트</span>
-        <div style={S.tabRow}>
-          <button style={{ ...S.tabBtn, ...(tab === 'mine' ? S.tabBtnActive : {}) }} onClick={() => setTab('mine')}>내 그룹</button>
-          <button style={{ ...S.tabBtn, ...(tab === 'public' ? S.tabBtnActive : {}) }} onClick={() => setTab('public')}>전체</button>
-        </div>
-      </div>
+      <AppHeader
+        title="모먼트"
+        centerContent={
+          <SegmentedControl
+            ariaLabel="모먼트 범위"
+            value={tab}
+            onChange={setTab}
+            options={[
+              { value: 'mine', label: '내 그룹', dot: dotSnapshot.mine },
+              { value: 'public', label: '전체', dot: dotSnapshot.public },
+            ]}
+          />
+        }
+      />
 
       <div style={S.list}>
         {isLoading ? (
@@ -300,20 +334,6 @@ export default function MomentPage() {
 
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', gap: 10,
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 900, color: '#1A1A1A', letterSpacing: '-0.6px', flexShrink: 0 },
-  tabRow: { display: 'flex', gap: 6 },
-  tabBtn: {
-    padding: '6px 14px', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700,
-    color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
-  },
-  tabBtnActive: { background: '#FFF4EF', border: '1px solid var(--color-primary)', color: 'var(--color-primary)' },
 
   list: { flex: 1, overflowY: 'auto', padding: '4px 16px 80px', display: 'flex', flexDirection: 'column', gap: 12 },
   loadingState: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },

@@ -2,13 +2,19 @@ import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
+import { useNavBadges } from '../lib/NavBadgeContext'
 import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import SlotIcon from '../components/SlotIcon'
 import FriendsSearchModal from '../components/FriendsSearchModal'
+import WishCategoryIcon from '../components/WishCategoryIcon'
+import { WISH_CATEGORY_OPTIONS } from '../lib/potConstants'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
+import ReportModal from '../components/ReportModal'
+import { MoreHorizontalIcon } from '../components/GroupIcons'
+import AppHeader from '../components/AppHeader'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -77,6 +83,8 @@ export default function GroupPage() {
   const [friendWishLoading, setFriendWishLoading] = useState(false)
   const [wishLikeBusyId, setWishLikeBusyId] = useState(null)
   const [openWishCommentsId, setOpenWishCommentsId] = useState(null)
+  const [reportTarget, setReportTarget] = useState(null) // { targetType, targetId } | null
+  const [wishMenuOpenId, setWishMenuOpenId] = useState(null)
   const [wishCommentsMap, setWishCommentsMap] = useState({}) // wish_place_id -> comments[]
   const [wishCommentsLoading, setWishCommentsLoading] = useState(false)
   const [newWishCommentText, setNewWishCommentText] = useState('')
@@ -94,6 +102,20 @@ export default function GroupPage() {
 
   const reloadRealFriends = () => getMyFriends().then(setRealFriends).catch(e => console.error(e))
   useEffect(() => { reloadRealFriends() }, [user.id])
+
+  const { friendIdsWithNewWish, markFriendsWishSeen, loaded: badgesLoaded } = useNavBadges()
+  // 배지 데이터가 서버에서 도착한(loaded) 시점 값을 스냅샷으로 고정 — 이후 markFriendsWishSeen이
+  // 전역 상태를 지워도 이번 방문 동안은 아바타 점이 유지된다. 다음 방문부터 반영됨.
+  // loaded 전에 스냅샷을 찍으면(새로고침 직후 이 페이지가 첫 화면일 때) 항상 빈 값으로
+  // 고정되고 seen 처리까지 먼저 나가버리는 레이스가 있어, loaded될 때까지 기다린다.
+  const [newWishFriendIds, setNewWishFriendIds] = useState(new Set())
+  const wishSeenMarked = useRef(false)
+  useEffect(() => {
+    if (!badgesLoaded || wishSeenMarked.current) return
+    wishSeenMarked.current = true
+    setNewWishFriendIds(new Set(friendIdsWithNewWish))
+    markFriendsWishSeen()
+  }, [badgesLoaded])
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
@@ -320,12 +342,10 @@ export default function GroupPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>친구</span>
-        <button style={styles.findFriendsBtn} onClick={() => { setFriendsModalTab('search'); setShowFriendsModal(true) }}>
-          친구 찾기
-        </button>
-      </div>
+      <AppHeader
+        title="친구"
+        action={{ label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } }}
+      />
 
       <div
         style={{ ...styles.dateNav, touchAction: 'pan-y' }}
@@ -396,13 +416,17 @@ export default function GroupPage() {
               const statusChips = SLOT_KEYS
                 .filter(slot => friend.statusMap[slot])
                 .map(slot => ({ slot, opt: SLOT_STATUS_OPTIONS.find(o => o.key === friend.statusMap[slot].status) }))
+              const hasNewWish = newWishFriendIds.has(friend.id)
               return (
                 <div key={friend.id} style={styles.friendRow} onClick={() => setSelectedFriendId(friend.id)}>
-                  {friend.avatar_url ? (
-                    <img src={friend.avatar_url} alt="" style={styles.avatarImg} />
-                  ) : (
-                    <div style={styles.avatar}>{friend.nickname[0]}</div>
-                  )}
+                  <div style={styles.avatarWrap}>
+                    {friend.avatar_url ? (
+                      <img src={friend.avatar_url} alt="" style={styles.avatarImg} />
+                    ) : (
+                      <div style={styles.avatar}>{friend.nickname[0]}</div>
+                    )}
+                    {hasNewWish && <span style={styles.avatarDot} />}
+                  </div>
                   <div style={styles.friendInfo}>
                     <div style={styles.friendNameRow}>
                       <span style={styles.friendName}>{friend.nickname}</span>
@@ -457,7 +481,7 @@ export default function GroupPage() {
               <button
                 style={{ ...styles.sheetTabBtn, ...(friendSheetTab === 'wish' ? styles.sheetTabBtnActive : {}) }}
                 onClick={() => setFriendSheetTab('wish')}
-              >가고 싶은 곳</button>
+              >가고 싶은 곳{newWishFriendIds.has(selectedFriendId) && <span style={styles.sheetTabDot} />}</button>
             </div>
 
             {friendSheetTab === 'wish' ? (
@@ -472,6 +496,12 @@ export default function GroupPage() {
                     const comments = wishCommentsMap[place.id] ?? []
                     return (
                       <div key={place.id} style={styles.friendWishItem}>
+                        <div style={styles.friendWishCategoryRow}>
+                          <WishCategoryIcon category={place.category} size={20} />
+                          <span style={styles.friendWishCategoryLabel}>
+                            {WISH_CATEGORY_OPTIONS.find(o => o.key === place.category)?.label ?? '좋아하는 곳'}
+                          </span>
+                        </div>
                         <LinkPreviewCard text={place.content} />
                         {(() => {
                           const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
@@ -488,6 +518,28 @@ export default function GroupPage() {
                           <button style={styles.wishCommentToggleBtn} onClick={() => toggleWishComments(place)}>
                             💬 {place.comment_count > 0 ? place.comment_count : '댓글'}
                           </button>
+                          <div style={{ position: 'relative', marginLeft: 'auto' }}>
+                            <button
+                              style={styles.wishMoreBtn}
+                              onClick={() => setWishMenuOpenId(id => id === place.id ? null : place.id)}
+                              aria-label="더보기"
+                            >
+                              <MoreHorizontalIcon size={16} />
+                            </button>
+                            {wishMenuOpenId === place.id && (
+                              <>
+                                <div style={styles.menuBackdrop} onClick={() => setWishMenuOpenId(null)} />
+                                <div style={styles.wishMoreDropdown}>
+                                  <button
+                                    style={styles.wishMoreItem}
+                                    onClick={() => { setWishMenuOpenId(null); setReportTarget({ targetType: 'wish_place', targetId: place.id }) }}
+                                  >
+                                    🚨 신고하기
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                         {commentsOpen && (
                           <div style={styles.wishCommentsBox}>
@@ -508,8 +560,15 @@ export default function GroupPage() {
                                       <span style={styles.wishProposalName}>{c.nickname}</span>
                                       <span style={styles.wishProposalMessage}>{c.content}</span>
                                     </div>
-                                    {c.user_id === user.id && (
+                                    {c.user_id === user.id ? (
                                       <button style={styles.wishProposalDismiss} onClick={() => removeWishComment(place, c.id)}>삭제</button>
+                                    ) : (
+                                      <button
+                                        style={styles.wishProposalDismiss}
+                                        onClick={() => setReportTarget({ targetType: 'wish_place_comment', targetId: c.id })}
+                                      >
+                                        신고
+                                      </button>
                                     )}
                                   </div>
                                 ))}
@@ -660,6 +719,14 @@ export default function GroupPage() {
         />
       )}
 
+      {reportTarget && (
+        <ReportModal
+          targetType={reportTarget.targetType}
+          targetId={reportTarget.targetId}
+          onClose={() => setReportTarget(null)}
+        />
+      )}
+
       <BottomNav />
     </div>
   )
@@ -668,13 +735,6 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
   findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
@@ -696,6 +756,11 @@ const styles = {
   friendRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', cursor: 'pointer' },
   avatar: { width: 36, height: 36, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
   avatarImg: { width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
+  avatarWrap: { position: 'relative', flexShrink: 0, display: 'inline-flex' },
+  avatarDot: {
+    position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: '50%',
+    background: 'var(--color-danger)', border: '1.5px solid var(--color-surface-2)',
+  },
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
   friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
@@ -714,11 +779,14 @@ const styles = {
   sheetName: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
   sheetTabs: { display: 'flex', gap: 6, marginBottom: 12 },
-  sheetTabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
   sheetTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
+  sheetTabDot: { position: 'absolute', top: 6, right: 10, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)' },
   sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
   friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   friendWishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
+  friendWishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 },
+  friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
   wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
   wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
@@ -733,6 +801,22 @@ const styles = {
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishMoreBtn: {
+    width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
+    color: 'var(--color-text-muted)', cursor: 'pointer',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0,
+  },
+  menuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
+  wishMoreDropdown: {
+    position: 'absolute', top: '110%', right: 0, zIndex: 50, minWidth: 112,
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 6px 20px rgba(0,0,0,0.12)', overflow: 'hidden',
+  },
+  wishMoreItem: {
+    width: '100%', padding: '10px 12px', background: 'none', border: 'none', textAlign: 'left',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
+  },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },

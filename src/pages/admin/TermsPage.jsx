@@ -14,7 +14,7 @@ export default function TermsPage() {
   const [terms, setTerms] = useState([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // null | term object (id 없으면 신규)
-  const [viewing, setViewing] = useState(null) // null | term object (읽기 전용 보기)
+  const [originalVersion, setOriginalVersion] = useState(null) // 재동의 트리거 여부 판단용 — 수정 시작 시점의 version
   const [saving, setSaving] = useState(false)
 
   const load = () => {
@@ -23,22 +23,29 @@ export default function TermsPage() {
   }
   useEffect(load, [])
 
-  const openNew = () => setEditing({ ...EMPTY, sort_order: terms.length + 1 })
-  const openEdit = (t) => setEditing({ ...t })
+  const openNew = () => { setEditing({ ...EMPTY, sort_order: terms.length + 1 }); setOriginalVersion(null) }
+  const openEdit = (t) => { setEditing({ ...t }); setOriginalVersion(t.version?.trim() || null) }
 
   const save = async () => {
     if (!editing.title.trim()) return
+    const payload = {
+      type: editing.type,
+      title: editing.title.trim(),
+      content: editing.content ?? '',
+      version: editing.version?.trim() || null,
+      is_required: editing.is_required,
+      is_active: editing.is_active,
+      sort_order: Number(editing.sort_order) || 0,
+    }
+
+    // 기존 필수+활성 약관의 버전을 바꾸는 경우에만 재동의가 트리거되므로, 그 경우에 한해 한 번 더 확인한다.
+    const versionChanged = editing.id && payload.version !== originalVersion
+    if (versionChanged && payload.is_required && payload.is_active) {
+      if (!confirm('버전을 변경하면 이미 동의한 사용자도 다음 접속 시 재동의해야 합니다. 계속할까요?')) return
+    }
+
     setSaving(true)
     try {
-      const payload = {
-        type: editing.type,
-        title: editing.title.trim(),
-        content: editing.content ?? '',
-        version: editing.version?.trim() || null,
-        is_required: editing.is_required,
-        is_active: editing.is_active,
-        sort_order: Number(editing.sort_order) || 0,
-      }
       if (editing.id) await updateTerm(editing.id, payload)
       else await createTerm(payload)
       setEditing(null)
@@ -101,7 +108,9 @@ export default function TermsPage() {
               <tr key={t.id} style={s.tr}>
                 <td style={s.td}>{t.sort_order}</td>
                 <td style={s.td}>{typeLabel(t.type)}</td>
-                <td style={{ ...s.td, fontWeight: 600 }}>{t.title}</td>
+                <td style={{ ...s.td, fontWeight: 600 }}>
+                  <button style={s.titleBtn} onClick={() => openEdit(t)}>{t.title}</button>
+                </td>
                 <td style={s.td}>
                   <span style={t.is_required ? s.badgeReq : s.badgeOpt}>
                     {t.is_required ? '필수' : '선택'}
@@ -114,8 +123,6 @@ export default function TermsPage() {
                   </button>
                 </td>
                 <td style={{ ...s.td, textAlign: 'right', whiteSpace: 'nowrap' }}>
-                  <button style={s.linkBtn} onClick={() => setViewing(t)}>보기</button>
-                  <button style={s.linkBtn} onClick={() => openEdit(t)}>수정</button>
                   <button style={{ ...s.linkBtn, color: '#E04545' }} onClick={() => remove(t)}>삭제</button>
                 </td>
               </tr>
@@ -124,43 +131,24 @@ export default function TermsPage() {
         </table>
       )}
 
-      {/* 보기 모달 (읽기 전용) */}
-      {viewing && (
-        <div style={s.overlay} onClick={() => setViewing(null)}>
-          <div style={s.modal} onClick={e => e.stopPropagation()}>
-            <h2 style={s.modalTitle}>{viewing.title}</h2>
-            <div style={s.viewMeta}>
-              <span style={viewing.is_required ? s.badgeReq : s.badgeOpt}>{viewing.is_required ? '필수' : '선택'}</span>
-              <span style={s.viewMetaText}>{typeLabel(viewing.type)}</span>
-              {viewing.version && <span style={s.viewMetaText}>버전 {viewing.version}</span>}
-              <span style={viewing.is_active ? s.viewMetaOn : s.viewMetaOff}>{viewing.is_active ? '활성' : '비활성'}</span>
-            </div>
-            <div style={s.viewContent}>{viewing.content || '등록된 내용이 없습니다.'}</div>
-            <div style={s.modalBtns}>
-              <button style={s.cancelBtn} onClick={() => setViewing(null)}>닫기</button>
-              <button style={s.saveBtn} onClick={() => { openEdit(viewing); setViewing(null) }}>수정</button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* 편집 모달 */}
+      {/* 편집 모달 (제목 클릭 시 바로 열림 — 내용 확인 + 수정을 겸함) */}
       {editing && (
         <div style={s.overlay} onClick={() => !saving && setEditing(null)}>
           <div style={s.modal} onClick={e => e.stopPropagation()}>
             <h2 style={s.modalTitle}>{editing.id ? '약관 수정' : '약관 추가'}</h2>
 
-            <div style={s.formRow}>
-              <label style={s.label}>구분</label>
-              <select style={s.input} value={editing.type} onChange={e => setEditing({ ...editing, type: e.target.value })}>
-                {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-              </select>
-            </div>
-
-            <div style={s.formRow}>
-              <label style={s.label}>제목</label>
-              <input style={s.input} value={editing.title} placeholder="예: 이용약관 동의"
-                onChange={e => setEditing({ ...editing, title: e.target.value })} />
+            <div style={s.formGrid}>
+              <div style={{ ...s.formRow, flex: '0 0 140px' }}>
+                <label style={s.label}>구분</label>
+                <select style={s.input} value={editing.type} onChange={e => setEditing({ ...editing, type: e.target.value })}>
+                  {TYPE_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                </select>
+              </div>
+              <div style={s.formRow}>
+                <label style={s.label}>제목</label>
+                <input style={s.input} value={editing.title} placeholder="예: 이용약관 동의"
+                  onChange={e => setEditing({ ...editing, title: e.target.value })} />
+              </div>
             </div>
 
             <div style={s.formRow}>
@@ -175,6 +163,7 @@ export default function TermsPage() {
                 <label style={s.label}>버전</label>
                 <input style={s.input} value={editing.version ?? ''} placeholder="예: 1.0"
                   onChange={e => setEditing({ ...editing, version: e.target.value })} />
+                <span style={s.hint}>필수 약관의 버전을 바꾸면 이미 동의한 사용자도 다음 접속 시 재동의 화면을 보게 됩니다.</span>
               </div>
               <div style={s.formRow}>
                 <label style={s.label}>정렬 순서</label>
@@ -224,17 +213,14 @@ const s = {
   toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   toggleOn: { borderColor: '#34A853', background: '#34A853', color: '#fff' },
   linkBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#FF6B35', fontWeight: 600, marginLeft: 10, padding: 2 },
+  titleBtn: { background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontSize: 13, fontWeight: 600, color: '#1A1A1A', textAlign: 'left' },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 24 },
   modal: { width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 14, padding: 28, display: 'flex', flexDirection: 'column', gap: 16 },
   modalTitle: { fontSize: 18, fontWeight: 800, margin: 0 },
-  viewMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: -8 },
-  viewMetaText: { fontSize: 12, color: '#8A8AA0', fontWeight: 600 },
-  viewMetaOn: { fontSize: 11, fontWeight: 700, color: '#34A853', background: '#EAF7EE', padding: '2px 8px', borderRadius: 4 },
-  viewMetaOff: { fontSize: 11, fontWeight: 700, color: '#9090A8', background: '#F0F0F4', padding: '2px 8px', borderRadius: 4 },
-  viewContent: { fontSize: 14, color: '#1A1A1A', lineHeight: 1.7, whiteSpace: 'pre-wrap', maxHeight: '50vh', overflowY: 'auto', background: '#FAFAFC', border: '1px solid #EEE', borderRadius: 8, padding: 14 },
   formRow: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 },
   formGrid: { display: 'flex', gap: 16 },
   label: { fontSize: 12, fontWeight: 700, color: '#4A4A60' },
+  hint: { fontSize: 11, color: '#9090A8', lineHeight: 1.4 },
   input: { padding: '10px 12px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', width: '100%' },
   checkRow: { display: 'flex', gap: 24, flexWrap: 'wrap' },
   checkLabel: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#1A1A1A', cursor: 'pointer' },

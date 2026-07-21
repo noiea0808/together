@@ -321,8 +321,8 @@ function TabGroup() {
       <RuleBlock
         icon="⚙️"
         title="토글 범위"
-        desc="그룹 공유 토글은 그룹 × 날짜 × 슬롯 단위로 설정된다. 같은 날이라도 슬롯별로 공유 여부를 다르게 지정할 수 있다. 예: A 그룹에는 점심만 공유, B 그룹에는 저녁만 공유."
-        field="group_share_settings(group_id, user_id, date, slot)"
+        desc="그룹 공유 토글은 그룹 × 날짜 단위로 설정된다. 슬롯 구분 없이 그룹 전체에 한 번에 적용된다. 예: A 그룹에는 공유, B 그룹에는 비공유처럼 그룹별로만 다르게 지정할 수 있다."
+        field="group_share_settings(group_id, user_id, date)"
       />
       <RuleBlock
         icon="🔗"
@@ -344,7 +344,7 @@ function TabGroup() {
           {[
             ['groups',              'id, name, invite_code, created_by',              '그룹 정보. invite_code는 Unique.'],
             ['group_members',       'group_id, user_id',                              '그룹-멤버 N:M 매핑. (group_id, user_id) Unique.'],
-            ['group_share_settings','group_id, user_id, date, slot, is_shared',       '그룹×날짜×슬롯 단위 공유 설정. is_shared 기본값 true. (group_id, user_id, date, slot) Unique.'],
+            ['group_share_settings','group_id, user_id, date, is_shared',             '그룹×날짜 단위 공유 설정(슬롯 구분 없음). is_shared 기본값 true. (group_id, user_id, date) PK.'],
           ].map(([table, cols, desc], i) => {
             const unimplemented = desc.includes('⚠️ 미구현')
             return (
@@ -369,7 +369,7 @@ function TabVisibility() {
       <RuleBlock
         icon="👁️"
         title="is_hidden 플래그"
-        desc="사용자가 특정 날짜의 상태를 숨기면, 해당 날짜의 모든 슬롯 상태가 모든 그룹에서 동시에 숨겨진다. 슬롯 단위 숨김은 지원하지 않는다. '나의 상태' 카드의 공개/숨김 버튼으로 제어하며, 그룹 카드의 슬롯별 공유 토글(group_share_settings)과는 독립적으로 동작한다."
+        desc="사용자가 특정 날짜의 상태를 숨기면, 해당 날짜의 모든 슬롯 상태가 모든 그룹에서 동시에 숨겨진다. 슬롯 단위 숨김은 지원하지 않는다. '나의 상태' 카드의 공개/숨김 버튼으로 제어하며, 그룹 카드의 공유 토글(group_share_settings)과는 독립적으로 동작한다."
         field="daily_status.is_hidden"
       />
       <RuleBlock

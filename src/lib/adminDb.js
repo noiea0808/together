@@ -89,3 +89,78 @@ export async function deleteHoliday(date) {
   const { error } = await adminSupabase.from('holidays').delete().eq('date', date)
   if (error) throw error
 }
+
+// ── 신고/제재 ──────────────────────────────────────────
+export async function getAllReportsAdmin() {
+  const { data, error } = await adminSupabase
+    .from('reports')
+    .select('*, reporter:reporter_id(id, nickname, email), resolver:resolved_by(id, nickname)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function resolveReportAdmin(reportId, adminId, status, actionTaken = null) {
+  const { data, error } = await adminSupabase
+    .from('reports')
+    .update({ status, resolved_at: new Date().toISOString(), resolved_by: adminId, action_taken: actionTaken })
+    .eq('id', reportId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function suspendUserAdmin(userId, reason, until = null) {
+  const { data, error } = await adminSupabase
+    .from('users')
+    .update({ is_suspended: true, suspended_reason: reason, suspended_until: until })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function unsuspendUserAdmin(userId) {
+  const { data, error } = await adminSupabase
+    .from('users')
+    .update({ is_suspended: false, suspended_reason: null, suspended_until: null })
+    .eq('id', userId)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+// ── 사용자 의견 ────────────────────────────────────────
+export async function getAllFeedbackAdmin() {
+  const { data, error } = await adminSupabase
+    .from('feedback')
+    .select('*, user:user_id(id, nickname, email), replier:replied_by(id, nickname)')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function replyToFeedbackAdmin(feedbackId, adminId, userId, reply) {
+  const { data, error } = await adminSupabase
+    .from('feedback')
+    .update({ reply, status: 'answered', replied_at: new Date().toISOString(), replied_by: adminId })
+    .eq('id', feedbackId)
+    .select()
+    .single()
+  if (error) throw error
+
+  const { error: notifError } = await adminSupabase.from('notifications').insert({
+    user_id: userId, title: '의견에 답변이 달렸어요', body: reply, url: '/account', event_type: 'feedback_reply',
+  })
+  if (notifError) console.error('feedback reply 알림 insert 실패:', notifError)
+
+  const { error: pushError } = await adminSupabase.functions.invoke('send-push', {
+    body: { userIds: [userId], title: '의견에 답변이 달렸어요', body: reply, url: '/account' },
+  })
+  if (pushError) console.warn('feedback reply send-push 실패:', pushError)
+
+  return data
+}

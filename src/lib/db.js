@@ -116,8 +116,21 @@ export async function getSessionUser() {
   return data
 }
 
+// 약관 동의 기록. agreedTerms: [{ id, version }] — 동의 당시의 term.version을 같이 저장해두면
+// 관리자가 이후 version을 올렸을 때(재동의 필요 약관) 이 기록만으로 "옛 버전에 동의함"을 구분할 수 있다.
+async function upsertTermAgreements(userId, agreedTerms = []) {
+  if (agreedTerms.length === 0) return
+  const rows = agreedTerms.map(t => ({
+    user_id: userId, term_id: t.id, agreed_version: t.version ?? null, agreed_at: new Date().toISOString(),
+  }))
+  const { error } = await supabase
+    .from('user_term_agreements')
+    .upsert(rows, { onConflict: 'user_id,term_id' })
+  if (error) throw error
+}
+
 // 온보딩 완료: 닉네임·생년월일·라이프스타일 저장 + 약관 동의 기록 + onboarded 처리
-export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTermIds = []) {
+export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTerms = []) {
   const { data: profile, error } = await supabase
     .from('users')
     .update({
@@ -131,24 +144,33 @@ export async function completeOnboarding(userId, { nickname, birthdate, lifestyl
     .single()
   if (error) throw error
 
-  if (agreedTermIds.length > 0) {
-    const rows = agreedTermIds.map(term_id => ({ user_id: userId, term_id }))
-    const { error: agreeError } = await supabase
-      .from('user_term_agreements')
-      .upsert(rows, { onConflict: 'user_id,term_id' })
-    if (agreeError) throw agreeError
-  }
+  await upsertTermAgreements(userId, agreedTerms)
   return profile
 }
 
+// 이미 onboarded된 사용자의 재동의(신규 필수 약관 추가 / 기존 약관 version 인상) 처리
+export async function recordTermAgreements(userId, agreedTerms = []) {
+  await upsertTermAgreements(userId, agreedTerms)
+}
+
 // ── 약관 ──────────────────────────────────────────
-// 온보딩에 노출할 활성 약관 (정렬 순)
+// 온보딩/재동의 화면에 노출할 활성 약관 (정렬 순)
 export async function getActiveTerms() {
   const { data, error } = await supabase
     .from('terms')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true })
+  if (error) throw error
+  return data
+}
+
+// 내가 동의한 약관 이력(term_id + 동의 당시 version). 로그인 시 재동의 필요 여부 판단에 쓴다.
+export async function getMyTermAgreements(userId) {
+  const { data, error } = await supabase
+    .from('user_term_agreements')
+    .select('term_id, agreed_version')
+    .eq('user_id', userId)
   if (error) throw error
   return data
 }
@@ -187,6 +209,65 @@ export async function updateTerm(id, patch) {
 export async function deleteTerm(id) {
   const { error } = await supabase.from('terms').delete().eq('id', id)
   if (error) throw error
+}
+
+// ── 오늘의 팁 ──────────────────────────────────────
+// 로그인 직후 팝업에 노출할 활성 팁 전체 (순서는 호출부에서 랜덤으로 섞는다)
+export async function getActiveDailyTips() {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .select('*')
+    .eq('is_active', true)
+  if (error) throw error
+  return data
+}
+
+// 어드민: 전체 팁 조회
+export async function getAllDailyTips() {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .select('*')
+    .order('created_at', { ascending: false })
+  if (error) throw error
+  return data
+}
+
+export async function createDailyTip(tip) {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .insert(tip)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function updateDailyTip(id, patch) {
+  const { data, error } = await supabase
+    .from('daily_tips')
+    .update({ ...patch, updated_at: new Date().toISOString() })
+    .eq('id', id)
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function deleteDailyTip(id) {
+  const { error } = await supabase.from('daily_tips').delete().eq('id', id)
+  if (error) throw error
+}
+
+// blob: resizeImageFile로 재인코딩한 JPEG 이미지 (크롭 없이 원본 비율 유지 — 스샷 등)
+export async function uploadDailyTipImage(blob) {
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const { error: uploadError } = await supabase.storage
+    .from('daily-tips')
+    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+  if (uploadError) throw uploadError
+
+  const { data: { publicUrl } } = supabase.storage.from('daily-tips').getPublicUrl(path)
+  return publicUrl
 }
 
 // ── 유저 ──────────────────────────────────────────
@@ -537,7 +618,7 @@ function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenK
       }
     }
   })
-  return Object.values(map).filter(s => !hiddenKeys.has(`${s.user_id}:${s.slot}`))
+  return Object.values(map).filter(s => !hiddenKeys.has(s.user_id))
 }
 
 // 단일 그룹 상태 — 실시간 부분 갱신(reloadGroup)에서 사용
@@ -553,7 +634,7 @@ export async function getGroupStatuses(groupId, date) {
 
   const [hiddenRes, statusRes, potRes] = await Promise.all([
     supabase.from('group_share_settings')
-      .select('user_id, slot').eq('group_id', groupId).eq('date', date).eq('is_shared', false),
+      .select('user_id').eq('group_id', groupId).eq('date', date).eq('is_shared', false),
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('pot_members')
@@ -567,7 +648,7 @@ export async function getGroupStatuses(groupId, date) {
     memberIds,
     statusRows: statusRes.data ?? [],
     potParts: potRes.data ?? [],
-    hiddenKeys: new Set((hiddenRes.data ?? []).map(r => `${r.user_id}:${r.slot}`)),
+    hiddenKeys: new Set((hiddenRes.data ?? []).map(r => r.user_id)),
     date,
   })
 }
@@ -607,7 +688,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('group_share_settings')
-      .select('group_id, user_id, slot').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
+      .select('group_id, user_id').in('group_id', groupIds).eq('date', date).eq('is_shared', false),
     supabase.from('meal_pots')
       .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
@@ -625,10 +706,10 @@ export async function getTodayBoard(groupIds, date) {
   groupIds.forEach(gid => { potsMap[gid] = [] })
   ;(potRes.data ?? []).forEach(p => { potsMap[p.group_id]?.push(p) })
 
-  // 공유 비활성 키 (그룹별)
+  // 공유 비활성 사용자 (그룹별)
   const hiddenByGroup = {}
   groupIds.forEach(gid => { hiddenByGroup[gid] = new Set() })
-  ;(shareRes.data ?? []).forEach(r => { hiddenByGroup[r.group_id]?.add(`${r.user_id}:${r.slot}`) })
+  ;(shareRes.data ?? []).forEach(r => { hiddenByGroup[r.group_id]?.add(r.user_id) })
 
   // 상태 그룹별 파생
   const statusesMap = {}
@@ -957,6 +1038,30 @@ export async function markAllNotificationsRead(userId) {
   if (error) throw error
 }
 
+// ── 네비 메뉴 레드닷 (모먼트/친구) ──────────────────────────
+// 실시간 구독 없이, 앱 진입 시 "마지막으로 본 시각 이후 새 항목이 있는가"만 1회 조회한다.
+export async function getNavBadges() {
+  const { data, error } = await supabase.rpc('get_nav_badges')
+  if (error) throw error
+  const row = data?.[0]
+  return {
+    momentsGroup: row?.moments_group ?? false,
+    momentsPublic: row?.moments_public ?? false,
+    friendsWish: row?.friends_wish ?? false,
+    friendIdsWithNewWish: row?.friend_ids_with_new_wish ?? [],
+  }
+}
+
+export async function markMomentsSeen(scope) {
+  const { error } = await supabase.rpc('mark_moments_seen', { p_scope: scope })
+  if (error) throw error
+}
+
+export async function markFriendsWishSeen() {
+  const { error } = await supabase.rpc('mark_friends_wish_seen')
+  if (error) throw error
+}
+
 export async function joinPot(potId, userId) {
   const { error } = await supabase
     .from('pot_members')
@@ -1092,38 +1197,30 @@ export async function getMySchedule(userId, fromDate, toDate) {
   return Object.values(map).sort((a, b) => a.date.localeCompare(b.date))
 }
 
-// ── 그룹 공유 설정 (그룹 × 날짜 × 슬롯 단위) ─────────────
-// 사전 조건: Supabase에 group_share_settings 테이블 생성 필요
-// CREATE TABLE group_share_settings (
-//   user_id uuid references users(id),
-//   group_id uuid references groups(id),
-//   date date,
-//   slot text,
-//   is_shared boolean default true,
-//   primary key (user_id, group_id, date, slot)
-// );
+// ── 그룹 공유 설정 (그룹 × 날짜 단위 — 슬롯 구분 없이 그룹 전체에 적용) ─────────────
+// 사전 조건: scripts/simplify_group_share_settings.sql 실행 필요
 export async function getGroupShareSettings(userId, date) {
   const { data, error } = await supabase
     .from('group_share_settings')
-    .select('group_id, slot, is_shared')
+    .select('group_id, is_shared')
     .eq('user_id', userId)
     .eq('date', date)
   if (error) throw error
   return data
 }
 
-export async function setGroupShareSetting(userId, groupId, date, slot, isShared) {
+export async function setGroupShareSetting(userId, groupId, date, isShared) {
   const { error } = await supabase
     .from('group_share_settings')
     .upsert(
-      { user_id: userId, group_id: groupId, date, slot, is_shared: isShared },
-      { onConflict: 'user_id,group_id,date,slot' }
+      { user_id: userId, group_id: groupId, date, is_shared: isShared },
+      { onConflict: 'user_id,group_id,date' }
     )
   if (error) throw error
 }
 
 // fromDate 이후 전체 날짜에 공유 설정 적용 (60일 범위)
-export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, isShared) {
+export async function setGroupShareSettingBulk(userId, groupId, fromDate, isShared) {
   if (isShared) {
     // true(공개)로 되돌릴 때 — 레코드 삭제로 기본값(공개) 복원
     const { error } = await supabase
@@ -1131,7 +1228,6 @@ export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, 
       .delete()
       .eq('user_id', userId)
       .eq('group_id', groupId)
-      .eq('slot', slot)
       .gte('date', fromDate)
     if (error) throw error
   } else {
@@ -1140,12 +1236,12 @@ export async function setGroupShareSettingBulk(userId, groupId, fromDate, slot, 
     const d = new Date(fromDate)
     for (let i = 0; i < 60; i++) {
       const dateStr = d.toISOString().slice(0, 10)
-      rows.push({ user_id: userId, group_id: groupId, date: dateStr, slot, is_shared: false })
+      rows.push({ user_id: userId, group_id: groupId, date: dateStr, is_shared: false })
       d.setDate(d.getDate() + 1)
     }
     const { error } = await supabase
       .from('group_share_settings')
-      .upsert(rows, { onConflict: 'user_id,group_id,date,slot' })
+      .upsert(rows, { onConflict: 'user_id,group_id,date' })
     if (error) throw error
   }
 }
@@ -1693,6 +1789,37 @@ export async function deleteWishPlaceComment(id) {
 // 내 계정 화면에서 내 위시 항목들의 좋아요/댓글 수를 한 번에 조회.
 export async function getMyWishPlaceReactions() {
   const { data, error } = await supabase.rpc('get_my_wish_place_reactions')
+  if (error) throw error
+  return data
+}
+
+// ── 신고 ──────────────────────────────────────────────
+// targetType: 'pot' | 'pot_comment' | 'wish_place' | 'wish_place_comment' | 'user'
+export async function reportContent(reporterId, targetType, targetId, reason, detail = null) {
+  const { error } = await supabase
+    .from('reports')
+    .insert({ reporter_id: reporterId, target_type: targetType, target_id: targetId, reason, detail })
+  if (error) throw error
+}
+
+// ── 사용자 의견 ────────────────────────────────────────
+// 1회성 답변 티켓: 사용자가 의견을 남기면 관리자만 확인 후 한 번 답변한다.
+export async function submitFeedback(userId, content) {
+  const { data, error } = await supabase
+    .from('feedback')
+    .insert({ user_id: userId, content })
+    .select()
+    .single()
+  if (error) throw error
+  return data
+}
+
+export async function getMyFeedback(userId) {
+  const { data, error } = await supabase
+    .from('feedback')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
   if (error) throw error
   return data
 }

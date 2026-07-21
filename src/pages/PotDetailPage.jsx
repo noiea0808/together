@@ -300,7 +300,7 @@ export default function PotDetailPage() {
 
   const doJoin = async () => {
     await joinPot(pot.id, user.id)
-    await setGroupShareSetting(user.id, pot.group_id, pot.date, pot.slot, true).catch(e => console.warn('share setting:', e))
+    await setGroupShareSetting(user.id, pot.group_id, pot.date, true).catch(e => console.warn('share setting:', e))
     invalidateBoard()
     await loadPot()
     setActionLoading(false)

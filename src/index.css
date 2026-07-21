@@ -79,6 +79,12 @@
   --max-width: 430px;
 
   --font-title: 'GmarketSansBold', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+
+  /* 5개 메인 메뉴(홈/일정/모먼트/친구/내 계정)가 공통으로 쓰는 AppHeader 규격 —
+     여기 값을 바꾸면 모든 화면 헤더가 같이 바뀐다. */
+  --header-height: 56px;
+  --header-padding-x: 20px;
+  --header-padding-x-narrow: 16px;
 }
 
 /* ===== 기본 타이포 & 바디 ===== */
@@ -109,6 +115,15 @@ body {
   position: relative;
   display: flex;
   flex-direction: column;
+}
+
+/* 마우스로 화면을 드래그해 스와이프(날짜/슬롯 전환, 캐러셀 넘기기)할 때, 손가락 아래
+   이미지에서 브라우저 기본 드래그(고스트 이미지 끌기)가 끼어들면서 제스처가 끊기는 문제 방지.
+   터치 스크롤/스크롤스냅 동작에는 영향 없다. */
+img {
+  -webkit-user-drag: none;
+  user-drag: none;
+  -webkit-touch-callout: none;
 }
 
 /* ===== 캐러셀 롤링 애니메이션 ===== */
@@ -213,3 +228,150 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
 .mt-md { margin-top: var(--spacing-md); }
 .mt-lg { margin-top: var(--spacing-lg); }
 .mt-xl { margin-top: var(--spacing-xl); }
+
+/* ===== AppHeader — 5개 메인 메뉴 공통 헤더 =====
+   좌(제목/브랜드) · 중(화면별 탐색·필터) · 우(액션+알림) 3열 그리드.
+   가운데 컬럼은 auto라서 내용 폭과 무관하게 항상 트랙 중앙에 놓이고,
+   좌우 컬럼은 padding에 붙어 시작/끝나므로 제목의 왼쪽 시작점과 알림의
+   오른쪽 끝은 화면마다 중앙 컨트롤 유무와 상관없이 항상 같은 자리에 온다. */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: grid;
+  grid-template-columns: minmax(90px, 1fr) auto minmax(90px, 1fr);
+  align-items: center;
+  height: var(--header-height);
+  padding: 0 var(--header-padding-x);
+  background: rgba(250, 248, 245, 0.95);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--color-border);
+  flex-shrink: 0;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: height 0.22s ease, opacity 0.18s ease, border-color 0.18s ease;
+}
+
+.app-header__left { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }
+.app-header__center { display: flex; align-items: center; justify-content: center; min-width: 0; }
+.app-header__right { display: flex; align-items: center; justify-content: flex-end; gap: 8px; min-width: 0; }
+
+.app-header__title {
+  font-family: var(--font-title);
+  font-weight: 800;
+  font-size: 20px;
+  color: var(--color-text);
+  letter-spacing: -0.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.app-header__brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.app-header__brand-label {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 19px;
+  color: var(--color-text);
+  letter-spacing: -0.4px;
+  white-space: nowrap;
+}
+
+/* 알림 벨 등 아이콘 전용 버튼 — 시각적 아이콘(22~24px)보다 터치 영역(40x40)을 넓게 잡는다 */
+.app-header-icon-btn {
+  position: relative;
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  padding: 0;
+  border-radius: var(--radius-full);
+  transition: background 0.12s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-header-icon-btn:active { background: var(--color-primary-a08); transform: scale(0.92); }
+.app-header-icon-btn__dot {
+  position: absolute;
+  top: 9px;
+  right: 10px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  border: 1.5px solid var(--color-bg);
+}
+
+/* 텍스트 액션 버튼 — '친구 찾기', '사용법' 등 화면별 보조 액션에 공통으로 쓴다 */
+.app-header-action {
+  height: 33px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-primary);
+  background: var(--color-primary-a08);
+  border: 1px solid var(--color-primary-a27);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.12s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-header-action:active { background: var(--color-primary-a20); transform: scale(0.96); }
+
+/* 세그먼트 컨트롤(모먼트: 내 그룹 / 전체) — 선택/비선택이 서로 다른 버튼처럼 보이지
+   않도록 트랙 하나에 옵션들을 붙여, 선택된 옵션만 배경으로 표시한다 */
+.app-header-segmented {
+  display: inline-flex;
+  align-items: center;
+  height: 33px;
+  padding: 2px;
+  background: var(--color-surface-2);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+}
+.app-header-segmented__option {
+  position: relative;
+  min-width: 58px;
+  height: 100%;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  background: none;
+  border: none;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.app-header-segmented__option.is-active { color: var(--color-primary); background: var(--color-primary-a10); }
+.app-header-segmented__option:active { transform: scale(0.96); }
+.app-header-segmented__dot {
+  position: absolute;
+  top: 3px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--color-danger);
+  border: 1.5px solid var(--color-surface-2);
+}
+
+@media (max-width: 380px) {
+  .app-header { padding: 0 var(--header-padding-x-narrow); }
+  .app-header-segmented__option { min-width: 48px; padding: 0 6px; }
+}

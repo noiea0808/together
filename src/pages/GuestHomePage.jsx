@@ -6,7 +6,7 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import PotCard from '../components/PotCard'
-import Header from '../components/Header'
+import AppHeader from '../components/AppHeader'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
@@ -57,10 +57,10 @@ export default function GuestHomePage() {
 
   return (
     <div style={styles.wrap}>
-      <Header hidden={headerHidden} />
+      <AppHeader brand={{ icon: <RiceBowlIcon size={24} />, label: '같이 먹자' }} hidden={headerHidden} />
       <div style={styles.page}>
         {/* 날짜 — 이동 불가, 게스트 표시. 헤더가 접히면 그 자리까지 따라 올라간다 */}
-        <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 44 }}>
+        <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 'var(--header-height)' }}>
           <span style={styles.datePrimary}>{formatDate(home?.date)}</span>
           <span style={styles.guestTag}>게스트</span>
         </div>
@@ -72,7 +72,7 @@ export default function GuestHomePage() {
             {SLOT_ORDER.map(slot => {
               const pot = potBySlot[slot]
               const isInPot = !!pot
-              const opt = isInPot ? { ...(isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT), label: getJoinedStatusLabel(home.date, pot.meal_time, pot.end_time) } : null
+              const opt = isInPot ? { ...(isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT), label: getJoinedStatusLabel(home.date, pot.meal_time, pot.end_time, (pot.pot_members?.length ?? 0) === 1) } : null
               return (
                 <div
                   key={slot}

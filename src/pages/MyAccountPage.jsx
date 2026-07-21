@@ -7,6 +7,9 @@ import {
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
+import FeedbackModal from '../components/FeedbackModal'
+import AppHeader from '../components/AppHeader'
+import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
@@ -39,6 +42,44 @@ function ToggleSwitch({ on, onClick, disabled, label }) {
   )
 }
 
+function ChevronRight({ size = 18 }) {
+  return <ChevronDownIcon size={size} strokeWidth={2} style={{ transform: 'rotate(-90deg)', color: 'var(--color-text-muted)', flexShrink: 0 }} />
+}
+
+// 설정 화면의 섹션 하나(제목 + 카드로 묶인 행 목록)를 나타낸다.
+function SettingsSection({ title, children }) {
+  return (
+    <div style={styles.settingsSection}>
+      <h2 style={styles.settingsSectionTitle}>{title}</h2>
+      <div style={styles.settingsList}>{children}</div>
+    </div>
+  )
+}
+
+// 설정 한 줄 — 제목/설명은 왼쪽에, 스위치나 chevron 같은 조작 요소는 오른쪽에 정렬한다.
+// last가 아니면 아래쪽에 얇은 구분선이 붙는다.
+function SettingsRow({ title, description, right, onClick, last }) {
+  return (
+    <div
+      style={{
+        ...styles.settingsRow,
+        ...(last ? null : styles.settingsRowDivider),
+        ...(onClick ? styles.settingsRowClickable : null),
+      }}
+      onClick={onClick}
+      role={onClick ? 'button' : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e => { if (e.key === 'Enter') onClick() }) : undefined}
+    >
+      <div style={styles.settingsRowText}>
+        <span style={styles.settingsRowTitle}>{title}</span>
+        {description && <span style={styles.settingsRowDesc}>{description}</span>}
+      </div>
+      {right}
+    </div>
+  )
+}
+
 export default function MyAccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -63,6 +104,7 @@ export default function MyAccountPage() {
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false)
 
   const [tab, setTab] = useState(() => searchParams.get('tab') === 'wish' ? 'wish' : 'info') // 'info' | 'wish'
   const [wishPlaces, setWishPlaces] = useState([])
@@ -97,6 +139,7 @@ export default function MyAccountPage() {
     if (!isPushSupported()) return
     getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
   }, [])
+
 
   useEffect(() => {
     if (tab !== 'wish' || !user) return
@@ -384,13 +427,21 @@ export default function MyAccountPage() {
   const handleToggleLunchReminder = async () => {
     if (lunchReminderLoading) return
     setLunchReminderLoading(true)
+    setPushError(null)
     try {
       const next = !lunchReminderEnabled
+      // 리마인드는 활동 알림과 별개 항목이지만 발송에는 같은 브라우저 푸시 구독이 필요하므로,
+      // 아직 구독 전이면 켜는 시점에 대신 구독해준다.
+      if (next && !pushEnabled) {
+        await subscribeToPush(user.id)
+        setPushEnabled(true)
+      }
       await setLunchReminderEnabled(user.id, next)
       setLunchReminderState(next)
       login({ ...user, notify_lunch_reminder: next })
     } catch (e) {
       console.error(e)
+      setPushError(e.message || '알림 설정에 실패했어요.')
     } finally {
       setLunchReminderLoading(false)
     }
@@ -425,10 +476,7 @@ export default function MyAccountPage() {
 
   return (
     <div style={styles.page}>
-      <div style={styles.header}>
-        <span style={styles.headerTitle}>내 계정</span>
-        <button style={styles.headerGuideBtn} onClick={() => navigate('/guide')}>사용법</button>
-      </div>
+      <AppHeader title="내 계정" action={{ label: '사용법', onClick: () => openDailyTipModal('guide') }} />
 
       <div style={styles.tabs}>
         <button style={{ ...styles.tabBtn, ...(tab === 'info' ? styles.tabBtnActive : {}) }} onClick={() => setTab('info')}>내 정보</button>
@@ -437,79 +485,90 @@ export default function MyAccountPage() {
 
       {tab === 'info' && (
       <div style={styles.body}>
-        {/* 프로필 */}
-        <div style={styles.profileCard}>
-          <div style={styles.avatarWrap} onClick={() => !avatarUploading && avatarInputRef.current?.click()}>
-            {user?.avatar_url ? (
-              <img src={user.avatar_url} alt="" style={styles.avatarImg} />
-            ) : (
-              <div style={styles.avatar}>{(user?.nickname ?? '?')[0]}</div>
-            )}
-            <div style={styles.avatarEditBadge}>
-              {avatarUploading ? (
-                <span style={{ fontSize: 9 }}>...</span>
+        <div style={styles.settingsGroup}>
+          {/* 프로필 — 카드 전체를 눌러 닉네임 수정으로 이동, 사진은 별도로 탭 */}
+          <div style={styles.profileCard} onClick={() => setEditing(true)} role="button" tabIndex={0}>
+            <div
+              style={styles.avatarWrap}
+              onClick={e => { e.stopPropagation(); if (!avatarUploading) avatarInputRef.current?.click() }}
+            >
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt="" style={styles.avatarImg} />
               ) : (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
-                  <circle cx="12" cy="13" r="3.3" />
-                </svg>
+                <div style={styles.avatar}>{(user?.nickname ?? '?')[0]}</div>
               )}
-            </div>
-            <input
-              ref={avatarInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleAvatarChange}
-              style={{ display: 'none' }}
-            />
-          </div>
-          <div style={styles.profileInfo}>
-            <div style={styles.profileNameRow}>
-              <span style={styles.profileName}>{user?.nickname}</span>
-              <button style={styles.editBtn} onClick={() => setEditing(true)}>변경</button>
-            </div>
-            <div style={styles.profileEmail}>{user?.email}</div>
-            {saved && <p style={styles.savedMsg}>✓ 닉네임이 변경됐어요.</p>}
-            {avatarError && <p style={styles.avatarErrorMsg}>{avatarError}</p>}
-          </div>
-        </div>
-
-        {/* 친구 검색 노출 */}
-        <div style={styles.section}>
-          <div style={styles.infoRow}>
-            <span style={styles.infoValue}>친구 찾기에서 내 계정 표시</span>
-            <ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="검색 노출" />
-          </div>
-          <p style={styles.installDesc}>끄면 다른 사람이 이메일이나 닉네임으로 나를 찾을 수 없어요.</p>
-        </div>
-
-        {/* 알림 */}
-        {isPushSupported() && (
-          <div style={styles.section}>
-            <span style={styles.sectionLabel}>알림</span>
-            {isIOS && !isInstalled ? (
-              <p style={styles.installDesc}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
-            ) : (
-              <div style={styles.notifList}>
-                <div style={styles.infoRow}>
-                  <span style={styles.infoValue}>알림 받기</span>
-                  <ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="알림 받기" />
-                </div>
-                <p style={styles.installDesc}>밥팟 초대, 참여, 댓글 소식을 알려드려요.</p>
-                {pushEnabled && (
-                  <div style={styles.notifSubItem}>
-                    <div style={styles.infoRow}>
-                      <span style={styles.infoValue}>점심 상태 리마인드</span>
-                      <ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />
-                    </div>
-                    <p style={styles.installDesc}>평일 점심시간 전에 상태를 안 정하면 한 번 알려드려요.</p>
-                  </div>
+              <div style={styles.avatarEditBadge}>
+                {avatarUploading ? (
+                  <span style={{ fontSize: 9 }}>...</span>
+                ) : (
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 8a2 2 0 0 1 2-2h1.5l1-1.5h7l1 1.5H18a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V8Z" />
+                    <circle cx="12" cy="13" r="3.3" />
+                  </svg>
                 )}
               </div>
-            )}
-            {pushError && <p style={styles.avatarErrorMsg}>{pushError}</p>}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleAvatarChange}
+                style={{ display: 'none' }}
+              />
+            </div>
+            <div style={styles.profileInfo}>
+              <span style={styles.profileName}>{user?.nickname}</span>
+              <span style={styles.profileEmail}>{user?.email}</span>
+              {saved && <p style={styles.savedMsg}>✓ 닉네임이 변경됐어요.</p>}
+              {avatarError && <p style={styles.avatarErrorMsg}>{avatarError}</p>}
+            </div>
+            <ChevronRight />
           </div>
-        )}
+
+          {/* 계정 공개 */}
+          <SettingsSection title="계정 공개">
+            <SettingsRow
+              title="친구 찾기 허용"
+              description="다른 사용자가 이메일이나 닉네임으로 나를 찾을 수 있어요."
+              right={<ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="친구 찾기 허용" />}
+              last
+            />
+          </SettingsSection>
+
+          {/* 알림 */}
+          {isPushSupported() && (
+            <SettingsSection title="알림">
+              {isIOS && !isInstalled ? (
+                <p style={styles.settingsNotice}>홈 화면에 앱을 추가하면 알림을 켤 수 있어요.</p>
+              ) : (
+                <>
+                  <SettingsRow
+                    title="활동 알림"
+                    description="밥팟 초대, 참여, 댓글 소식을 알려드려요."
+                    right={<ToggleSwitch on={pushEnabled} onClick={handleTogglePush} disabled={pushLoading} label="활동 알림" />}
+                  />
+                  <SettingsRow
+                    title="점심 상태 리마인드"
+                    description="평일 점심시간 전에 상태를 정하지 않으면 한 번 알려드려요."
+                    right={<ToggleSwitch on={lunchReminderEnabled} onClick={handleToggleLunchReminder} disabled={lunchReminderLoading} label="점심 상태 리마인드" />}
+                    last
+                  />
+                </>
+              )}
+            </SettingsSection>
+          )}
+          {pushError && <p style={{ ...styles.avatarErrorMsg, margin: '-6px 0 0 4px' }}>{pushError}</p>}
+
+          {/* 지원 */}
+          <SettingsSection title="지원">
+            <SettingsRow
+              title="의견 보내기"
+              description="불편했던 점이나 바라는 점을 알려주세요."
+              right={<ChevronRight />}
+              onClick={() => setShowFeedbackModal(true)}
+              last
+            />
+          </SettingsSection>
+        </div>
 
         {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
         {!isInstalled && (
@@ -517,6 +576,8 @@ export default function MyAccountPage() {
             <InstallAppPrompt hideDesc />
           </div>
         )}
+
+        {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
 
         {/* 회원 탈퇴 · 로그아웃 — 화면 아래쪽으로 밀어 스크롤해야 보이게 해서, 실수로 누르기
             쉬운 위치(헤더)를 피한다 */}
@@ -876,14 +937,6 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  header: {
-    height: 44, padding: '0 var(--spacing-md)', position: 'sticky', top: 0,
-    background: 'rgba(250,248,245,0.95)', zIndex: 10, backdropFilter: 'blur(8px)', flexShrink: 0,
-    borderBottom: '1px solid var(--color-border)',
-    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-  },
-  headerTitle: { fontFamily: 'var(--font-title)', fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.6px' },
-  headerGuideBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', fontFamily: 'inherit' },
   // 이 페이지는 내부 스크롤 컨테이너가 아니라 문서(페이지) 자체가 스크롤되는 구조라
   // position:sticky가 걸리지 않는다 — 그래서 fixed로 고정하고, 아래 paddingBottom을
   // 넉넉히 잡아 끝까지 스크롤하면 로그아웃/회원 탈퇴가 이 바 위로 완전히 올라오게 한다.
@@ -896,29 +949,48 @@ const styles = {
     borderTop: '1px solid var(--color-border)', zIndex: 90,
   },
 
-  profileCard: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-lg)' },
+  // 프로필 카드와 3개 설정 섹션을 한 그룹으로 묶어, 페이지 내 다른 블록(설치 안내, 로그아웃)과는
+  // 구분되는 넉넉한 간격을 준다.
+  settingsGroup: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-xl)' },
+
+  profileCard: {
+    display: 'flex', alignItems: 'center', gap: 14, padding: '18px 20px',
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-lg)', cursor: 'pointer',
+  },
   avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
-  avatar: { width: 48, height: 48, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
-  avatarImg: { width: 48, height: 48, borderRadius: '50%', objectFit: 'cover', display: 'block' },
+  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  avatarImg: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', display: 'block' },
   avatarEditBadge: {
-    position: 'absolute', bottom: -2, right: -2, width: 20, height: 20, borderRadius: '50%',
+    position: 'absolute', bottom: -2, right: -2, width: 19, height: 19, borderRadius: '50%',
     background: '#5C5650', color: '#fff', fontSize: 11, display: 'flex',
-    alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface-2)',
+    alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)',
   },
   avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-danger)', margin: 0 },
-  profileInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
-  profileNameRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  profileName: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  profileInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
+  profileName: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
+  savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600, margin: '2px 0 0' },
 
-  section: { display: 'flex', flexDirection: 'column', gap: 8 },
-  sectionLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
-  notifList: { display: 'flex', flexDirection: 'column', gap: 8 },
-  notifSubItem: { display: 'flex', flexDirection: 'column', gap: 8, marginLeft: 14, paddingLeft: 10, borderLeft: '2px solid var(--color-border)' },
-  infoRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  infoValue: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
-  editBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: '1px solid var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer' },
-  savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600 },
+  // 섹션 = 제목(굵게, 카드 밖) + 카드 하나(그 안에서 행들을 얇은 구분선으로만 나눔).
+  // 카드를 행마다 만들지 않고 섹션마다 하나만 써서 테두리가 과도해지지 않게 한다.
+  settingsSection: { display: 'flex', flexDirection: 'column', gap: 10 },
+  settingsSectionTitle: { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 0 4px' },
+  settingsList: {
+    display: 'flex', flexDirection: 'column',
+    background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
+    overflow: 'hidden',
+  },
+  settingsRow: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
+    minHeight: 68, padding: '14px 20px', boxSizing: 'border-box',
+  },
+  settingsRowDivider: { borderBottom: '1px solid rgba(220,212,201,0.55)' },
+  settingsRowClickable: { cursor: 'pointer' },
+  settingsRowText: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
+  settingsRowTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)', lineHeight: 1.35 },
+  settingsRowDesc: { fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', lineHeight: 1.5 },
+  settingsNotice: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '18px 20px', margin: 0 },
 
   toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
   toggleThumb: { display: 'block', width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s' },
