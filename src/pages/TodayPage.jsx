@@ -308,7 +308,7 @@ export default function TodayPage() {
       const groupIds = myGroups.map(g => g.id)
       // 보드(멤버/상태/팟) 일괄 + 내 상태 + 공유설정 병렬 — 그룹 수와 무관하게 상수 횟수 쿼리
       const [board, myStatuses, shareRows] = await Promise.all([
-        getTodayBoard(groupIds, dateStr),
+        getTodayBoard(groupIds, dateStr, user.id),
         getMyStatuses(user.id, dateStr),
         getGroupShareSettings(user.id, dateStr).catch(() => []),
       ])
@@ -319,7 +319,7 @@ export default function TodayPage() {
         await ensureDefaultPots(g.id, dateStr, configs)
       }))
       // 자동 생성 후 팟 목록 재조회
-      const refreshed = await getTodayBoard(groupIds, dateStr)
+      const refreshed = await getTodayBoard(groupIds, dateStr, user.id)
 
       // 내 상태 (사용자 의향 원본)
       const slots = {}
@@ -367,7 +367,7 @@ export default function TodayPage() {
       const configs = await getGroupDefaultPotConfigs(groupId)
       await ensureDefaultPots(groupId, dateStr, configs) // 다른 기기의 기본팟 설정 변경분 재생성
       const [statuses, pots] = await Promise.all([
-        getGroupStatuses(groupId, dateStr),
+        getGroupStatuses(groupId, dateStr, user.id),
         getGroupPots(groupId, dateStr),
       ])
       setStatusesMap(prev => ({ ...prev, [groupId]: statuses }))
@@ -1762,9 +1762,22 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {/* 그룹 상태 요약 — 펼친 상태에선 아래 상태 필터 탭과 내용이 겹쳐 접혀 있을 때만 한눈에 보기 칩으로 표시 */}
       {collapsed && (
         <div style={styles.groupStatusSummary}>
-          <span style={{ ...styles.groupStatusChip, color: 'var(--color-success)', background: 'var(--color-success-bg)' }}>같이가능 {statusCounts['open'] ?? 0}</span>
-          <span style={{ ...styles.groupStatusChip, color: '#FF6B35', background: '#FFF4EF' }}>같이 먹기로 함 {(statusCounts['참여중'] ?? 0) + (statusCounts['참여완료'] ?? 0)}</span>
-          <span style={{ ...styles.groupStatusChip, color: 'var(--color-text-muted)', background: '#F5F0EB' }}>미설정 {unsetMembers.length}</span>
+          {(() => {
+            const openOpt = SLOT_STATUS_OPTIONS.find(o => o.key === 'open')
+            return (
+              <span style={{ ...styles.groupStatusChip, color: openOpt.color, background: openOpt.bg, border: `1px solid ${openOpt.border}` }}>{openOpt.emoji} 같이가능 {statusCounts['open'] ?? 0}</span>
+            )
+          })()}
+          {(statusCounts['참여중'] ?? 0) > 0 && (() => {
+            const opt = SLOT_STATUS_OPTIONS.find(o => o.key === '참여중')
+            return (
+              <span style={{ ...styles.groupStatusChip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>{opt.label} {statusCounts['참여중']}</span>
+            )
+          })()}
+          {(statusCounts['참여완료'] ?? 0) > 0 && (
+            <span style={{ ...styles.groupStatusChip, color: '#8F877D', background: '#F5F0EB', border: '1px solid #E8E3DE' }}>{SLOT_STATUS_OPTIONS.find(o => o.key === '참여완료').label} {statusCounts['참여완료']}</span>
+          )}
+          <span style={{ ...styles.groupStatusChip, color: 'var(--color-text-muted)', background: '#F5F0EB', border: '1px solid #E8E3DE' }}>미설정 {unsetMembers.length}</span>
         </div>
       )}
 
