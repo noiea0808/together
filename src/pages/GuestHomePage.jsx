@@ -72,7 +72,7 @@ export default function GuestHomePage() {
             {SLOT_ORDER.map(slot => {
               const pot = potBySlot[slot]
               const isInPot = !!pot
-              const opt = isInPot ? { ...(isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT), label: getJoinedStatusLabel(home.date, pot.meal_time, pot.end_time) } : null
+              const opt = isInPot ? { ...(isPotTimeExpired(home.date, pot.end_time) ? DONE_OPT : JOINED_OPT), label: getJoinedStatusLabel(home.date, pot.meal_time, pot.end_time, (pot.pot_members?.length ?? 0) === 1) } : null
               return (
                 <div
                   key={slot}

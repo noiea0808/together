@@ -9,6 +9,7 @@ import {
 } from '../lib/db'
 import FeedbackModal from '../components/FeedbackModal'
 import AppHeader from '../components/AppHeader'
+import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import BottomNav from '../components/BottomNav'
@@ -475,7 +476,7 @@ export default function MyAccountPage() {
 
   return (
     <div style={styles.page}>
-      <AppHeader title="내 계정" action={{ label: '사용법', onClick: () => navigate('/guide') }} />
+      <AppHeader title="내 계정" action={{ label: '사용법', onClick: () => openDailyTipModal('guide') }} />
 
       <div style={styles.tabs}>
         <button style={{ ...styles.tabBtn, ...(tab === 'info' ? styles.tabBtnActive : {}) }} onClick={() => setTab('info')}>내 정보</button>

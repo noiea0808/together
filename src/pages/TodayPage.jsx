@@ -677,7 +677,7 @@ export default function TodayPage() {
     const earliestPot = myPotsInSlot[0]
     const isInPot = potCount > 0
     const inPotExpired = isInPot && isPotTimeExpired(dateStr, earliestPot?.end_time)
-    const lockedLabel = isInPot ? getJoinedStatusLabel(dateStr, earliestPot?.meal_time, earliestPot?.end_time) : null
+    const lockedLabel = isInPot ? getJoinedStatusLabel(dateStr, earliestPot?.meal_time, earliestPot?.end_time, (earliestPot?.pot_members?.length ?? 0) === 1) : null
     const lockedOpt = isInPot ? { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: lockedLabel } : null
     const displayOpt = lockedOpt ?? opt
 
@@ -1037,7 +1037,7 @@ export default function TodayPage() {
               .sort((a, b) => (a.meal_time ?? '').localeCompare(b.meal_time ?? ''))
             if (myPotsInSlot.length === 0) return null
             const inPotExpired = isPotTimeExpired(dateStr, myPotsInSlot[0].end_time)
-            const lockedOpt = { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: getJoinedStatusLabel(dateStr, myPotsInSlot[0].meal_time, myPotsInSlot[0].end_time) }
+            const lockedOpt = { ...SLOT_STATUS_OPTIONS.find(o => o.key === (inPotExpired ? '참여완료' : '참여중')), label: getJoinedStatusLabel(dateStr, myPotsInSlot[0].meal_time, myPotsInSlot[0].end_time, (myPotsInSlot[0].pot_members?.length ?? 0) === 1) }
             return (
               <>
                 <div style={styles.potInfoBanner}>
@@ -1738,7 +1738,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}</>}</span>
+            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time, (myGroupPot?.pot_members?.length ?? 0) === 1)}</>}</span>
           ) : (
             <button
               style={{
@@ -2249,7 +2249,7 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
               <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
             </div>
             <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : (expired || isFull) ? potListStyles.joinBtnFull : {}) }}>
-              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time) : expired ? '종료' : isFull ? '마감' : '같이 먹기'}
+              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time, filled === 1) : expired ? '종료' : isFull ? '마감' : '같이 먹기'}
             </button>
           </div>
         </div>

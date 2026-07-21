@@ -24,10 +24,6 @@ function dismissToday() {
   localStorage.setItem('dailyTipDismissedDate', JSON.stringify(toDateStr(new Date())))
 }
 
-// 테스트 기간 동안 "오늘 하루 보지 않기"를 무시하고 매번 팝업을 띄우기 위한 스위치.
-// 테스트가 끝나면 true로 되돌린다.
-const ENABLE_DISMISS_TODAY = false
-
 // 별표(is_featured) 팁은 가중치 2, 일반 팁은 가중치 1로 뽑아 순서를 정한다.
 // 매 단계에서 남은 항목 중 가중치에 비례한 확률로 하나를 뽑아 앞으로 보내는 방식이라,
 // 별표 팁이 평균적으로 더 앞쪽(끝까지 안 넘겨도 보일 위치)에 나올 확률이 두 배가 된다.
@@ -48,13 +44,19 @@ function weightedShuffle(items) {
 }
 
 const TABS = {
-  guide: { key: 'guide', label: "'같이먹자' 시작하기" },
+  guide: { key: 'guide', label: '시작하기' },
   tip: { key: 'tip', label: '오늘의 팁' },
 }
 
-// 로그인 후 접속할 때마다 뜨는 팝업. "'같이먹자' 시작하기"(guide, 정해진 순서)와
+// 내 계정 > 사용법처럼, 다른 화면에서 이 팝업을 특정 탭으로 직접 열고 싶을 때 쓴다.
+const OPEN_EVENT = 'daily-tip-modal:open'
+export function openDailyTipModal(tab = 'tip') {
+  window.dispatchEvent(new CustomEvent(OPEN_EVENT, { detail: { tab } }))
+}
+
+// 로그인 후 접속할 때마다 뜨는 팝업. "시작하기"(guide, 정해진 순서)와
 // "오늘의 팁"(tip, 랜덤 순서) 두 탭을 가지며, 탭은 자유롭게 오갈 수 있다.
-// 이 기기에서 처음 뜰 때는 시작하기 탭을 기본으로 보여주고, 이후부터는 오늘의 팁 탭을 기본으로 보여준다.
+// 시작하기 탭이 있으면 항상 그 탭을 기본으로 보여주고, 없으면 오늘의 팁을 보여준다.
 // "오늘 하루 보지 않기"는 기기(로컬스토리지) 기준으로만 적용되며, 그냥 닫기는 다음 접속 때 다시 뜬다.
 // GroupInviteModal과 겹치지 않도록 초대 코드가 대기 중이면 이번 접속에서는 띄우지 않는다.
 export default function DailyTipModal() {
@@ -75,7 +77,7 @@ export default function DailyTipModal() {
   useEffect(() => {
     if (!user || !user.onboarded || user.is_guest) return
     if (tabItems !== null) return
-    if (ENABLE_DISMISS_TODAY && isDismissedToday()) return
+    if (isDismissedToday()) return
     if (localStorage.getItem('pendingInviteCode')) return
 
     let cancelled = false
@@ -89,16 +91,43 @@ export default function DailyTipModal() {
           return
         }
         setTabItems({ guide, tip })
-
-        const firstVisit = !localStorage.getItem('dailyTipGuideSeen')
-        const initialTab = (firstVisit && guide.length > 0) ? 'guide' : (tip.length > 0 ? 'tip' : 'guide')
-        setActiveTab(initialTab)
-        if (firstVisit) localStorage.setItem('dailyTipGuideSeen', '1')
+        setActiveTab(guide.length > 0 ? 'guide' : 'tip')
         setOpen(true)
       })
       .catch(() => { if (!cancelled) setTabItems({ guide: [], tip: [] }) })
     return () => { cancelled = true }
   }, [user?.id, user?.onboarded, user?.is_guest])
+
+  useEffect(() => {
+    const openTab = (list, tab) => {
+      const guide = list.filter(t => t.category === 'guide').sort((a, b) => a.sort_order - b.sort_order)
+      const tip = weightedShuffle(list.filter(t => t.category !== 'guide'))
+      const next = { guide, tip }
+      setTabItems(next)
+      if (next[tab]?.length > 0) {
+        setActiveTab(tab)
+        setIndex(0)
+        setOpen(true)
+      }
+    }
+
+    const handler = (e) => {
+      const tab = e.detail?.tab ?? 'tip'
+      if (tabItems) {
+        if (tabItems[tab]?.length > 0) {
+          setActiveTab(tab)
+          setIndex(0)
+          if (scrollRef.current) scrollRef.current.scrollLeft = 0
+          setOpen(true)
+        }
+        return
+      }
+      getActiveDailyTips().then(list => openTab(list, tab)).catch(() => {})
+    }
+
+    window.addEventListener(OPEN_EVENT, handler)
+    return () => window.removeEventListener(OPEN_EVENT, handler)
+  }, [tabItems])
 
   const items = tabItems?.[activeTab] ?? []
   const availableTabs = tabItems ? Object.keys(TABS).filter(k => tabItems[k]?.length > 0) : []

@@ -5,10 +5,10 @@ import { resizeImageFile } from '../../lib/resizeImage'
 const EMPTY = { content: '', image_url: null, is_active: true, is_featured: false, sort_order: 0 }
 
 const CATEGORY_TABS = [
+  { key: 'guide', label: '시작하기', addLabel: '+ 안내 추가', empty: '등록된 시작 안내가 없습니다. "안내 추가"로 만들어주세요.',
+    subtitle: '' },
   { key: 'tip', label: '오늘의 팁', addLabel: '+ 팁 추가', empty: '등록된 팁이 없습니다. "팁 추가"로 만들어주세요.',
     subtitle: '로그인 후 접속할 때마다 뜨는 팁 팝업입니다. 활성 상태인 팁만 랜덤 순서로 사용자에게 노출되며, 별표 표시한 팁은 노출 가중치가 2배 적용됩니다.' },
-  { key: 'guide', label: "'같이먹자' 시작하기", addLabel: '+ 안내 추가', empty: '등록된 시작 안내가 없습니다. "안내 추가"로 만들어주세요.',
-    subtitle: '' },
 ]
 
 function truncate(text, max = 40) {
@@ -27,7 +27,7 @@ export default function TipsPage() {
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState(null) // null | tip object (id 없으면 신규) + _newImageFile
   const [saving, setSaving] = useState(false)
-  const [activeCategory, setActiveCategory] = useState('tip')
+  const [activeCategory, setActiveCategory] = useState('guide')
 
   const load = () => {
     setLoading(true)
