@@ -146,15 +146,6 @@ export default function TodayPage() {
   const [viewMode, setViewMode] = useState(
     () => localStorage.getItem('lastViewMode') || 'group'
   )
-  const subSlotRowRef = useRef(null)
-  // scrollBy({behavior:'smooth'}) 옵션객체 시그니처는 일부 인앱 브라우저(WebView)에서 지원이 불안정해
-  // CSS scrollBehavior + 직접 scrollLeft 대입 방식(범용 호환)으로 스크롤한다.
-  const scrollSubSlots = (dir) => {
-    const el = subSlotRowRef.current
-    if (!el) return
-    el.scrollLeft += dir * 200
-  }
-  const subSlotBtnRefs = useRef({})
   const [slideDir, setSlideDir] = useState('next')
   // 전환 중 함께 화면에 걸쳐두는 "밀려나가는" 이전 슬롯 — 트랙 애니메이션이 끝나면 null로 비운다.
   const [prevSlot, setPrevSlot] = useState(null)
@@ -164,14 +155,6 @@ export default function TodayPage() {
   // 나의 상태 카드가 스와이프된다는 걸 처음 진입한 사용자에게만 몸으로 알려주는 1회성 넛지.
   const [showSwipeHint, setShowSwipeHint] = useState(() => !localStorage.getItem('statusCardSwipeHintShown'))
   const dismissSwipeHint = () => { localStorage.setItem('statusCardSwipeHintShown', '1'); setShowSwipeHint(false) }
-
-  // 선택된 슬롯 버튼을 서브탭 행 중앙으로 — 위 스크롤과 같은 이유로 scrollLeft 직접 대입
-  const centerSubSlot = (slot) => {
-    const container = subSlotRowRef.current
-    const btn = subSlotBtnRefs.current[slot]
-    if (!container || !btn) return
-    container.scrollLeft = Math.max(0, btn.offsetLeft - (container.clientWidth - btn.clientWidth) / 2)
-  }
 
   // 메인 상태 카드 스와이프·서브탭 클릭 공용 슬롯 전환 — 방향에 따라 슬라이드 애니메이션 결정
   const goToSlot = (slot) => {
@@ -185,6 +168,9 @@ export default function TodayPage() {
   }
 
   // 메인 상태 카드 위의 스와이프는 슬롯 전환 전담 — 페이지 레벨 날짜 스와이프로 버블링되지 않도록 막는다.
+  // 카드 전체가 탭 영역(편집 팝업 열기)이 된 뒤로는, 드래그가 클릭으로 이어져 편집 팝업이
+  // 실수로 열리지 않도록 드래그 여부를 기록해뒀다가 onClick에서 건너뛴다.
+  const cardWasDragged = useRef(false)
   const handleCardSwipeStart = (e) => { e.stopPropagation(); swipeStart.current = { x: e.clientX, y: e.clientY } }
   const handleCardSwipeEnd = (e) => {
     if (!swipeStart.current) return
@@ -192,6 +178,8 @@ export default function TodayPage() {
     const dx = e.clientX - swipeStart.current.x
     const dy = e.clientY - swipeStart.current.y
     swipeStart.current = null
+    if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
+    cardWasDragged.current = true
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
     const idx = SLOT_ORDER.indexOf(selectedSlot)
     if (dx < 0 && idx < SLOT_ORDER.length - 1) goToSlot(SLOT_ORDER[idx + 1])
@@ -236,6 +224,8 @@ export default function TodayPage() {
   const [mySlots, setMySlots] = useState({})
   // 날짜 전체 초기화 확인 팝업
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  // 메인 상태 카드 우상단 더보기(⋮) 메뉴
+  const [showCardMenu, setShowCardMenu] = useState(false)
   // 밥팟 만들기 충돌 팝업
   const [createConflict, setCreateConflict] = useState(null) // { existingPot, groupId, slot }
   // 공유 토글 범위 선택 팝업
@@ -271,7 +261,8 @@ export default function TodayPage() {
     if (shareTogglePending) { setShareTogglePending(null); return }
     if (createConflict) { setCreateConflict(null); return }
     if (showResetConfirm) { setShowResetConfirm(false); return }
-  }, [leavePotConfirm, slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm]))
+    if (showCardMenu) { setShowCardMenu(false); return }
+  }, [leavePotConfirm, slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm, showCardMenu]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -355,8 +346,6 @@ export default function TodayPage() {
       setLoading(false)
     }
   }, [user, dateStr, applySnapshot])
-
-  useEffect(() => { centerSubSlot(selectedSlot) }, [selectedSlot])
 
   useEffect(() => { loadData() }, [loadData])
 
@@ -761,13 +750,45 @@ export default function TodayPage() {
           ? { bg: '#EFE6D6' }
           : SLOT_THEME[selectedSlot]
         const prevInfo = prevSlot ? getSlotInfo(prevSlot) : null
+        // resetAll이 지우는 대상(명시적 상태 또는 참여 중인 밥팟)이 하나라도 있을 때만 메뉴 노출
+        const hasResettable = SLOT_ORDER.some(s => mySlots[s]) || Object.values(potsMap).flat().some(p => p.pot_members?.some(pm => pm.user_id === user.id))
         // 카드 한 장을 그린다 — paired=true면 트랙 안에서 옆 카드와 나란히 절반씩 차지한다.
+        // 카드 전체가 탭 영역 — 클릭하면 해당 슬롯 편집 팝업을 연다. 더보기(⋮) 메뉴 클릭은 별도로 막는다.
         const renderStatusCard = (slot, info, paired) => (
-          <div key={slot} style={{ ...styles.mainStatusCard, width: undefined, minWidth: 0, flex: paired ? '0 0 50%' : '0 0 100%' }}>
+          <div
+            key={slot}
+            style={{
+              ...styles.mainStatusCard, width: undefined, minWidth: 0, flex: paired ? '0 0 50%' : '0 0 100%',
+              cursor: info.isPastDate ? 'default' : 'pointer',
+            }}
+            onClick={() => {
+              if (cardWasDragged.current) { cardWasDragged.current = false; return }
+              if (!info.isPastDate) openSlotEditor(slot)
+            }}
+          >
             <div style={styles.mainStatusHeaderRow}>
               <span style={styles.mainStatusTitle}>내 {slot}</span>
-              {!info.isPastDate && (
-                <button style={styles.mainStatusChangeBtn} onClick={() => openSlotEditor(slot)}>변경</button>
+              {!info.isPastDate && hasResettable && (
+                <div style={{ position: 'relative' }}>
+                  <button
+                    style={styles.mainStatusMenuBtn}
+                    aria-label="더보기"
+                    onClick={(e) => { e.stopPropagation(); setShowCardMenu(v => (slot === selectedSlot ? !v : true)) }}
+                  >⋮</button>
+                  {showCardMenu && slot === selectedSlot && (
+                    <>
+                      <div style={styles.cardMenuOverlay} onClick={(e) => { e.stopPropagation(); setShowCardMenu(false) }} />
+                      <div style={styles.cardMenuDropdown} onClick={e => e.stopPropagation()}>
+                        <button
+                          style={styles.cardMenuItem}
+                          onClick={() => { setShowCardMenu(false); setShowResetConfirm(true) }}
+                        >
+                          <UndoIcon size={13} strokeWidth={2.2} /> 오늘 상태 초기화
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
               )}
             </div>
             <div style={styles.mainStatusBody}>
@@ -828,52 +849,29 @@ export default function TodayPage() {
           </div>
         </div>
 
-        {/* 슬림한 한 줄 슬롯 네비게이션 — 화살표는 양 끝에 분리되어 카드와 겹치지 않음 */}
-        <div style={styles.subSlotWrap}>
-          <button style={styles.subSlotArrowBtn} onClick={() => scrollSubSlots(-1)} aria-label="이전">
-            <svg width="6" height="10" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
-          <div style={styles.subSlotRow} className="no-scrollbar" ref={subSlotRowRef}>
-            {SLOT_ORDER.map(slot => {
-              const info = getSlotInfo(slot)
-              const isSelected = selectedSlot === slot
-              return (
-                <button
-                  key={slot}
-                  ref={el => { subSlotBtnRefs.current[slot] = el }}
-                  style={{
-                    ...styles.subSlotBtn,
-                    borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
-                    background: '#fff',
-                    opacity: info.isPastDate ? 0.65 : 1,
-                  }}
-                  onClick={() => goToSlot(slot)}
-                >
-                  <span style={styles.subSlotEmojiWrap}>
-                    <SlotIcon slot={slot} size={34} muted={!isSelected} style={styles.subSlotEmojiImg} />
-                  </span>
-                  <span style={styles.subSlotTextCol}>
-                    <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
-                    <span style={{ ...styles.subSlotStatus, color: info.label ? info.color : '#ADA59B' }}>{info.label ?? '미정'}</span>
-                  </span>
-                </button>
-              )
-            })}
-          </div>
-          <button style={styles.subSlotArrowBtn} onClick={() => scrollSubSlots(1)} aria-label="다음">
-            <svg width="6" height="10" viewBox="0 0 9 15" fill="none"><path d="M1.5 1.5L7.5 7.5L1.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-          </button>
+        {/* 슬롯 네비게이션 — 6개 슬롯을 화면 폭 안에 한 번에 표시. 상태는 텍스트 대신 배경색으로 표시 */}
+        <div style={styles.subSlotRow}>
+          {SLOT_ORDER.map(slot => {
+            const info = getSlotInfo(slot)
+            const isSelected = selectedSlot === slot
+            return (
+              <button
+                key={slot}
+                style={{
+                  ...styles.subSlotBtn,
+                  background: info.label ? info.bg : '#fff',
+                  borderColor: isSelected ? 'var(--color-primary)' : (info.label ? info.border : 'var(--color-border)'),
+                  borderWidth: isSelected ? 2 : 1.5,
+                  opacity: info.isPastDate ? 0.65 : 1,
+                }}
+                onClick={() => goToSlot(slot)}
+              >
+                <SlotIcon slot={slot} size={26} muted={!isSelected} />
+                <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
+              </button>
+            )
+          })}
         </div>
-
-        {/* 초기화 — 핵심 카드 밖, 보조 텍스트 링크로. resetAll이 지우는 대상(명시적 상태 또는
-            참여 중인 밥팟)이 하나라도 있을 때만 노출 */}
-        {(SLOT_ORDER.some(slot => mySlots[slot]) || Object.values(potsMap).flat().some(p => p.pot_members?.some(pm => pm.user_id === user.id))) && (
-          <div style={styles.resetLinkRow}>
-            <button style={styles.resetAllBtn} onClick={() => setShowResetConfirm(true)}>
-              <UndoIcon size={13} strokeWidth={2.2} /> 오늘 상태 초기화
-            </button>
-          </div>
-        )}
       </div>
         )
       })()}
@@ -2342,8 +2340,6 @@ const styles = {
   relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
-  resetLinkRow: { display: 'flex', justifyContent: 'flex-end' },
-  resetAllBtn: { display: 'inline-flex', alignItems: 'center', gap: 4, fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '2px 4px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)', opacity: 0.75 },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
@@ -2389,7 +2385,23 @@ const styles = {
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
-  mainStatusChangeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, padding: '5px 12px', borderRadius: 'var(--radius-full)', cursor: 'pointer', background: 'var(--color-surface-2)', border: 'none', color: 'var(--color-text)' },
+  mainStatusMenuBtn: {
+    width: 26, height: 26, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    fontSize: 16, fontWeight: 900, lineHeight: 1, letterSpacing: '-1px', padding: '0 0 6px',
+    borderRadius: '50%', cursor: 'pointer', background: 'none', border: 'none', color: 'var(--color-text-muted)',
+  },
+  cardMenuOverlay: { position: 'fixed', inset: 0, zIndex: 90, background: 'transparent' },
+  cardMenuDropdown: {
+    position: 'absolute', top: 30, right: 0, zIndex: 91, minWidth: 148,
+    background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.12)', padding: 4,
+  },
+  cardMenuItem: {
+    display: 'flex', alignItems: 'center', gap: 6, width: '100%', boxSizing: 'border-box',
+    padding: '9px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: 'none',
+    border: 'none', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600,
+    fontFamily: 'inherit', whiteSpace: 'nowrap',
+  },
   mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
@@ -2407,18 +2419,9 @@ const styles = {
   mainStatusMeta: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
-  subSlotWrap: { display: 'flex', alignItems: 'center', gap: 4 },
-  subSlotArrowBtn: { flexShrink: 0, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'transparent', color: '#C7BFB6', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
-  subSlotRow: { display: 'flex', alignItems: 'center', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', scrollBehavior: 'smooth', flex: 1, minWidth: 0 },
-  subSlotBtn: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 7, height: 44, boxSizing: 'border-box', padding: '0 10px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent', flex: '0 0 auto', whiteSpace: 'nowrap' },
-  subSlotEmojiWrap: {
-    width: 34, height: 34, flexShrink: 0,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-  },
-  subSlotEmojiImg: { flexShrink: 0 },
-  subSlotTextCol: { display: 'flex', flexDirection: 'column', gap: 1, minWidth: 0, alignItems: 'flex-start' },
-  subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700 },
-  subSlotStatus: { fontSize: 'var(--font-size-2xs)', fontWeight: 600 },
+  subSlotRow: { display: 'flex', alignItems: 'stretch', gap: 4 },
+  subSlotBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, flex: '1 1 0', minWidth: 0, height: 60, boxSizing: 'border-box', padding: '6px 1px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
+  subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.3px' },
   sectionTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
   groupCard: { marginBottom: 22, padding: '12px 12px 10px', background: 'var(--color-surface-2)', borderRadius: 16, transition: 'opacity 0.2s' },
