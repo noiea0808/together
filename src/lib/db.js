@@ -94,7 +94,7 @@ export async function getSessionUser() {
     if (authUser.is_anonymous) {
       const { data: guestProfile, error: gErr } = await supabase
         .from('users')
-        .upsert({ auth_id: authUser.id, nickname: '게스트', is_guest: true, onboarded: true }, { onConflict: 'auth_id' })
+        .upsert({ auth_id: authUser.id, nickname: '게스트', is_guest: true, onboarded: true, last_login_at: new Date().toISOString() }, { onConflict: 'auth_id' })
         .select()
         .single()
       if (gErr) return null
@@ -105,7 +105,7 @@ export async function getSessionUser() {
       ?? '사용자'
     const { data: newProfile, error: insertError } = await supabase
       .from('users')
-      .upsert({ auth_id: authUser.id, email: authUser.email, nickname, onboarded: false }, { onConflict: 'auth_id' })
+      .upsert({ auth_id: authUser.id, email: authUser.email, nickname, onboarded: false, last_login_at: new Date().toISOString() }, { onConflict: 'auth_id' })
       .select()
       .single()
     if (insertError) return null
@@ -113,6 +113,8 @@ export async function getSessionUser() {
   }
 
   if (error) return null
+  // 최근 로그인 시각 갱신 — 세션 로드를 막지 않도록 결과를 기다리지 않는다.
+  supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
   return data
 }
 
