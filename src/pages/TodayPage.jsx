@@ -136,7 +136,7 @@ export default function TodayPage() {
   const [currentDate, setCurrentDate] = useState(initialDate)
   const [selectedSlot, setSelectedSlot] = useState(getDefaultSlot)
   const [viewMode, setViewMode] = useState(
-    () => localStorage.getItem('lastViewMode') || 'group'
+    () => localStorage.getItem('lastViewMode') || 'pot'
   )
   const subSlotRowRef = useRef(null)
   // scrollBy({behavior:'smooth'}) 옵션객체 시그니처는 일부 인앱 브라우저(WebView)에서 지원이 불안정해

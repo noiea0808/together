@@ -60,7 +60,13 @@ export default function AdminLayout() {
           <div>
             <div style={s.brandName}>같이먹자</div>
             <div style={s.brandSub}>Admin</div>
+            <div style={s.brandSince}>since 2026-06-25</div>
           </div>
+        </div>
+
+        <div style={s.accountBar}>
+          {adminUser?.email && <div style={s.adminEmail}>{adminUser.email}</div>}
+          <button style={s.logoutBtn} onClick={handleLogout}>로그아웃</button>
         </div>
 
         <nav style={s.nav}>
@@ -90,12 +96,6 @@ export default function AdminLayout() {
             </div>
           ))}
         </nav>
-
-        <div style={s.sidebarFooter}>
-          {adminUser?.email && <div style={s.adminEmail}>{adminUser.email}</div>}
-          <button style={s.logoutBtn} onClick={handleLogout}>로그아웃</button>
-          <a href="/today" style={s.backLink}>← 서비스로 돌아가기</a>
-        </div>
       </aside>
 
       {/* Main */}
@@ -134,6 +134,15 @@ const s = {
   brandIcon: { fontSize: 28 },
   brandName: { fontSize: 15, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 },
   brandSub: { fontSize: 11, color: '#FF6B35', fontWeight: 600, letterSpacing: 1 },
+  brandSince: { fontSize: 10, color: '#8888A8', marginTop: 2 },
+  accountBar: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    padding: '10px 20px',
+    borderBottom: '1px solid #2E2E42',
+  },
   nav: { flex: 1, overflowY: 'auto', padding: '12px 0' },
   navSection: { marginBottom: 4 },
   navSectionTitle: {
@@ -177,19 +186,14 @@ const s = {
     borderRadius: 4,
     letterSpacing: 0.5,
   },
-  sidebarFooter: {
-    padding: '14px 20px',
-    borderTop: '1px solid #2E2E42',
-    display: 'flex',
-    flexDirection: 'column',
-    gap: 8,
-  },
   adminEmail: {
     fontSize: 11,
     color: '#5A5A7A',
     overflow: 'hidden',
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
+    flex: 1,
+    minWidth: 0,
   },
   logoutBtn: {
     fontSize: 12,
@@ -197,13 +201,8 @@ const s = {
     background: 'none',
     border: 'none',
     padding: 0,
-    textAlign: 'left',
+    flexShrink: 0,
     cursor: 'pointer',
-  },
-  backLink: {
-    fontSize: 12,
-    color: '#5A5A7A',
-    textDecoration: 'none',
   },
   main: {
     flex: 1,
