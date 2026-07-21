@@ -175,20 +175,28 @@ export default function DailyTipModal() {
           </div>
         )}
 
+        {/* 넛지 애니메이션을 scroll-snap 컨테이너 자신이 아니라 이 바깥 래퍼에 건다.
+            iOS Safari는 overflow-x:auto + scroll-snap-type이 걸린 요소에 transform
+            애니메이션까지 같이 주면 애니메이션 종료 시 스냅 위치를 잘못 계산해, 첫 카드가
+            아니라 두세 번째 카드로 스냅해버리는 버그가 있다. */}
         <div
-          className="no-scrollbar"
-          style={{ ...styles.scroll, animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined }}
-          ref={scrollRef}
-          onScroll={handleScroll}
+          style={{ animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined }}
           onAnimationEnd={dismissSwipeHint}
-          {...dragScroll}
         >
-          {items.map(item => (
-            <div key={item.id} style={styles.item}>
-              {item.image_url && <img src={item.image_url} alt="" style={styles.image} loading="lazy" />}
-              {item.content && <p style={styles.body}>{item.content}</p>}
-            </div>
-          ))}
+          <div
+            className="no-scrollbar"
+            style={styles.scroll}
+            ref={scrollRef}
+            onScroll={handleScroll}
+            {...dragScroll}
+          >
+            {items.map(item => (
+              <div key={item.id} style={styles.item}>
+                {item.image_url && <img src={item.image_url} alt="" style={styles.image} loading="lazy" />}
+                {item.content && <p style={styles.body}>{item.content}</p>}
+              </div>
+            ))}
+          </div>
         </div>
 
         {items.length > 1 && (

@@ -55,12 +55,12 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
         <div style={styles.modalOverlay} onClick={() => setShowInAppGuide(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
             <div style={styles.modalTitle}>
-              {isAndroid ? '브라우저에서 열어야 설치할 수 있어요' : '사파리 브라우저에서 열어야 앱추가를 할 수 있어요'}
+              {isAndroid ? '브라우저에서 열어야 설치할 수 있어요' : <>사파리 브라우저에서 열어야{'\n'}앱추가를 할 수 있어요</>}
             </div>
             <p style={styles.modalDesc}>
               {isAndroid
                 ? '카톡 안에서는 설치를 진행할 수 없어요. 아래 버튼을 누르면 크롬으로 바로 열려요.'
-                : '아래 버튼으로 링크를 복사한 뒤 사파리에 붙여넣어 열어주세요.'}
+                : <>아래 버튼으로 링크를 복사한 뒤{'\n'}사파리에 붙여넣어 열어주세요</>}
             </p>
 
             {isAndroid && (
@@ -69,7 +69,7 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
               </button>
             )}
             {!isAndroid && (
-              <button style={styles.modalClose} onClick={copyCurrentLink}>
+              <button style={{ ...styles.modalClose, marginBottom: 'var(--spacing-lg)' }} onClick={copyCurrentLink}>
                 {linkCopied ? '복사했어요 ✓' : '링크 복사하기'}
               </button>
             )}
@@ -94,7 +94,7 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
               </>
             ) : (
               <p style={styles.guideSingleLine}>
-                새로 열린 브라우저에서 다시 <strong>홈 화면에 추가</strong>를 눌러주세요.
+                새로 열린 브라우저에서{'\n'}다시 <strong>홈 화면에 추가</strong>를 눌러주세요.
               </p>
             )}
             <button style={styles.modalCancel} onClick={() => setShowInAppGuide(false)}>
@@ -193,11 +193,11 @@ const styles = {
   installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-success)', fontWeight: 700, padding: 8 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
   modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
-  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-lg)', textAlign: 'center' },
-  modalDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, margin: '0 0 var(--spacing-lg)' },
+  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 'var(--spacing-lg)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.4 },
+  modalDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, margin: '0 0 var(--spacing-lg)', whiteSpace: 'pre-line' },
   guideDivider: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', margin: '0 0 var(--spacing-md)' },
   guideSteps: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' },
-  guideSingleLine: { fontSize: 'var(--font-size-sm)', lineHeight: 1.6, textAlign: 'center', margin: '0 0 var(--spacing-xl)' },
+  guideSingleLine: { fontSize: 'var(--font-size-sm)', lineHeight: 1.6, textAlign: 'center', margin: '0 0 var(--spacing-xl)', whiteSpace: 'pre-line' },
   guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
   guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 'var(--font-size-2xs)' },
   modalClose: { ...PRIMARY_ACTION_BUTTON },

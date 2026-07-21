@@ -4,6 +4,7 @@ import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { useUser } from '../lib/UserContext'
 import { invalidateCache } from '../lib/cache'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import GroupInviteShare from '../components/GroupInviteShare'
 
 export default function GroupSetupPage() {
   const navigate = useNavigate()
@@ -13,15 +14,16 @@ export default function GroupSetupPage() {
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [createdGroup, setCreatedGroup] = useState(null) // 생성 직후: 초대 화면으로 전환
 
   const handleCreate = async () => {
     if (!groupName.trim() || loading) return
     setLoading(true)
     setError(null)
     try {
-      await createGroup(groupName.trim(), user.id)
+      const group = await createGroup(groupName.trim(), user.id)
       invalidateCache(`board:${user.id}:`, { prefix: true })
-      navigate('/today', { replace: true })
+      setCreatedGroup(group)
     } catch (e) {
       setError('그룹 생성에 실패했어요.')
     } finally {
@@ -43,6 +45,16 @@ export default function GroupSetupPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  if (createdGroup) {
+    return (
+      <div style={styles.page}>
+        <div style={styles.card}>
+          <GroupInviteShare group={createdGroup} onDone={() => navigate('/today', { replace: true })} />
+        </div>
+      </div>
+    )
   }
 
   return (

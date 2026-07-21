@@ -13,7 +13,6 @@ import GuestHomePage from './pages/GuestHomePage'
 import MySchedulePage from './pages/MySchedulePage'
 import MomentPage from './pages/MomentPage'
 import MyAccountPage from './pages/MyAccountPage'
-import GuidePage from './pages/GuidePage'
 import CreatePotPage from './pages/CreatePotPage'
 import PotDetailPage from './pages/PotDetailPage'
 import GroupPage from './pages/GroupPage'
@@ -105,7 +104,6 @@ function ConsumerRoutes() {
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
       <Route path="/moment"   element={guestSafe(<MomentPage />)} />
       <Route path="/account"  element={guestSafe(<MyAccountPage />)} />
-      <Route path="/guide"    element={guestSafe(<GuidePage />)} />
       <Route path="/create"   element={guestSafe(<CreatePotPage />)} />
       <Route path="/pot/:id"  element={<PotDetailPage />} />
       <Route path="/group"    element={guestSafe(<GroupPage />)} />
