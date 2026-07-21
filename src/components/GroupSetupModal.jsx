@@ -3,6 +3,7 @@ import { createGroup, getGroupByInviteCode, joinGroup } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { UsersIcon, UserPlusIcon } from './GroupIcons'
+import GroupInviteShare from './GroupInviteShare'
 
 export default function GroupSetupModal({ userId, onClose, onDone }) {
   const [tab, setTab] = useState('create') // 'create' | 'join'
@@ -10,6 +11,7 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [createdGroup, setCreatedGroup] = useState(null) // 생성 직후: 초대 화면으로 전환
 
   const switchTab = (t) => { setTab(t); setError(null) }
 
@@ -18,9 +20,9 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
     setLoading(true)
     setError(null)
     try {
-      await createGroup(groupName.trim(), userId)
+      const group = await createGroup(groupName.trim(), userId)
       invalidateCache(`board:${userId}:`, { prefix: true })
-      onDone()
+      setCreatedGroup(group)
     } catch (e) {
       setError('그룹 생성에 실패했어요.')
     } finally {
@@ -45,6 +47,16 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
   }
 
   const canSubmit = tab === 'create' ? !!groupName.trim() : inviteCode.trim().length === 6
+
+  if (createdGroup) {
+    return (
+      <div style={styles.overlay} onClick={onDone}>
+        <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+          <GroupInviteShare group={createdGroup} onDone={onDone} />
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div style={styles.overlay} onClick={onClose}>
