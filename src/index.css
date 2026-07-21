@@ -146,6 +146,10 @@ img {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+@keyframes fabSpin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
 /* 상태 선택 팝업: 시간/메모 필드는 상태를 고른 뒤에만 나타나므로, 등장이 툭 튀지 않게 살짝 슬라이드+페이드. */
 @keyframes slotPopupFieldsIn {
   from { opacity: 0; transform: translateY(-4px); }
