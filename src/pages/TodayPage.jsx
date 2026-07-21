@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSetting, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
@@ -14,12 +14,11 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon } from '../components/GroupIcons'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import PotIcon from '../components/PotIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
-import { extractFirstUrl } from '../components/LinkPreviewCard'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 // 상태값별 내 상태 카드 보조 문구
@@ -228,10 +227,13 @@ export default function TodayPage() {
   const [showCardMenu, setShowCardMenu] = useState(false)
   // 밥팟 만들기 충돌 팝업
   const [createConflict, setCreateConflict] = useState(null) // { existingPot, groupId, slot }
-  // 공유 토글 범위 선택 팝업
-  const [shareTogglePending, setShareTogglePending] = useState(null) // { groupId, groupName, isShared }
   // 그룹 단위 공유 설정: { [groupId]: boolean }
   const [shareSettingsMap, setShareSettingsMap] = useState({})
+  // 공유 토글 등 즉시 피드백용 짧은 플로팅 토스트
+  const [toastMessage, setToastMessage] = useState(null)
+  const toastTimer = useRef(null)
+  // 밥팟 만들기 원형 버튼 — 탭하면 짧게 회전한 뒤 생성 페이지로 이동
+  const [fabSpinning, setFabSpinning] = useState(false)
   // 밥팟 참여하기 다이얼로그
   const [showJoinPot, setShowJoinPot] = useState(false)
   const [joinPotInput, setJoinPotInput] = useState('')
@@ -241,6 +243,8 @@ export default function TodayPage() {
   // 그룹 순서 편집
   const [editingOrder, setEditingOrder] = useState(false)
   const [localGroups, setLocalGroups] = useState([])
+  // 그룹으로 보기 — 순서 편집/모두 접기를 모아둔 더보기(⋮) 메뉴
+  const [showViewMenu, setShowViewMenu] = useState(false)
   // 밥팟 나가기 확인 팝업
   const [leavePotConfirm, setLeavePotConfirm] = useState(null) // pot 객체
   const [leavingPot, setLeavingPot] = useState(false)
@@ -249,7 +253,7 @@ export default function TodayPage() {
   const isToday = currentDate.getTime() === TODAY.getTime()
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || shareTogglePending || showJoinPot || showGroupSetup || leavePotConfirm))
+  useScrollLock(!!(editingSlot || showResetConfirm || createConflict || showJoinPot || showGroupSetup || leavePotConfirm))
   useEscKey(useCallback(() => {
     if (leavePotConfirm) { setLeavePotConfirm(null); return }
     if (slotEndPickerOpen) { setSlotEndPickerOpen(false); return }
@@ -258,11 +262,11 @@ export default function TodayPage() {
     if (showJoinPot) { setShowJoinPot(false); setJoinPotInput(''); setJoinPotError(''); return }
     if (showGroupSetup) { setShowGroupSetup(false); return }
     if (editingOrder) { cancelEditingOrder(); return }
-    if (shareTogglePending) { setShareTogglePending(null); return }
     if (createConflict) { setCreateConflict(null); return }
     if (showResetConfirm) { setShowResetConfirm(false); return }
     if (showCardMenu) { setShowCardMenu(false); return }
-  }, [leavePotConfirm, slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, shareTogglePending, createConflict, showResetConfirm, showCardMenu]))
+    if (showViewMenu) { setShowViewMenu(false); return }
+  }, [leavePotConfirm, slotEndPickerOpen, slotStartPickerOpen, editingSlot, showJoinPot, showGroupSetup, editingOrder, createConflict, showResetConfirm, showCardMenu, showViewMenu]))
 
   useEffect(() => {
     if (isToday) setSearchParams({}, { replace: true })
@@ -348,6 +352,8 @@ export default function TodayPage() {
   }, [user, dateStr, applySnapshot])
 
   useEffect(() => { loadData() }, [loadData])
+
+  useEffect(() => () => clearTimeout(toastTimer.current), [])
 
   // 실시간 구독 — 상태/밥팟 변경 시 영향받는 그룹만, 디바운스로 묶어서 재로드
   const groupsRef = useRef([])
@@ -462,13 +468,11 @@ export default function TodayPage() {
           if (groupId && groupsRef.current.some(g => g.id === groupId)) {
             scheduleReload([groupId])
           }
-          // 내 설정이 바뀐 경우 shareSettingsMap도 갱신
-          if (payload.new?.user_id === user.id) {
-            const { group_id, slot, is_shared } = payload.new
-            setShareSettingsMap(prev => ({
-              ...prev,
-              [group_id]: { ...(prev[group_id] ?? {}), [slot]: is_shared },
-            }))
+          // 내 설정이 바뀐 경우 shareSettingsMap도 갱신 — group_share_settings는 슬롯 구분 없이
+          // 그룹×날짜 단위이므로(row.group_id -> boolean) 오늘 날짜에 대한 변경만 반영한다.
+          // 대량 upsert(전후 60일)는 다른 날짜 row에 대해서도 이벤트를 쏘므로 date로 걸러야 한다.
+          if (payload.new?.user_id === user.id && payload.new?.date === dateStr) {
+            setShareSettingsMap(prev => ({ ...prev, [payload.new.group_id]: payload.new.is_shared }))
           }
         }
       )
@@ -636,28 +640,31 @@ export default function TodayPage() {
     }
   }
 
+  // 원형 밥팟 만들기 버튼 — 짧게 한 바퀴 돌고 나서 생성 흐름(또는 충돌 팝업)으로 넘어간다
+  const handleFabCreatePot = () => {
+    if (fabSpinning || groups.length === 0) return
+    setFabSpinning(true)
+    setTimeout(() => {
+      setFabSpinning(false)
+      handleCreatePot(groups[0].id, selectedSlot)
+    }, 320)
+  }
+
   const applyShare = (groupId, isShared) => {
     setShareSettingsMap(prev => ({ ...prev, [groupId]: isShared }))
   }
 
-  // 토글 클릭 → 팝업 띄우기
-  const handleToggleShare = (groupId, groupName, isShared) => {
-    setShareTogglePending({ groupId, groupName, isShared })
-  }
+  // 짧게 떴다 사라지는 플로팅 토스트 — 연달아 호출되면 이전 타이머를 취소하고 다시 보여준다
+  const showToast = useCallback((message) => {
+    clearTimeout(toastTimer.current)
+    setToastMessage(message)
+    toastTimer.current = setTimeout(() => setToastMessage(null), 2200)
+  }, [])
 
-  // 이 날짜만 적용
-  const confirmShareSingle = async () => {
-    const { groupId, isShared } = shareTogglePending
-    setShareTogglePending(null)
+  // 공유/비공유 토글 — '오늘만 적용' 없이 항상 해당 날짜 포함 전후 모든 날짜에 적용
+  const handleToggleShare = async (groupId, isShared) => {
     applyShare(groupId, isShared)
-    try { await setGroupShareSetting(user.id, groupId, dateStr, isShared) } catch {}
-  }
-
-  // 오늘 이후 전체 적용
-  const confirmShareBulk = async () => {
-    const { groupId, isShared } = shareTogglePending
-    setShareTogglePending(null)
-    applyShare(groupId, isShared)
+    showToast(isShared ? '내 상태를 그룹에 공유해요' : '내 상태 공유를 중지해요')
     try { await setGroupShareSettingBulk(user.id, groupId, dateStr, isShared) } catch {}
   }
 
@@ -890,27 +897,42 @@ export default function TodayPage() {
             <button
               style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
               onClick={() => { setViewMode('pot'); localStorage.setItem('lastViewMode', 'pot') }}
-            >밥팟으로 보기</button>
+            >밥팟 보기</button>
             <button
               style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
               onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
-            >그룹으로 보기</button>
+            >그룹 보기</button>
           </div>
         )}
 
-        {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 우측에 작게 */}
+        {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 더보기(⋮) 메뉴로 묶어서 우측에 작게 */}
         <div style={styles.sectionTitleRow}>
           <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : '오늘 열린 밥팟'}</div>
-          <div style={{ display: 'flex', gap: 6 }}>
-            {viewMode === 'group' && groups.length > 1 && !editingOrder && (
-              <button style={styles.collapseAllBtn} onClick={startEditingOrder}>순서 편집</button>
-            )}
-            {viewMode === 'group' && !editingOrder && (
-              <button style={styles.collapseAllBtn} onClick={() => { setAllCollapsed(v => !v); setCollapseKey(k => k + 1) }}>
-                {allCollapsed ? '모두 펼치기' : '모두 접기'}
+          {viewMode === 'group' && !editingOrder && (
+            <div style={{ position: 'relative' }}>
+              <button style={styles.viewMenuBtn} aria-label="더보기" onClick={() => setShowViewMenu(v => !v)}>
+                <MoreHorizontalIcon size={18} />
               </button>
-            )}
-          </div>
+              {showViewMenu && (
+                <>
+                  <div style={styles.cardMenuOverlay} onClick={() => setShowViewMenu(false)} />
+                  <div style={styles.cardMenuDropdown}>
+                    {groups.length > 1 && (
+                      <button style={styles.cardMenuItem} onClick={() => { setShowViewMenu(false); startEditingOrder() }}>
+                        순서 편집
+                      </button>
+                    )}
+                    <button
+                      style={styles.cardMenuItem}
+                      onClick={() => { setShowViewMenu(false); setAllCollapsed(v => !v); setCollapseKey(k => k + 1) }}
+                    >
+                      {allCollapsed ? '모두 펼치기' : '모두 접기'}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {groups.length === 0 && (
@@ -946,14 +968,14 @@ export default function TodayPage() {
                   myUserId={user.id}
                   mySlotData={mySlots[selectedSlot]}
                   isShared={shareSettingsMap[group.id] ?? true}
-                  onToggleShare={(isShared) => handleToggleShare(group.id, group.name, isShared)}
+                  onToggleShare={(isShared) => handleToggleShare(group.id, isShared)}
+                  onShowToast={showToast}
                   amIInAnyPot={amIInAnyPot}
                   allCollapsed={allCollapsed}
                   collapseKey={collapseKey}
                   dateStr={dateStr}
                   onNavigate={navigate}
                   onRefresh={() => loadData({ force: true })}
-                  onCreatePot={handleCreatePot}
                 />
               )
             })
@@ -962,12 +984,6 @@ export default function TodayPage() {
           )}
         </div>
 
-        {/* 주요 CTA — 밥팟별 보기에서만 전역 CTA를 강하게 노출(그룹별 보기는 그룹마다 자체 생성 버튼이 있음) */}
-        {groups.length > 0 && viewMode === 'pot' && (
-          <button style={styles.primaryCreateBtn} onClick={() => handleCreatePot(groups[0].id, selectedSlot)}>
-            + 밥팟 만들기
-          </button>
-        )}
         <div style={styles.secondaryLinkRow}>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
           <span style={styles.secondaryLinkDivider}>·</span>
@@ -978,30 +994,17 @@ export default function TodayPage() {
     </div>
     <BottomNav />
 
-    {shareTogglePending && (
-      <div style={styles.overlay}>
-        <div style={styles.dialog}>
-          <div style={{ fontSize: 32 }}>{shareTogglePending.isShared ? '🔓' : '🔒'}</div>
-          <div style={styles.dialogTitle}>
-            {shareTogglePending.isShared ? '상태 공유' : '상태 비공유'}
-          </div>
-          <p style={styles.dialogDesc}>
-            이후 날짜에도 모두 적용할까요?{'\n'}
-            <span style={{ fontSize: 12 }}>
-              ({shareTogglePending.groupName} 그룹 전체에 적용돼요)
-            </span>
-          </p>
-          <div style={styles.dialogBtns}>
-            <button style={styles.dialogBtnPrimary} onClick={confirmShareBulk}>
-              오늘 이후 모두 적용
-            </button>
-            <button style={{ ...styles.dialogBtnPrimary, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)' }} onClick={confirmShareSingle}>
-              오늘만 적용
-            </button>
-            <button style={styles.dialogBtnCancel} onClick={() => setShareTogglePending(null)}>취소</button>
-          </div>
-        </div>
+    {/* 주요 CTA — 밥팟별/그룹별 보기 공통 원형 플로팅 버튼 */}
+    {groups.length > 0 && (
+      <div style={styles.fabWrap}>
+        <button style={styles.fabBtn} onClick={handleFabCreatePot} aria-label="밥팟 만들기">
+          <span style={{ ...styles.fabIcon, animation: fabSpinning ? 'fabSpin 0.32s ease' : 'none' }}>+</span>
+        </button>
       </div>
+    )}
+
+    {toastMessage && (
+      <div style={styles.floatingToast}>{toastMessage}</div>
     )}
 
     {createConflict && (
@@ -1495,7 +1498,7 @@ export default function TodayPage() {
   )
 }
 
-function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, isShared, onToggleShare, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh, onCreatePot }) {
+function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, isShared, onToggleShare, onShowToast, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh }) {
   const [showInvite, setShowInvite] = useState(false)
   const [copied, setCopied] = useState(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -1604,7 +1607,15 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
   useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showInvite || confirmRemoveMember || proposeTarget))
 
-  const handleToggleSharing = () => onToggleShare(!isShared)
+  // 참여 중인 슬롯은 무조건 공유 상태라 끌 수 없다 — 시도하면 이유를 토스트로 알려주고 끝낸다.
+  // (정상적으로 토글이 적용됐을 때의 안내 토스트는 상위 handleToggleShare가 띄운다)
+  const handleToggleSharing = () => {
+    if (isInThisGroupPot) {
+      onShowToast?.('참여 중인 밥팟이 있어 오늘은 내 상태 공유를 멈출 수 없어요')
+      return
+    }
+    onToggleShare(!isShared)
+  }
 
   const isMaster = group.created_by === myUserId
 
@@ -1650,6 +1661,8 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
   const isInPot = amIInAnyPot // 전체 그룹 기준 (상태 표시용)
   const isInThisGroupPot = pots.some(p => p.pot_members?.some(pm => pm.user_id === myUserId)) // 이 그룹 팟 참여 여부 (헤더 색상용)
+  // 참여 중인 슬롯은 공유 선호(isShared)와 무관하게 무조건 공유된 것으로 취급한다
+  const effectiveIsShared = isInThisGroupPot || isShared
   const myGroupPot = isInThisGroupPot ? pots.find(p => p.pot_members?.some(pm => pm.user_id === myUserId)) : null
   const isMyGroupPotExpired = isInThisGroupPot && isPotTimeExpired(dateStr, myGroupPot?.end_time)
   const myPotMemberIds = new Set((myGroupPot?.pot_members ?? []).map(pm => pm.user_id))
@@ -1721,22 +1734,18 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {/* 그룹 헤더 — 카드가 아닌 얇은 라벨 행 */}
       <div style={styles.groupHeader}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-          <span style={{ ...styles.groupName, color: isShared ? 'var(--color-text)' : '#8F877D' }}>{group.name}</span>
+          <span style={{ ...styles.groupName, color: effectiveIsShared ? 'var(--color-text)' : '#8F877D' }}>{group.name}</span>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
-          {isInThisGroupPot ? (
-            <span style={styles.toggleLocked}>{isMyGroupPotExpired ? `✅ ${getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time)}` : <><RiceBowlIcon size={14} /> {getJoinedStatusLabel(dateStr, myGroupPot?.meal_time, myGroupPot?.end_time, (myGroupPot?.pot_members?.length ?? 0) === 1)}</>}</span>
-          ) : (
-            <button
-              style={{
-                ...styles.groupHeaderPillBtn,
-                color: isShared ? '#FF6B35' : '#8F877D',
-                background: isShared ? '#FFF4EF' : '#F5F0EB',
-                border: `1px solid ${isShared ? '#FFD6C0' : '#E8E3DE'}`,
-              }}
-              onClick={handleToggleSharing}
-            >{isShared ? '공유중' : '비공유'}</button>
-          )}
+          {/* 참여 중인 슬롯은 무조건 공유되므로(effectiveIsShared) 배지는 항상 공유 상태로 보이지만,
+              버튼 자체는 계속 눌러서 이후 날짜들에 대한 공유 선호를 바꿀 수 있다 */}
+          <button
+            style={styles.groupHeaderIconBtn}
+            onClick={handleToggleSharing}
+            aria-label={effectiveIsShared ? '공유중' : '비공유'}
+          >
+            {effectiveIsShared ? <BroadcastIcon size={15} strokeWidth={2} /> : <BroadcastOffIcon size={15} strokeWidth={2} />}
+          </button>
           <button style={styles.groupHeaderIconBtn} onClick={() => { setShowSettings(v => !v); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setConfirmLeave(false); setShowInvite(false) }} aria-label="그룹 설정">
             <SlidersIcon size={15} strokeWidth={2} />
           </button>
@@ -1752,7 +1761,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
           {(() => {
             const openOpt = SLOT_STATUS_OPTIONS.find(o => o.key === 'open')
             return (
-              <span style={{ ...styles.groupStatusChip, color: openOpt.color, background: openOpt.bg, border: `1px solid ${openOpt.border}` }}>{openOpt.emoji} 같이가능 {statusCounts['open'] ?? 0}</span>
+              <span style={{ ...styles.groupStatusChip, color: openOpt.color, background: openOpt.bg, border: `1px solid ${openOpt.border}` }}>같이가능 {statusCounts['open'] ?? 0}</span>
             )
           })()}
           {(statusCounts['참여중'] ?? 0) > 0 && (() => {
@@ -2052,7 +2061,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       {!collapsed && (
         <div style={styles.memberSection}>
           {/* 상태 필터 탭 */}
-          <div className="no-scrollbar" style={{ display: 'flex', gap: 5, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 10 }}>
+          <div className="no-scrollbar" style={{ display: 'flex', gap: 5, flexWrap: 'nowrap', overflowX: 'auto', marginBottom: 6 }}>
             {filterTabs.filter(tab => tab.key === 'open' || tab.count > 0).map(tab => {
               const isActive = statusFilter === tab.key
               return (
@@ -2070,7 +2079,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                     whiteSpace: 'nowrap', flexShrink: 0,
                   }}
                 >
-                  {tab.key === 'open' ? `${tab.emoji} ` : ''}{tab.label} {tab.count}
+                  {tab.label} {tab.count}
                 </button>
               )
             })}
@@ -2133,12 +2142,6 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
           ))}
         </div>
       )}
-
-      {!collapsed && (
-        <button style={styles.groupCreateBtn} onClick={() => onCreatePot(group.id, slot)}>
-          + {group.name}에 밥팟 만들기
-        </button>
-      )}
     </div>
   )
 }
@@ -2176,6 +2179,7 @@ function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
 }
 
 // 그룹별 보기 · 밥팟별 보기 공용 카드 — showMeta일 때만 상단에 슬롯/그룹 태그 표시
+// 참여 여부와 무관하게 동일한 구성: 제목/메뉴, 시간/참여자 아바타, 오른쪽 참여 버튼. 메모는 카드에 노출하지 않는다.
 function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate }) {
   const potParticipants = (pot.pot_members ?? []).map(pm => {
     const groupNickname = pm.users?.group_members?.find(gm => gm.group_id === pot.group_id)?.nickname
@@ -2190,96 +2194,69 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
   const visibleAvatars = potParticipants.slice(0, 4)
   const extraCount = potParticipants.length - visibleAvatars.length
 
+  const metaRow = showMeta && (
+    <div style={potListStyles.metaRow}>
+      <span style={{
+        ...potListStyles.slotBadge,
+        color: SLOT_CHIP_COLOR[pot.slot]?.text ?? potListStyles.slotBadge.color,
+        background: SLOT_CHIP_COLOR[pot.slot]?.bg ?? potListStyles.slotBadge.background,
+        border: `1px solid ${SLOT_CHIP_COLOR[pot.slot]?.border ?? 'transparent'}`,
+      }}>
+        {pot.slot}
+      </span>
+      <span style={potListStyles.groupNameText}>{groupName}</span>
+    </div>
+  )
+
+  const buttonStyle = isJoined
+    ? potListStyles.joinBtnJoined
+    : (expired || isFull) ? potListStyles.joinBtnFull : {}
+  const buttonLabel = isJoined
+    ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time, filled === 1)
+    : expired ? '종료' : isFull ? '마감' : '참여'
+
   return (
-    <div
-      style={potListStyles.card}
-      onClick={() => onNavigate(`/pot/${pot.id}`)}
-    >
+    <div style={potListStyles.card} onClick={() => onNavigate(`/pot/${pot.id}`)}>
       {/* 끼니 · 그룹명 — 밥팟별 보기에서만 표시 (그룹별 보기는 이미 슬롯/그룹 문맥 안이라 생략) */}
-      {/* 슬롯만 색 배지로 강조하고 그룹명은 텍스트로 낮춰, 두 정보가 같은 무게로 경쟁하지 않게 함 */}
-      {showMeta && (
-        <div style={potListStyles.metaRow}>
-          <span style={{
-            ...potListStyles.slotBadge,
-            color: SLOT_CHIP_COLOR[pot.slot]?.text ?? potListStyles.slotBadge.color,
-            background: SLOT_CHIP_COLOR[pot.slot]?.bg ?? potListStyles.slotBadge.background,
-            border: `1px solid ${SLOT_CHIP_COLOR[pot.slot]?.border ?? 'transparent'}`,
-          }}>
-            {pot.slot}
-          </span>
-          <span style={potListStyles.groupNameText}>{groupName}</span>
-        </div>
-      )}
+      {metaRow}
 
       <div style={potListStyles.mainRow}>
-        {/* 썸네일 — 밥팟 카드의 시작점 역할. 사용자가 고른 아이콘이 있으면 그걸, 없으면 예전 방식대로 대체 */}
-        <div style={pot.icon || pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)', borderRadius: 12 }}>
+        {/* 썸네일 — 사용자가 고른 아이콘이 있으면 그걸, 없으면 예전 방식대로 대체 */}
+        <div style={pot.icon || pot.is_default ? potListStyles.iconThumb : { ...potListStyles.iconThumb, background: 'var(--color-surface-2)' }}>
           {pot.icon
-            ? <PotIcon icon={pot.icon} size={60} />
-            : pot.is_default ? <RiceBowlIcon size={46} /> : <span style={{ fontSize: 30 }}>🎉</span>}
+            ? <PotIcon icon={pot.icon} size={54} />
+            : pot.is_default ? <RiceBowlIcon size={47} /> : <span style={{ fontSize: 36 }}>🎉</span>}
         </div>
 
         <div style={potListStyles.contentCol}>
-          {/* 1순위: 타임명  2순위: 시간 — 시간은 톤을 낮춰 타이틀과의 위계를 분명히 함 */}
+          {/* 1행: 제목 · 메뉴 */}
           <div style={potListStyles.row1}>
             <span style={potListStyles.title}>{pot.title}</span>
-            {timeStr && <span style={potListStyles.time}>{timeStr}{endStr}</span>}
+            {pot.menu && <span style={potListStyles.menuText}>· {pot.menu}</span>}
           </div>
 
-          {/* 메뉴 · 메모 — 아이콘 대신 굵기/색으로만 구분 */}
-          {(pot.menu || pot.memo) && (
-            <div style={potListStyles.detailCol}>
-              {pot.menu && <span style={potListStyles.menuText}>{pot.menu}</span>}
-              {pot.memo && <MemoText memo={pot.memo} />}
-            </div>
-          )}
-
-          {/* 3순위: 참여 인원 · 참여자 아바타 */}
-          <div style={potListStyles.row3}>
-            <div style={potListStyles.avatarStack}>
+          {/* 2행: 시간 · 참여자 아바타 — 인원수 텍스트 대신 실제 참여자 얼굴(이니셜/사진)로 보여준다 */}
+          <div style={potListStyles.row2}>
+            {timeStr && <span style={potListStyles.time}>{timeStr}{endStr}</span>}
+            {filled > 0 && (
               <div style={potListStyles.avatarGroup}>
                 {visibleAvatars.map((m, i) => (
-                  <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -8, zIndex: 10 - i, ...(m.avatar_url ? potListStyles.avatarDotImg : {}) }}>
+                  <span key={m.id} style={{ ...potListStyles.avatarDot, marginLeft: i === 0 ? 0 : -6, zIndex: 10 - i, ...(m.avatar_url ? potListStyles.avatarDotImg : {}) }}>
                     {m.avatar_url ? <img src={m.avatar_url} alt="" style={potListStyles.avatarImgInner} /> : m.nickname[0]}
                     {m.is_guest && <span style={potListStyles.guestMark}>G</span>}
                   </span>
                 ))}
-                {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -8 }}>+{extraCount}</span>}
+                {extraCount > 0 && <span style={{ ...potListStyles.avatarDot, marginLeft: -6 }}>+{extraCount}</span>}
               </div>
-              <span style={potListStyles.count}>{filled}/{pot.max_people}명</span>
-            </div>
-            <button type="button" style={{ ...potListStyles.joinBtn, ...(isJoined ? potListStyles.joinBtnJoined : (expired || isFull) ? potListStyles.joinBtnFull : {}) }}>
-              {isJoined ? getJoinedStatusLabel(pot.date, pot.meal_time, pot.end_time, filled === 1) : expired ? '종료' : isFull ? '마감' : '같이 먹기'}
-            </button>
+            )}
           </div>
         </div>
+
+        <button type="button" style={{ ...potListStyles.joinBtn, ...buttonStyle }}>
+          {buttonLabel}
+        </button>
       </div>
     </div>
-  )
-}
-
-const LINK_PREVIEW_MAX_AGE_MS = 24 * 60 * 60 * 1000
-
-// 메모에 링크가 섞여 있으면 주소 대신 링크 제목으로 바꿔서 한 줄로 보여준다.
-function MemoText({ memo }) {
-  const url = extractFirstUrl(memo)
-  const [title, setTitle] = useState(null)
-
-  useEffect(() => {
-    if (!url) return
-    const cached = getCache(`linkpreview:${url}`, LINK_PREVIEW_MAX_AGE_MS)
-    if (cached?.data?.title) { setTitle(cached.data.title); return }
-    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
-      .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
-      .then(data => { setCache(`linkpreview:${url}`, data); if (data.title) setTitle(data.title) })
-      .catch(() => {})
-  }, [url])
-
-  const display = title ? memo.replace(url, title) : memo
-  return (
-    <span style={url ? potListStyles.memoTextLink : potListStyles.memoText}>
-      {url ? '🔗 ' : ''}{display}
-    </span>
   )
 }
 
@@ -2293,28 +2270,23 @@ const potListStyles = {
     boxShadow: '0 1px 3px rgba(0,0,0,0.04)',
   },
   mainRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  iconThumb: { width: 60, height: 60, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' },
+  iconThumb: { width: 44, height: 44, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, boxShadow: '0 2px 8px rgba(0,0,0,0.12)' },
   contentCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 4 },
-  row1: { display: 'flex', alignItems: 'baseline', gap: 6 },
-  title: { flex: 1, fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  time: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
-  detailCol: { display: 'flex', flexDirection: 'column', gap: 1 },
+  row1: { display: 'flex', alignItems: 'baseline', gap: 5, overflow: 'hidden' },
+  title: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: '#1A1A1A', letterSpacing: '-0.2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flexShrink: 0, maxWidth: '55%' },
   menuText: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#5A5148', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  memoText: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  memoTextLink: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-primary-dark)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  row3: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginTop: 3 },
-  avatarStack: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
+  row2: { display: 'flex', alignItems: 'center', gap: 8 },
+  time: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
   avatarGroup: { display: 'flex', alignItems: 'center', flexShrink: 0 },
   avatarDot: {
-    width: 24, height: 24, borderRadius: '50%',
-    background: '#A89E93', color: '#fff', fontSize: 10, fontWeight: 800,
+    width: 20, height: 20, borderRadius: '50%',
+    background: '#A89E93', color: '#fff', fontSize: 9, fontWeight: 800,
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     border: '1.5px solid #fff', flexShrink: 0, position: 'relative',
   },
   avatarDotImg: { background: 'transparent', padding: 0, overflow: 'hidden' },
   avatarImgInner: { width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' },
   guestMark: { position: 'absolute', bottom: -2, right: -2, fontSize: 7, color: '#fff', background: '#FF9800', borderRadius: '50%', width: 9, height: 9, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800 },
-  count: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
   joinBtn: {
     fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff',
     background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)',
@@ -2380,6 +2352,13 @@ const styles = {
   slotPopupBtns: { display: 'flex', gap: 8 },
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
+  floatingToast: {
+    position: 'fixed', bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+    maxWidth: 'calc(var(--max-width) - 32px)', zIndex: 400, background: 'rgba(30,25,20,0.8)', color: '#fff',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '10px 18px', borderRadius: 'var(--radius-lg)',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.2)', textAlign: 'center', backdropFilter: 'blur(4px)',
+    pointerEvents: 'none', animation: 'toastIn 0.22s ease',
+  },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   dialogIconBadge: {
@@ -2438,18 +2417,16 @@ const styles = {
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.3px', color: 'var(--color-text)' },
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
   groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '3px 9px', whiteSpace: 'nowrap' },
-  memberSection: { padding: '0 0 8px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
+  memberSection: { padding: '0 0 4px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
   memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.08)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', whiteSpace: 'nowrap' },
   memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
   memberProposeSendBtn: { ...PRIMARY_ACTION_BUTTON },
   proposeMenuInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
   groupMealList: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 },
-  groupCreateBtn: { width: '100%', textAlign: 'center', padding: '9px 0', marginTop: 10, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
   groupHeaderIconBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', border: '1px solid #E2DBD3', borderRadius: '50%', fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
-  groupHeaderPillBtn: { height: 28, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '0 10px', cursor: 'pointer', boxSizing: 'border-box', whiteSpace: 'nowrap' },
-  collapseAllBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer' },
+  viewMenuBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--color-border)', borderRadius: '50%', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
   lowerSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', margin: '0 calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', boxShadow: '0 -1px 6px rgba(0,0,0,0.03)' },
   viewModeTabs: { display: 'flex', gap: 6 },
   viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s, border-color 0.15s' },
@@ -2461,7 +2438,6 @@ const styles = {
   orderBtns: { display: 'flex', gap: 4, flexShrink: 0 },
   orderBtn: { width: 32, height: 32, border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)', background: 'var(--color-surface)', fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' },
   toggleWrap: { display: 'flex', alignItems: 'center', gap: 4, cursor: 'pointer' },
-  toggleLocked: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'var(--color-success-bg)', border: '1px solid var(--color-success-border)', borderRadius: 'var(--radius-full)', padding: '3px 8px', whiteSpace: 'nowrap' },
   toggleTrack: { width: 32, height: 18, borderRadius: 9, position: 'relative', transition: 'background 0.2s', flexShrink: 0 },
   toggleThumb: { position: 'absolute', top: 2, left: 2, width: 14, height: 14, borderRadius: '50%', background: '#fff', transition: 'transform 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' },
   toggleLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap' },
@@ -2525,7 +2501,17 @@ const styles = {
   potsArea: { padding: '10px var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 8 },
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
-  primaryCreateBtn: { width: '100%', padding: 14, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer', boxShadow: '0 3px 10px rgba(255,107,53,0.22)' },
+  fabWrap: {
+    position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+    width: '100%', maxWidth: 'var(--max-width)', zIndex: 90, pointerEvents: 'none',
+  },
+  fabBtn: {
+    position: 'absolute', right: 16, bottom: 0, width: 56, height: 56, borderRadius: '50%',
+    background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    cursor: 'pointer', boxShadow: '0 4px 14px rgba(255,107,53,0.4)', pointerEvents: 'auto',
+  },
+  fabIcon: { display: 'inline-block', fontSize: 36, fontWeight: 500, lineHeight: 1 },
   secondaryLinkRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 20, marginTop: -6 },
   secondaryLinkBtn: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', padding: '4px 2px', fontFamily: 'inherit' },
   secondaryLinkDivider: { color: 'var(--color-border)', fontSize: 'var(--font-size-xs)' },
