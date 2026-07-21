@@ -30,6 +30,14 @@ const STATUS_SUBTEXT = {
 }
 const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot}은 어떻게 할까요?`
 
+// 상태 선택 팝업의 버튼 부제 — 슬롯명은 팝업 타이틀에 이미 나오므로 빼고, 뜻만 짧게.
+// 메인 카드에 쓰는 STATUS_SUBTEXT(슬롯명 포함, 문장형)와는 용도가 달라 별도로 둔다.
+const STATUS_BTN_SUBTEXT = {
+  open: '같이 먹을 수 있어요',
+  closed: '이미 약속이 있어요',
+  skip: '이번엔 쉬어갈게요',
+}
+
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
 // 슬롯별 분위기에 어울리는 상태 카드 배경 — 아침(새벽 노을)/오전간식(커피)/점심(한낮 햇살)/오후간식(녹차)/저녁(노을)/야식(밤)
@@ -136,7 +144,7 @@ export default function TodayPage() {
   const [currentDate, setCurrentDate] = useState(initialDate)
   const [selectedSlot, setSelectedSlot] = useState(getDefaultSlot)
   const [viewMode, setViewMode] = useState(
-    () => localStorage.getItem('lastViewMode') || 'pot'
+    () => localStorage.getItem('lastViewMode') || 'group'
   )
   const subSlotRowRef = useRef(null)
   // scrollBy({behavior:'smooth'}) 옵션객체 시그니처는 일부 인앱 브라우저(WebView)에서 지원이 불안정해
@@ -1155,11 +1163,13 @@ export default function TodayPage() {
                 borderColor: !draftData.status ? 'var(--color-primary)' : 'var(--color-border)',
                 background: !draftData.status ? 'rgba(255,107,53,0.08)' : 'var(--color-surface-2)',
                 color: !draftData.status ? 'var(--color-primary)' : 'var(--color-text-muted)',
-                fontWeight: !draftData.status ? 700 : 400,
               }}
               onClick={() => setDraftData(prev => ({ ...prev, status: undefined }))}
             >
-              <StatusIcon statusKey={undefined} size={47} /> 미설정
+              <StatusIcon statusKey={undefined} size={40} />
+              <span style={styles.slotPopupStatusTextCol}>
+                <span style={{ ...styles.slotPopupStatusLabel, fontWeight: !draftData.status ? 700 : 500 }}>미설정</span>
+              </span>
             </button>
             {SLOT_STATUS_OPTIONS.filter(o => o.selectable).map(o => (
               <button
@@ -1169,59 +1179,38 @@ export default function TodayPage() {
                   borderColor: draftData.status === o.key ? o.color : 'var(--color-border)',
                   background: draftData.status === o.key ? o.color + '15' : 'var(--color-surface-2)',
                   color: draftData.status === o.key ? o.color : 'var(--color-text)',
-                  fontWeight: draftData.status === o.key ? 700 : 400,
                 }}
                 onClick={() => setDraftData(prev => ({ ...prev, status: o.key }))}
               >
-                <StatusIcon statusKey={o.key} size={47} /> {o.label}
+                <StatusIcon statusKey={o.key} size={40} />
+                <span style={styles.slotPopupStatusTextCol}>
+                  <span style={{ ...styles.slotPopupStatusLabel, fontWeight: draftData.status === o.key ? 700 : 500 }}>{o.label}</span>
+                  <span style={styles.slotPopupStatusSub}>{STATUS_BTN_SUBTEXT[o.key]}</span>
+                </span>
               </button>
             ))}
           </div>
 
-          {/* 시간 / 메모 */}
-          {(() => {
-            const fieldDisabled = !draftData.status || draftData.status === 'skip'
-            const showEndTime = !fieldDisabled && (draftData.status === 'open' || draftData.status === 'closed')
-            const ct = getCarouselTime(draftData.time)
-            const updateCarousel = (patch) => {
-              const next = { ...ct, ...patch }
-              const newTime = carouselTimeToStr(next)
-              setDraftData(prev => ({
-                ...prev,
-                time: newTime,
-                end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(newTime, prev.duration_minutes) : prev.end_time,
-              }))
-            }
+          {/* 시간 / 메모 — 상태를 고른 뒤에만 노출. 패스는 시간/메모가 의미 없어 계속 숨김 */}
+          {(draftData.status === 'open' || draftData.status === 'closed') && (() => {
             const timeOn = !!draftData.time
-            const carouselDisabled = fieldDisabled || !timeOn
             const dur = draftData.duration_minutes ?? 60
             const setSlotDuration = (min) => setDraftData(prev => ({
               ...prev,
               duration_minutes: min,
               end_time: min > 0 ? addSlotMinutes(prev.time, min) : prev.end_time,
             }))
-            const endCt = getCarouselTime(draftData.end_time)
-            const updateEndCarousel = (patch) => {
-              const next = { ...endCt, ...patch }
-              setDraftData(prev => ({ ...prev, end_time: carouselTimeToStr(next), duration_minutes: 0 }))
-            }
             return (
               <div style={styles.slotPopupFields}>
-                {fieldDisabled && (
-                  <div style={styles.slotPopupDisabledBanner}>
-                    {!draftData.status ? '상태를 먼저 선택하세요' : '패스는 시간/메모를 입력할 수 없어요'}
-                  </div>
-                )}
                 {/* 시간 행 — 프리셋 버튼 */}
                 <div style={{ ...styles.slotPopupFieldWrap }}>
                   <div style={styles.slotPopupFieldLabel}>시작시간</div>
                   <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap' }}>
                     {(SLOT_TIME_PRESETS[editingSlot] ?? []).map(t => {
-                      const isActive = !fieldDisabled && (draftData.time?.startsWith(t) ?? false)
+                      const isActive = draftData.time?.startsWith(t) ?? false
                       return (
                         <button
                           key={t}
-                          disabled={fieldDisabled}
                           style={{
                             padding: '6px 11px',
                             border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -1230,10 +1219,9 @@ export default function TodayPage() {
                             color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
                             fontSize: 12,
                             fontWeight: isActive ? 700 : 500,
-                            cursor: fieldDisabled ? 'not-allowed' : 'pointer',
-                            opacity: fieldDisabled ? 0.3 : 1,
+                            cursor: 'pointer',
                           }}
-                          onClick={() => !fieldDisabled && setDraftData(prev => ({
+                          onClick={() => setDraftData(prev => ({
                             ...prev,
                             time: t + ':00',
                             end_time: (prev.duration_minutes ?? 0) > 0 ? addSlotMinutes(t + ':00', prev.duration_minutes) : prev.end_time,
@@ -1243,11 +1231,10 @@ export default function TodayPage() {
                     })}
                     {/* 직접 설정 */}
                     {(() => {
-                      const isCustom = timeOn && !fieldDisabled && !(SLOT_TIME_PRESETS[editingSlot] ?? []).some(t => draftData.time?.startsWith(t))
+                      const isCustom = timeOn && !(SLOT_TIME_PRESETS[editingSlot] ?? []).some(t => draftData.time?.startsWith(t))
                       return (
                         <button
                           type="button"
-                          disabled={fieldDisabled}
                           style={{
                             padding: '6px 11px',
                             border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
@@ -1256,10 +1243,9 @@ export default function TodayPage() {
                             color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
                             fontSize: 12,
                             fontWeight: isCustom ? 700 : 500,
-                            cursor: fieldDisabled ? 'not-allowed' : 'pointer',
-                            opacity: fieldDisabled ? 0.3 : 1,
+                            cursor: 'pointer',
                           }}
-                          onClick={() => !fieldDisabled && setSlotStartPickerOpen(true)}
+                          onClick={() => setSlotStartPickerOpen(true)}
                         >
                           {isCustom && draftData.time ? draftData.time.slice(0, 5) : '직접 설정'}
                         </button>
@@ -1267,24 +1253,22 @@ export default function TodayPage() {
                     })()}
                     {/* 시간 없음 버튼 */}
                     <button
-                      disabled={fieldDisabled}
                       style={{
                         padding: '6px 11px',
-                        border: `1.5px solid ${!timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        border: `1.5px solid ${!timeOn ? 'var(--color-primary)' : 'var(--color-border)'}`,
                         borderRadius: 'var(--radius-full)',
-                        background: !timeOn && !fieldDisabled ? 'rgba(255,107,53,0.09)' : 'transparent',
-                        color: !timeOn && !fieldDisabled ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                        background: !timeOn ? 'rgba(255,107,53,0.09)' : 'transparent',
+                        color: !timeOn ? 'var(--color-primary)' : 'var(--color-text-muted)',
                         fontSize: 12,
-                        fontWeight: !timeOn && !fieldDisabled ? 700 : 500,
-                        cursor: fieldDisabled ? 'not-allowed' : 'pointer',
-                        opacity: fieldDisabled ? 0.3 : 1,
+                        fontWeight: !timeOn ? 700 : 500,
+                        cursor: 'pointer',
                       }}
-                      onClick={() => !fieldDisabled && setDraftData(prev => ({ ...prev, time: undefined, end_time: null }))}
+                      onClick={() => setDraftData(prev => ({ ...prev, time: undefined, end_time: null }))}
                     >미정</button>
                   </div>
                 </div>
-                {/* 종료시간 행 — open/closed 이고 시간 ON일 때 */}
-                {showEndTime && timeOn && (
+                {/* 종료시간 행 — 시간 ON일 때 */}
+                {timeOn && (
                   <div style={{ ...styles.slotPopupFieldWrap, marginTop: 4 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
                       <div style={styles.slotPopupFieldLabel}>종료시간</div>
@@ -1313,17 +1297,16 @@ export default function TodayPage() {
                   </div>
                 )}
                 {/* 메모 행 */}
-                <div style={{ ...styles.slotPopupFieldWrap, marginTop: 8, opacity: fieldDisabled ? 0.25 : 1 }}>
+                <div style={{ ...styles.slotPopupFieldWrap, marginTop: 8 }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <div style={{ ...styles.slotPopupFieldLabel, flexShrink: 0 }}>메모</div>
                     <input
-                      style={{ ...styles.slotPopupInput, flex: 1, background: fieldDisabled ? '#F0F0F0' : 'var(--color-surface)', cursor: fieldDisabled ? 'not-allowed' : 'auto' }}
+                      style={{ ...styles.slotPopupInput, flex: 1 }}
                       placeholder="메모를 입력하세요"
                       value={draftData.menu ?? ''}
                       onChange={e => setDraftData(prev => ({ ...prev, menu: e.target.value }))}
                       onKeyDown={e => { if (e.key === 'Enter') saveSlotEditor() }}
                       maxLength={20}
-                      disabled={fieldDisabled}
                     />
                   </div>
                 </div>
@@ -2368,16 +2351,18 @@ const styles = {
   slotEmpty: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
   slotPopup: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   slotPopupTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
-  slotPopupStatusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
+  slotPopupStatusGrid: { display: 'flex', flexDirection: 'column', gap: 8 },
   slotPopupStatusBtn: {
-    padding: '10px 8px', border: '1.5px solid', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', cursor: 'pointer', transition: 'all 0.12s',
-    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, whiteSpace: 'nowrap',
+    width: '100%', boxSizing: 'border-box', padding: '12px 14px', border: '1.5px solid', borderRadius: 14, cursor: 'pointer', transition: 'all 0.12s',
+    display: 'flex', alignItems: 'center', gap: 12, textAlign: 'left',
   },
-  slotPopupFields: { display: 'flex', flexDirection: 'column', gap: 4 },
+  slotPopupStatusTextCol: { display: 'flex', flexDirection: 'column', gap: 1 },
+  slotPopupStatusLabel: { fontSize: 'var(--font-size-sm)' },
+  slotPopupStatusSub: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 400, lineHeight: 1.3 },
+  slotPopupFields: { display: 'flex', flexDirection: 'column', gap: 4, animation: 'slotPopupFieldsIn 0.18s ease-out' },
   slotPopupFieldWrap: { display: 'flex', flexDirection: 'column', gap: 4, transition: 'opacity 0.15s' },
   slotPopupFieldLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   slotPopupInput: { width: '100%', padding: '10px var(--spacing-sm)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', color: 'var(--color-text)', boxSizing: 'border-box' },
-  slotPopupDisabledBanner: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#9E9E9E', background: '#F5F5F5', border: '1px dashed #BDBDBD', borderRadius: 'var(--radius-sm)', padding: '6px 10px', textAlign: 'center' },
   timeDialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
   timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },

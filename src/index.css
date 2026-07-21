@@ -146,6 +146,11 @@ img {
   from { opacity: 0; transform: translateY(-10px); }
   to   { opacity: 1; transform: translateY(0); }
 }
+/* 상태 선택 팝업: 시간/메모 필드는 상태를 고른 뒤에만 나타나므로, 등장이 툭 튀지 않게 살짝 슬라이드+페이드. */
+@keyframes slotPopupFieldsIn {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 /* 나의 상태 카드 전환: 이전 카드와 다음 카드를 나란히 붙인 트랙을 밀어, 이전 카드가
    밀려나가는 동안 다음 카드가 뒤따라 등장하게 한다 (TodayPage 메인 상태 카드). */
 @keyframes slotTrackNext {
