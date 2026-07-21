@@ -849,7 +849,7 @@ export default function TodayPage() {
           </div>
         </div>
 
-        {/* 슬롯 네비게이션 — 6개 슬롯을 화면 폭 안에 한 번에 표시. 상태는 텍스트 대신 배경색으로 표시 */}
+        {/* 슬롯 네비게이션 — 6개 슬롯을 화면 폭 안에 한 번에 표시. 아이콘 존은 중립색, 하단 라벨 띠가 상태색을 담당 */}
         <div style={styles.subSlotRow}>
           {SLOT_ORDER.map(slot => {
             const info = getSlotInfo(slot)
@@ -859,15 +859,19 @@ export default function TodayPage() {
                 key={slot}
                 style={{
                   ...styles.subSlotBtn,
-                  background: info.label ? info.bg : '#fff',
-                  borderColor: isSelected ? 'var(--color-primary)' : (info.label ? info.border : 'var(--color-border)'),
+                  background: '#fff',
+                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
                   borderWidth: isSelected ? 2 : 1.5,
                   opacity: info.isPastDate ? 0.65 : 1,
                 }}
                 onClick={() => goToSlot(slot)}
               >
-                <SlotIcon slot={slot} size={26} muted={!isSelected} />
-                <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : '#9E958B' }}>{slot}</span>
+                <div style={styles.subSlotIconZone}>
+                  <SlotIcon slot={slot} muted={!isSelected} style={styles.subSlotIconImg} />
+                </div>
+                <div style={{ ...styles.subSlotLabelZone, background: info.label ? info.bg : 'var(--color-surface-2)' }}>
+                  <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
+                </div>
               </button>
             )
           })}
@@ -2420,7 +2424,10 @@ const styles = {
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
   subSlotRow: { display: 'flex', alignItems: 'stretch', gap: 4 },
-  subSlotBtn: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, flex: '1 1 0', minWidth: 0, height: 60, boxSizing: 'border-box', padding: '6px 1px', border: '1.5px solid', borderRadius: 12, cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
+  subSlotBtn: { display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 0, height: 60, boxSizing: 'border-box', padding: 0, border: '1.5px solid', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
+  subSlotIconZone: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
+  subSlotIconImg: { position: 'absolute', top: '50%', left: '50%', width: '80%', height: '80%', transform: 'translate(-50%, -50%)', objectFit: 'cover' },
+  subSlotLabelZone: { flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '1px 0 4px' },
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.3px' },
   sectionTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
