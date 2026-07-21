@@ -54,11 +54,13 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
       {showInAppGuide && (
         <div style={styles.modalOverlay} onClick={() => setShowInAppGuide(false)}>
           <div style={styles.modal} onClick={e => e.stopPropagation()}>
-            <div style={styles.modalTitle}>브라우저에서 열어야 설치할 수 있어요</div>
+            <div style={styles.modalTitle}>
+              {isAndroid ? '브라우저에서 열어야 설치할 수 있어요' : '사파리 브라우저에서 열어야 앱추가를 할 수 있어요'}
+            </div>
             <p style={styles.modalDesc}>
               {isAndroid
                 ? '카톡 안에서는 설치를 진행할 수 없어요. 아래 버튼을 누르면 크롬으로 바로 열려요.'
-                : '카톡 안에서는 설치를 진행할 수 없어요. 아래 버튼으로 링크를 복사한 뒤 사파리에 붙여넣어 열어주세요.'}
+                : '아래 버튼으로 링크를 복사한 뒤 사파리에 붙여넣어 열어주세요.'}
             </p>
 
             {isAndroid && (
@@ -67,36 +69,34 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
               </button>
             )}
             {!isAndroid && (
-              <button style={{ ...styles.modalClose, marginBottom: 12 }} onClick={copyCurrentLink}>
+              <button style={styles.modalClose} onClick={copyCurrentLink}>
                 {linkCopied ? '복사했어요 ✓' : '링크 복사하기'}
               </button>
             )}
 
-            <div style={styles.guideDivider}>버튼이 안 될 때</div>
-            <div style={styles.guideSteps}>
-              <div style={styles.guideStep}>
-                <span style={styles.guideNum}>1</span>
-                <span>
-                  {isIOS
-                    ? <>화면 하단(또는 우측 상단)의 <strong>··· 더보기</strong> 또는 <strong>공유</strong> 버튼을 찾아 탭하세요.</>
-                    : <>화면 우측 상단의 <strong>⋮ 메뉴</strong> 또는 <strong>공유 아이콘</strong>을 찾아 탭하세요.</>
-                  }
-                </span>
-              </div>
-              <div style={styles.guideStep}>
-                <span style={styles.guideNum}>2</span>
-                <span>
-                  {isIOS
-                    ? <><strong>Safari로 열기</strong>가 있으면 선택하세요.</>
-                    : <><strong>다른 브라우저로 열기</strong>가 있으면 선택하세요.</>
-                  }
-                </span>
-              </div>
-              <div style={styles.guideStep}>
-                <span style={styles.guideNum}>3</span>
-                <span>새로 열린 브라우저에서 다시 <strong>홈 화면에 추가</strong>를 눌러주세요.</span>
-              </div>
-            </div>
+            {isAndroid ? (
+              <>
+                <div style={styles.guideDivider}>버튼이 안 될 때</div>
+                <div style={styles.guideSteps}>
+                  <div style={styles.guideStep}>
+                    <span style={styles.guideNum}>1</span>
+                    <span>화면 우측 상단의 <strong>⋮ 메뉴</strong> 또는 <strong>공유 아이콘</strong>을 찾아 탭하세요.</span>
+                  </div>
+                  <div style={styles.guideStep}>
+                    <span style={styles.guideNum}>2</span>
+                    <span><strong>다른 브라우저로 열기</strong>가 있으면 선택하세요.</span>
+                  </div>
+                  <div style={styles.guideStep}>
+                    <span style={styles.guideNum}>3</span>
+                    <span>새로 열린 브라우저에서 다시 <strong>홈 화면에 추가</strong>를 눌러주세요.</span>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <p style={styles.guideSingleLine}>
+                새로 열린 브라우저에서 다시 <strong>홈 화면에 추가</strong>를 눌러주세요.
+              </p>
+            )}
             <button style={styles.modalCancel} onClick={() => setShowInAppGuide(false)}>
               닫기
             </button>
@@ -197,6 +197,7 @@ const styles = {
   modalDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, margin: '0 0 var(--spacing-lg)' },
   guideDivider: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', margin: '0 0 var(--spacing-md)' },
   guideSteps: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', marginBottom: 'var(--spacing-xl)' },
+  guideSingleLine: { fontSize: 'var(--font-size-sm)', lineHeight: 1.6, textAlign: 'center', margin: '0 0 var(--spacing-xl)' },
   guideStep: { display: 'flex', alignItems: 'flex-start', gap: 'var(--spacing-md)', fontSize: 'var(--font-size-sm)', lineHeight: 1.6 },
   guideNum: { width: 28, height: 28, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, flexShrink: 0, fontSize: 'var(--font-size-2xs)' },
   modalClose: { ...PRIMARY_ACTION_BUTTON },

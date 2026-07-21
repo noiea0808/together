@@ -591,11 +591,16 @@ export async function setStatusHidden(userId, date, isHidden) {
 // ── 상태 파생 공통 헬퍼 ──────────────────────────────
 // 저장된 daily_status에 "밥팟 참여 사실"을 덮어써 그룹별 표시 상태를 만든다.
 // 참여는 daily_status보다 우선: 이 그룹 팟 → 참여중 / 다른 그룹 팟 → 약속있음(closed)
-function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenKeys, date }) {
+function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenKeys, date, myUserId }) {
   const memberSet = new Set(memberIds)
   const map = {}
   statusRows.forEach(s => {
     if (memberSet.has(s.user_id)) map[`${s.user_id}:${s.slot}`] = { ...s }
+  })
+  // 뷰어(myUserId) 본인이 오늘 슬롯별로 참여 중인 팟 id — 같은 팟 여부 판별용
+  const myPotIdBySlot = {}
+  potParts.forEach(pm => {
+    if (pm.user_id === myUserId) myPotIdBySlot[pm.meal_pots.slot] = pm.meal_pots.id
   })
   potParts.forEach(pm => {
     const mp = pm.meal_pots
@@ -606,6 +611,7 @@ function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenK
       map[key] = {
         user_id: pm.user_id, date, slot: mp.slot,
         status: isPotTimeExpired(date, mp.end_time) ? '참여완료' : '참여중',
+        same_pot: mp.id === myPotIdBySlot[mp.slot],
         meal_time: mp.meal_time, end_time: mp.end_time,
         menu: existing?.menu ?? null, is_hidden: existing?.is_hidden ?? false,
       }
@@ -622,7 +628,7 @@ function deriveGroupStatuses({ groupId, memberIds, statusRows, potParts, hiddenK
 }
 
 // 단일 그룹 상태 — 실시간 부분 갱신(reloadGroup)에서 사용
-export async function getGroupStatuses(groupId, date) {
+export async function getGroupStatuses(groupId, date, myUserId) {
   const { data: members, error: mErr } = await supabase
     .from('group_members')
     .select('user_id')
@@ -638,7 +644,7 @@ export async function getGroupStatuses(groupId, date) {
     supabase.from('daily_status')
       .select('*').in('user_id', memberIds).eq('date', date),
     supabase.from('pot_members')
-      .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
+      .select('user_id, meal_pots!inner(id, group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
   ])
   if (statusRes.error) throw statusRes.error
@@ -650,12 +656,13 @@ export async function getGroupStatuses(groupId, date) {
     potParts: potRes.data ?? [],
     hiddenKeys: new Set((hiddenRes.data ?? []).map(r => r.user_id)),
     date,
+    myUserId,
   })
 }
 
 // 오늘 화면 일괄 로더 — 그룹 수와 무관하게 상수 횟수 쿼리
 // members / status / 공유설정 / pots / 팟참여를 한 번씩만 조회하고 클라이언트에서 그룹별 분배
-export async function getTodayBoard(groupIds, date) {
+export async function getTodayBoard(groupIds, date, myUserId) {
   const empty = { membersMap: {}, statusesMap: {}, potsMap: {} }
   if (!groupIds || groupIds.length === 0) return empty
 
@@ -692,7 +699,7 @@ export async function getTodayBoard(groupIds, date) {
     supabase.from('meal_pots')
       .select('*, pot_members(user_id, users(nickname, avatar_url, is_guest, group_members(nickname, group_id))), modifier:users!last_modified_by(nickname), pot_comments(count)').in('group_id', groupIds).eq('date', date),
     supabase.from('pot_members')
-      .select('user_id, meal_pots!inner(group_id, slot, meal_time, end_time, date)')
+      .select('user_id, meal_pots!inner(id, group_id, slot, meal_time, end_time, date)')
       .in('user_id', memberIds).eq('meal_pots.date', date),
   ])
   if (statusRes.error) throw statusRes.error
@@ -721,6 +728,7 @@ export async function getTodayBoard(groupIds, date) {
       potParts,
       hiddenKeys: hiddenByGroup[gid],
       date,
+      myUserId,
     })
   })
 

@@ -195,8 +195,8 @@ export default function OnboardingPage() {
     <div style={styles.page}>
       <div style={styles.top}>
         <div style={styles.logo}><RiceBowlIcon size={112} /></div>
+        <p style={styles.tagline}>"점약있어?" 묻지 말고,</p>
         <h1 style={styles.title}>같이 먹자</h1>
-        <p style={styles.sub}>'점약있어?' 묻지 않아도,{'\n'}오늘 밥자리가 보여요</p>
       </div>
 
       {view === 'select'
@@ -234,29 +234,31 @@ const styles = {
   page: {
     flex: 1, display: 'flex', flexDirection: 'column',
     alignItems: 'center', justifyContent: 'center',
-    padding: 'var(--spacing-lg)', gap: 'var(--spacing-lg)',
+    padding: 'calc(var(--spacing-lg) + 16px) var(--spacing-lg) var(--spacing-lg)',
   },
-  top: { textAlign: 'center' },
-  logo: { fontSize: 56, marginBottom: 8 },
-  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-2xl)', fontWeight: 900, marginBottom: 8 },
-  sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', whiteSpace: 'pre-line', lineHeight: 1.6 },
+  top: { textAlign: 'center', marginBottom: 32 },
+  logo: { fontSize: 56, marginBottom: 18 },
+  tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
+  title: { fontFamily: 'var(--font-title)', fontSize: 40, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.25, letterSpacing: '-0.5px', margin: 0 },
   card: {
     width: '100%', background: 'var(--color-surface)',
     border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
     padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)',
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
+    marginBottom: 'var(--spacing-lg)',
   },
   selectGroup: {
-    width: '100%', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)',
+    width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+    marginBottom: 'var(--spacing-xl)',
   },
   socialBtn: {
-    width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
-    gap: 10, padding: '13px var(--spacing-md)',
+    width: 'min(78vw, calc(var(--max-width) * 0.78))', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    gap: 10, padding: '11px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)',
     fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer',
   },
   googleBtn: { background: '#fff', color: '#3c4043' },
-  kakaoBtn: { background: '#FEE500', color: '#3C1E1E', border: '1.5px solid #FEE500' },
+  kakaoBtn: { background: '#F9DD3B', color: '#3C1E1E', border: '1.5px solid #F9DD3B' },
   emailBtn: { background: 'var(--color-surface-2)', color: 'var(--color-text)' },
   emailFormHeader: { display: 'flex', alignItems: 'center', gap: 8 },
   backBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '0 4px', flexShrink: 0 },

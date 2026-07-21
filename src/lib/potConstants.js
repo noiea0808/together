@@ -48,10 +48,10 @@ export function isPotTimeStarted(date, meal_time) {
   return new Date() >= start
 }
 
-// 참여 확정된 밥팟의 표시용 라벨 — 시작 전엔 '먹기로 함', 진행 중엔 '먹는 중', 종료 후엔 '먹었음'.
-// 시작 전인데 팟에 본인 혼자뿐이면(isAlone) '같이'라는 말이 맞지 않으므로 '밥팟 참여중'으로 대신한다.
+// 참여 확정된 밥팟의 표시용 라벨 — 시작 전엔 '먹을 예정', 진행 중엔 '먹는 중', 종료 후엔 '먹었음'.
+// 시작 전인데 팟에 본인 혼자뿐이면(isAlone) '같이'라는 말이 맞지 않으므로 '밥팟 참여 예정'으로 대신한다.
 export function getJoinedStatusLabel(date, meal_time, end_time, isAlone = false) {
   if (isPotTimeExpired(date, end_time)) return '같이 먹었음'
   if (isPotTimeStarted(date, meal_time)) return '같이 먹는 중'
-  return isAlone ? '밥팟 참여중' : '같이 먹기로 함'
+  return isAlone ? '밥팟 참여 예정' : '같이 먹을 예정'
 }

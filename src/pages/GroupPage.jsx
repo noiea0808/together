@@ -44,6 +44,13 @@ function addDays(date, n) {
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 const isActiveStatus = st => st === '참여중' || st === '참여완료'
 
+// 나와 같은 팟인지에 따라 참여 상태 라벨을 구분 — 같은 팟: 같이 먹을 예정/같이 먹음, 다른 팟: 밥팟 참여 예정/밥팟 참여완료
+const SAME_POT_LABEL = { '참여중': '같이 먹을 예정', '참여완료': '같이 먹음' }
+const OTHER_POT_LABEL = { '참여중': '밥팟 참여 예정', '참여완료': '밥팟 참여완료' }
+function getPotStatusLabel(status, samePot) {
+  return (samePot ? SAME_POT_LABEL : OTHER_POT_LABEL)[status] ?? null
+}
+
 export default function GroupPage() {
   const { user } = useUser()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -133,7 +140,7 @@ export default function GroupPage() {
   useEffect(() => {
     if (groups.length === 0) return
     setStatusLoading(true)
-    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr).then(s => [g.id, s])))
+    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr, user.id).then(s => [g.id, s])))
       .then(entries => {
         setStatusesMap(Object.fromEntries(entries))
         setStatusLoading(false)
@@ -415,7 +422,12 @@ export default function GroupPage() {
             {displayedFriends.map(friend => {
               const statusChips = SLOT_KEYS
                 .filter(slot => friend.statusMap[slot])
-                .map(slot => ({ slot, opt: SLOT_STATUS_OPTIONS.find(o => o.key === friend.statusMap[slot].status) }))
+                .map(slot => {
+                  const s = friend.statusMap[slot]
+                  const opt = SLOT_STATUS_OPTIONS.find(o => o.key === s.status)
+                  const label = getPotStatusLabel(s.status, s.same_pot) ?? opt?.label
+                  return { slot, opt: opt && { ...opt, label } }
+                })
               const hasNewWish = newWishFriendIds.has(friend.id)
               return (
                 <div key={friend.id} style={styles.friendRow} onClick={() => setSelectedFriendId(friend.id)}>
@@ -428,22 +440,24 @@ export default function GroupPage() {
                     {hasNewWish && <span style={styles.avatarDot} />}
                   </div>
                   <div style={styles.friendInfo}>
-                    <div style={styles.friendNameRow}>
-                      <span style={styles.friendName}>{friend.nickname}</span>
-                      {friendGroupFilter === null && friend.groups.map(g => (
-                        <span key={g.id} style={styles.groupTag}>{g.name}</span>
-                      ))}
-                    </div>
-                    {statusChips.length > 0 && (
-                      <div style={styles.statusChipRow}>
-                        {statusChips.map(({ slot, opt }) => opt && (
-                          <span key={slot} style={{ ...styles.miniChip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                            {opt.emoji} {slot} · {opt.label}
-                          </span>
+                    <span style={styles.friendName}>{friend.nickname}</span>
+                    {friendGroupFilter === null && friend.groups.length > 0 && (
+                      <div style={styles.groupNameRow}>
+                        {friend.groups.map(g => (
+                          <span key={g.id} style={styles.groupNameText}>{g.name}</span>
                         ))}
                       </div>
                     )}
                   </div>
+                  {statusChips.length > 0 && (
+                    <div style={styles.statusChipRow}>
+                      {statusChips.map(({ slot, opt }) => opt && (
+                        <span key={slot} style={{ ...styles.miniChip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
+                          {opt.emoji} {slot} · {opt.label}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   <span style={styles.friendChevron}>›</span>
                 </div>
               )
@@ -605,7 +619,8 @@ export default function GroupPage() {
                 <div style={styles.statusGrid}>
                   {SLOT_KEYS.map(slot => {
                     const s = selectedFriend.statusMap[slot]
-                    const opt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
+                    const rawOpt = s ? SLOT_STATUS_OPTIONS.find(o => o.key === s.status) : null
+                    const opt = rawOpt && { ...rawOpt, label: getPotStatusLabel(s.status, s.same_pot) ?? rawOpt.label }
                     const pendingInv = findPendingInvitation(selectedFriend.id, slot)
                     const invited = hasPendingInvitation(selectedFriend.id, slot)
                     const isSelected = proposeSlot === slot
@@ -761,13 +776,15 @@ const styles = {
     position: 'absolute', top: -1, right: -1, width: 9, height: 9, borderRadius: '50%',
     background: 'var(--color-danger)', border: '1.5px solid var(--color-surface-2)',
   },
-  friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 4, minWidth: 0 },
+  friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
   friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
   friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  groupNameRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
+  groupNameText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 500 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
-  statusChipRow: { display: 'flex', gap: 4, flexWrap: 'wrap', marginTop: 2 },
+  statusChipRow: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 },
   miniChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', whiteSpace: 'nowrap' },
 
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
