@@ -118,6 +118,33 @@ export function ChevronDownIcon(props) {
   )
 }
 
+// 그룹에 내 상태가 공유되고 있음을 나타내는 방송/신호 아이콘.
+export function BroadcastIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M8.5 15.5a5 5 0 0 1 0-7" />
+      <path d="M15.5 8.5a5 5 0 0 1 0 7" />
+      <path d="M5.3 18.7a9 9 0 0 1 0-13.4" />
+      <path d="M18.7 5.3a9 9 0 0 1 0 13.4" />
+    </IconBase>
+  )
+}
+
+// 공유가 꺼져 있음을 나타내는 방송 아이콘 — BroadcastIcon에 사선을 더해 '끔' 상태를 표현한다.
+export function BroadcastOffIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <path d="M8.5 15.5a5 5 0 0 1-.7-6.2" />
+      <path d="M15.5 8.5a5 5 0 0 1 .7 6.2" />
+      <path d="M5.3 18.7a9 9 0 0 1-1.6-10" />
+      <path d="M18.7 5.3a9 9 0 0 1 1.6 10" />
+      <line x1="3" y1="3" x2="21" y2="21" />
+    </IconBase>
+  )
+}
+
 export function MegaphoneIcon(props) {
   return (
     <IconBase {...props}>

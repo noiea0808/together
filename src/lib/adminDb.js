@@ -6,7 +6,7 @@ export async function getAllUsersAdmin() {
   const [{ data: users, error: usersError }, { data: terms, error: termsError }] = await Promise.all([
     adminSupabase
       .from('users')
-      .select('id, nickname, email, is_admin, is_guest, onboarded, birthdate, lifestyle, created_at, group_members(count), user_term_agreements(term_id)')
+      .select('id, nickname, email, is_admin, is_guest, onboarded, birthdate, lifestyle, created_at, last_login_at, group_members(count), pot_members(count), user_term_agreements(term_id)')
       .order('created_at', { ascending: false }),
     adminSupabase
       .from('terms')
@@ -23,6 +23,7 @@ export async function getAllUsersAdmin() {
     return {
       ...u,
       group_count: u.group_members?.[0]?.count ?? 0,
+      pot_count: u.pot_members?.[0]?.count ?? 0,
       agreed_required_count: requiredActiveTerms.filter(t => agreedIds.has(t.id)).length,
       required_total_count: requiredActiveTerms.length,
       agreed_term_titles: (terms ?? []).filter(t => agreedIds.has(t.id)).map(t => t.title),

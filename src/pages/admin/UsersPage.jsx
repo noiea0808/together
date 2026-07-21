@@ -131,11 +131,13 @@ export default function UsersPage() {
               <th style={s.th}>닉네임</th>
               <th style={s.th}>이메일</th>
               <th style={s.th}>가입일</th>
+              <th style={s.th}>최근 로그인</th>
               <th style={s.th}>상태</th>
               <th style={s.th}>생년월일</th>
               <th style={s.th}>라이프스타일</th>
               <th style={s.th}>약관동의</th>
               <th style={s.th}>그룹 수</th>
+              <th style={s.th}>참여 밥팟 수</th>
               <th style={s.th}>관리자</th>
             </tr>
           </thead>
@@ -154,6 +156,7 @@ export default function UsersPage() {
                 <td style={{ ...s.td, fontWeight: 600 }}>{u.nickname}</td>
                 <td style={s.td}>{u.email || '—'}</td>
                 <td style={s.td}>{formatDate(u.created_at)}</td>
+                <td style={s.td}>{formatDate(u.last_login_at)}</td>
                 <td style={s.td}>
                   {u.is_guest && <span style={s.badgeGuest}>게스트</span>}
                   {!u.is_guest && (
@@ -177,6 +180,7 @@ export default function UsersPage() {
                   )}
                 </td>
                 <td style={s.td}>{u.group_count}</td>
+                <td style={s.td}>{u.pot_count}</td>
                 <td style={s.td}>
                   <button
                     style={{ ...s.toggle, ...(u.is_admin ? s.toggleOn : {}) }}

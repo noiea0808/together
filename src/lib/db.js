@@ -94,7 +94,7 @@ export async function getSessionUser() {
     if (authUser.is_anonymous) {
       const { data: guestProfile, error: gErr } = await supabase
         .from('users')
-        .upsert({ auth_id: authUser.id, nickname: '게스트', is_guest: true, onboarded: true }, { onConflict: 'auth_id' })
+        .upsert({ auth_id: authUser.id, nickname: '게스트', is_guest: true, onboarded: true, last_login_at: new Date().toISOString() }, { onConflict: 'auth_id' })
         .select()
         .single()
       if (gErr) return null
@@ -105,7 +105,7 @@ export async function getSessionUser() {
       ?? '사용자'
     const { data: newProfile, error: insertError } = await supabase
       .from('users')
-      .upsert({ auth_id: authUser.id, email: authUser.email, nickname, onboarded: false }, { onConflict: 'auth_id' })
+      .upsert({ auth_id: authUser.id, email: authUser.email, nickname, onboarded: false, last_login_at: new Date().toISOString() }, { onConflict: 'auth_id' })
       .select()
       .single()
     if (insertError) return null
@@ -113,6 +113,8 @@ export async function getSessionUser() {
   }
 
   if (error) return null
+  // 최근 로그인 시각 갱신 — 세션 로드를 막지 않도록 결과를 기다리지 않는다.
+  supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
   return data
 }
 
@@ -1227,22 +1229,22 @@ export async function setGroupShareSetting(userId, groupId, date, isShared) {
   if (error) throw error
 }
 
-// fromDate 이후 전체 날짜에 공유 설정 적용 (60일 범위)
-export async function setGroupShareSettingBulk(userId, groupId, fromDate, isShared) {
+// centerDate 전후 모든 날짜(과거·미래 60일씩)에 공유 설정 적용 — '오늘만 적용' 옵션은 없고 항상 이 방식으로 적용된다.
+export async function setGroupShareSettingBulk(userId, groupId, centerDate, isShared) {
   if (isShared) {
-    // true(공개)로 되돌릴 때 — 레코드 삭제로 기본값(공개) 복원
+    // true(공개)로 되돌릴 때 — 날짜 제한 없이 전체 레코드 삭제로 기본값(공개) 복원
     const { error } = await supabase
       .from('group_share_settings')
       .delete()
       .eq('user_id', userId)
       .eq('group_id', groupId)
-      .gte('date', fromDate)
     if (error) throw error
   } else {
-    // false(비공개)로 — fromDate부터 60일치 레코드 upsert
+    // false(비공개)로 — centerDate 기준 앞뒤 60일씩 레코드 upsert
     const rows = []
-    const d = new Date(fromDate)
-    for (let i = 0; i < 60; i++) {
+    const d = new Date(centerDate)
+    d.setDate(d.getDate() - 60)
+    for (let i = 0; i < 121; i++) {
       const dateStr = d.toISOString().slice(0, 10)
       rows.push({ user_id: userId, group_id: groupId, date: dateStr, is_shared: false })
       d.setDate(d.getDate() + 1)

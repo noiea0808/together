@@ -11,15 +11,17 @@ import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/butt
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotIconPicker from '../components/PotIconPicker'
 
-function nextFullHour() {
-  const h = (new Date().getHours() + 1) % 24
-  return `${String(h).padStart(2, '0')}:00`
+const SLOT_DEFAULT_TIME = {
+  '아침': '07:00',
+  '오전간식': '10:00',
+  '점심': '12:00',
+  '오후간식': '15:00',
+  '저녁': '19:00',
+  '야식': '22:00',
 }
+
 function defaultTimeForSlot(slot) {
-  if (slot === '아침') return '07:00'
-  if (slot === '점심') return '12:00'
-  if (slot === '저녁') return '19:00'
-  return nextFullHour()
+  return SLOT_DEFAULT_TIME[slot] ?? '12:00'
 }
 
 const WEEKDAY_OPTIONS = [
