@@ -23,8 +23,6 @@ const STATUS_ITEMS = [
   { key: 'open', label: 'open · 참여 가능' },
   { key: 'skip', label: 'skip · 쉬어감' },
   { key: 'closed', label: 'closed · 마감' },
-  { key: '참여중', label: '참여중 (밥공기로 대체)' },
-  { key: '참여완료', label: '참여완료 (밥공기 톤 낮춤)' },
   { key: '__fallback__', label: '미정 (폴백)' },
 ]
 

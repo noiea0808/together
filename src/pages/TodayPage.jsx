@@ -680,7 +680,7 @@ export default function TodayPage() {
 
     let timeStr = null, desc = null
     if (isInPot) {
-      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}${potCount ? ` · ${potCount}타임` : ''}`
+      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
       const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
       desc = groupName ? `${groupName}에서 ${lockedLabel}` : `${earliestPot.title} 밥팟에 ${inPotExpired ? '참여 완료' : '참여 중'}`
     } else if (data?.time) {
@@ -793,9 +793,11 @@ export default function TodayPage() {
             </div>
             <div style={styles.mainStatusBody}>
               <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
-                {info.key
+                {/* 기본은 슬롯 아이콘, open/skip/closed처럼 사용자가 직접 고른 상태일 때만 상태 아이콘으로 바꾼다.
+                    참여중/참여완료(밥팟 참여)는 직접 고른 상태가 아니라 슬롯 그대로 유지하고, 완료된 건만 톤을 낮춘다. */}
+                {info.key === 'open' || info.key === 'skip' || info.key === 'closed'
                   ? <StatusIcon statusKey={info.key} size={112} style={styles.mainStatusIconImg} />
-                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} />}
+                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} muted={info.key === '참여완료'} />}
               </div>
               <div style={styles.mainStatusTextCol}>
                 {info.label ? (

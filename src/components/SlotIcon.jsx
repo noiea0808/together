@@ -24,7 +24,7 @@ export default function SlotIcon({ slot, size = 24, muted = false, style, ...pro
       alt=""
       width={size}
       height={size}
-      style={{ display: 'block', objectFit: 'contain', opacity: muted ? 0.55 : 1, filter: muted ? 'grayscale(0.4)' : 'none', ...style }}
+      style={{ display: 'block', objectFit: 'contain', opacity: muted ? 0.55 : 1, filter: `${muted ? 'grayscale(0.4) ' : ''}drop-shadow(0 2px 3px rgba(43,34,24,0.18))`, ...style }}
       {...props}
     />
   )
