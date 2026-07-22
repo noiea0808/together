@@ -687,7 +687,7 @@ export default function TodayPage() {
 
     let timeStr = null, desc = null
     if (isInPot) {
-      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}${potCount > 1 ? ` · ${potCount}타임` : ''}`
+      timeStr = `${earliestPot.meal_time?.slice(0, 5) ?? ''}${earliestPot.end_time ? ` ~ ${earliestPot.end_time.slice(0, 5)}` : ''}`
       const groupName = groups.find(g => g.id === earliestPot.group_id)?.name
       desc = groupName ? `${groupName}에서 ${lockedLabel}` : `${earliestPot.title} 밥팟에 ${inPotExpired ? '참여 완료' : '참여 중'}`
     } else if (data?.time) {
@@ -704,6 +704,7 @@ export default function TodayPage() {
       timeStr,
       desc,
       isInPot,
+      isDuplicatePot: potCount > 1,
       isPastDate,
     }
   }
@@ -774,7 +775,10 @@ export default function TodayPage() {
             }}
           >
             <div style={styles.mainStatusHeaderRow}>
-              <span style={styles.mainStatusTitle}>내 {slot}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={styles.mainStatusTitle}>내 {slot}</span>
+                {info.isDuplicatePot && <span style={styles.duplicatePotBadge}>중복참여</span>}
+              </div>
               {!info.isPastDate && hasResettable && (
                 <div style={{ position: 'relative' }}>
                   <button
@@ -876,7 +880,9 @@ export default function TodayPage() {
                 onClick={() => goToSlot(slot)}
               >
                 <div style={styles.subSlotIconZone}>
-                  <SlotIcon slot={slot} muted={!isSelected} style={styles.subSlotIconImg} />
+                  {info.key === 'open' || info.key === 'skip' || info.key === 'closed'
+                    ? <StatusIcon statusKey={info.key} muted={!isSelected} style={styles.subSlotIconImg} />
+                    : <SlotIcon slot={slot} muted={!isSelected || info.key === '참여완료'} style={styles.subSlotIconImg} />}
                 </div>
                 <div style={{ ...styles.subSlotLabelZone, background: info.label ? info.bg : 'var(--color-surface-2)' }}>
                   <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
@@ -2390,6 +2396,7 @@ const styles = {
   mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
+  duplicatePotBadge: { fontSize: 'var(--font-size-2xs)', color: '#FF6B35', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 'var(--radius-full)', padding: '1px 6px', fontWeight: 700 },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
   // 아이콘 원본 png에 연한 받침 원이 같이 그려져 있어, 확대 후 원형으로 잘라내 여백을 줄이고 흰 테두리로 마무리한다.
   mainStatusIconWrap: {

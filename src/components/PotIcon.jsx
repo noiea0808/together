@@ -22,7 +22,7 @@ export default function PotIcon({ icon, size = 24, style, ...props }) {
       alt=""
       width={size}
       height={size}
-      style={{ display: 'block', objectFit: 'contain', ...style }}
+      style={{ display: 'block', objectFit: 'contain', filter: 'drop-shadow(0 2px 3px rgba(43,34,24,0.24))', ...style }}
       {...props}
     />
   )
