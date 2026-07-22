@@ -7,6 +7,7 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import AppHeader from '../components/AppHeader'
+import SlotStatusBadge from '../components/SlotStatusBadge'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -120,10 +121,8 @@ export default function MySchedulePage() {
                     </div>
                   </div>
                   <div style={S.chipsArea}>
-                    {hasStatus ? chips.map(({ slot, opt }) => opt && (
-                      <span key={slot} style={{ ...S.chip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                        {slot} · {opt.label}
-                      </span>
+                    {hasStatus ? chips.map(({ slot, opt }) => (
+                      <SlotStatusBadge key={slot} slot={slot} opt={opt} size={55} />
                     )) : (
                       <span style={S.noStatus}>미설정</span>
                     )}
@@ -156,12 +155,11 @@ const S = {
   card: { borderRadius: 15, padding: '12px 14px', marginBottom: 7, cursor: 'pointer' },
   row: { display: 'flex', alignItems: 'center', gap: 10 },
 
-  dateCol: { minWidth: 38, textAlign: 'center', flexShrink: 0 },
+  dateCol: { minWidth: 38, textAlign: 'center', flexShrink: 0, marginRight: 6 },
   dayNum: { fontSize: 'var(--font-size-lg)', fontWeight: 900, lineHeight: 1.1 },
   dayName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, marginTop: 1 },
 
-  chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 4, alignItems: 'center', minWidth: 0 },
-  chip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', whiteSpace: 'nowrap' },
+  chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', minWidth: 0 },
   noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
   todayBadge: { background: 'var(--color-primary)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
   goIcon: { color: '#ADA59B', fontSize: 'var(--font-size-base)', fontWeight: 700, flexShrink: 0 },

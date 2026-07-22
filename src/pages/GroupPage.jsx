@@ -8,6 +8,7 @@ import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import SlotIcon from '../components/SlotIcon'
+import SlotStatusBadge from '../components/SlotStatusBadge'
 import FriendsSearchModal from '../components/FriendsSearchModal'
 import WishCategoryIcon from '../components/WishCategoryIcon'
 import { WISH_CATEGORY_OPTIONS } from '../lib/potConstants'
@@ -451,10 +452,8 @@ export default function GroupPage() {
                   </div>
                   {statusChips.length > 0 && (
                     <div style={styles.statusChipRow}>
-                      {statusChips.map(({ slot, opt }) => opt && (
-                        <span key={slot} style={{ ...styles.miniChip, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                          {opt.emoji} {slot} · {opt.label}
-                        </span>
+                      {statusChips.map(({ slot, opt }) => (
+                        <SlotStatusBadge key={slot} slot={slot} opt={opt} size={55} />
                       ))}
                     </div>
                   )}
@@ -784,8 +783,8 @@ const styles = {
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
-  statusChipRow: { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4, flexShrink: 0 },
-  miniChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', whiteSpace: 'nowrap' },
+  // 너비를 고정해야 배지 개수가 달라도 모든 친구 행에서 같은 x 위치에서 시작한다(세로 줄맞춤).
+  statusChipRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center', gap: 5, flexShrink: 0, width: 120 },
 
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
   sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '80vh', overflowY: 'auto' },
