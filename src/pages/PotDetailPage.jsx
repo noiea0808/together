@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, setPotMomentScope, getGroupMembers, invitePotFriend } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
@@ -106,8 +106,12 @@ const gateStyles = {
 
 export default function PotDetailPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const { id } = useParams()
   const { user, login } = useUser()
+  // 앱 안에서 이동해온 게 아니라 초대 링크 등으로 직접 들어온 경우 히스토리가 없어
+  // navigate(-1)이 반응하지 않는다. 이때는 홈으로 보낸다.
+  const enteredDirectly = location.key === 'default'
 
   const [pot, setPot] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -408,9 +412,7 @@ export default function PotDetailPage() {
       <div style={S.header}>
         {draft && draftScope === 'all'
           ? <button style={S.headerTextBtn} onClick={cancelDraft}>취소</button>
-          // 게스트는 초대 링크로 바로 이 화면에 들어와 브라우저 히스토리가 없는 경우가
-          // 많아 navigate(-1)이 아무 반응이 없다. 뒤로가기 모양은 유지하되 홈으로 보낸다.
-          : <button style={S.backBtn} onClick={() => user?.is_guest ? navigate('/today') : navigate(-1)} aria-label="뒤로가기">‹</button>
+          : <button style={S.backBtn} onClick={() => (user?.is_guest || enteredDirectly) ? navigate('/today') : navigate(-1)} aria-label="뒤로가기">‹</button>
         }
         <div style={{ flex: 1, textAlign: 'center' }}>
           <div style={S.headerTitle}>밥팟 상세</div>
