@@ -2237,7 +2237,7 @@ function MealPodCard({ pot, groupName, showMeta = false, myUserId, onNavigate })
         <div style={potListStyles.contentCol}>
           {/* 1행: 제목 · 메뉴 */}
           <div style={potListStyles.row1}>
-            <span style={potListStyles.title}>{pot.title}</span>
+            <span style={{ ...potListStyles.title, maxWidth: pot.menu ? '55%' : '100%' }}>{pot.title}</span>
             {pot.menu && <span style={potListStyles.menuText}>· {pot.menu}</span>}
           </div>
 
