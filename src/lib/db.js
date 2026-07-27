@@ -35,6 +35,20 @@ export async function signOut() {
   await supabase.auth.signOut()
 }
 
+// 비밀번호 재설정 메일 발송. 링크를 열면 /reset-password 로 돌아와 새 비밀번호를 입력한다.
+export async function requestPasswordReset(email) {
+  const { error } = await supabase.auth.resetPasswordForEmail(email, {
+    redirectTo: window.location.origin + '/reset-password',
+  })
+  if (error) throw error
+}
+
+// 재설정 메일 링크로 들어와 생긴 임시 세션에서 새 비밀번호로 교체한다.
+export async function updatePassword(newPassword) {
+  const { error } = await supabase.auth.updateUser({ password: newPassword })
+  if (error) throw error
+}
+
 // 회원 탈퇴: delete-account Edge Function 을 호출해
 // 앱 데이터 + auth.users 레코드를 완전히 삭제한 뒤 세션을 종료한다.
 // (auth 계정 삭제는 service_role 권한이 필요하므로 서버에서 처리)

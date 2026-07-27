@@ -6,6 +6,7 @@ import { NotificationSyncProvider } from './lib/NotificationSyncContext'
 import { NavBadgeProvider } from './lib/NavBadgeContext'
 import { getActiveTerms, getMyTermAgreements } from './lib/db'
 import OnboardingPage from './pages/OnboardingPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import TermsConsentPage from './pages/TermsConsentPage'
 import TodayPage from './pages/TodayPage'
@@ -99,6 +100,7 @@ function ConsumerRoutes() {
   return (
     <Routes>
       <Route path="/onboarding" element={!user ? <OnboardingPage /> : <Navigate to={user.onboarded ? '/today' : '/welcome'} replace />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/welcome" element={!user ? <Navigate to="/onboarding" replace /> : (user.onboarded ? <Navigate to="/today" replace /> : <ProfileSetupPage />)} />
       <Route path="/today"    element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
