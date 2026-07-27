@@ -74,6 +74,15 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
   const [currentDate, setCurrentDate] = useState(TODAY)
+  // 날짜 전환 시 목록이 밀려나는 방향 — next(다음 날짜 방향)/prev(이전 날짜 방향)
+  const [dateSlideDir, setDateSlideDir] = useState('next')
+  const goToDate = (updater) => {
+    setCurrentDate(d => {
+      const next = updater(d)
+      setDateSlideDir(next > d ? 'next' : 'prev')
+      return next
+    })
+  }
   // 날짜 네비 바 좌우 스와이프로 날짜 이동
   const dateSwipeStart = useRef(null)
   const handleDateSwipeStart = (e) => { dateSwipeStart.current = { x: e.clientX, y: e.clientY } }
@@ -83,7 +92,7 @@ export default function GroupPage() {
     const dy = e.clientY - dateSwipeStart.current.y
     dateSwipeStart.current = null
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
-    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
+    goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
   const [friendGroupFilter, setFriendGroupFilter] = useState(null) // null = 전체, 아니면 group.id
   const [selectedFriendId, setSelectedFriendId] = useState(null)
@@ -399,15 +408,15 @@ export default function GroupPage() {
         onPointerUp={handleDateSwipeEnd}
         onPointerCancel={() => { dateSwipeStart.current = null }}
       >
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           <span style={{ ...styles.relBadge, background: relLabel.color }}>{relLabel.label}</span>
           {!isToday && (
-            <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
+            <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
       </div>
 
       <div style={styles.body}>
@@ -429,9 +438,11 @@ export default function GroupPage() {
           </div>
         )}
 
-        {/* 친구 목록 — 가로 스크롤 필터 칩과 겹치지 않도록 이 영역에만 좌우 스와이프로 날짜 이동을 붙인다 */}
+        {/* 친구 목록 — 가로 스크롤 필터 칩과 겹치지 않도록 이 영역에만 좌우 스와이프로 날짜 이동을 붙인다.
+            key가 dateStr이라 날짜가 바뀔 때마다 방향에 맞춰 슬라이드-인 애니메이션이 재생된다. */}
         <div
-          style={{ touchAction: 'pan-y' }}
+          key={dateStr}
+          style={{ touchAction: 'pan-y', animation: `${dateSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out` }}
           onPointerDown={handleDateSwipeStart}
           onPointerUp={handleDateSwipeEnd}
           onPointerCancel={() => { dateSwipeStart.current = null }}

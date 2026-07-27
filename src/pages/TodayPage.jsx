@@ -283,6 +283,55 @@ export default function TodayPage() {
     setShareSettingsMap(snap.shareSettingsMap)
   }, [])
 
+  // 특정 날짜의 보드 데이터를 가져와 캐시에 저장만 한다(화면 상태는 건드리지 않음) —
+  // 현재 날짜 로드와 전후 날짜 프리페치가 이 로직을 공유한다.
+  const fetchBoardSnapshot = useCallback(async (forDateStr) => {
+    const key = `board:${user.id}:${forDateStr}`
+    const myGroups = await getMyGroups(user.id)
+    if (myGroups.length === 0) {
+      const snap = { groups: [], membersMap: {}, statusesMap: {}, potsMap: {}, mySlots: {}, shareSettingsMap: {} }
+      setCache(key, snap)
+      return snap
+    }
+
+    const groupIds = myGroups.map(g => g.id)
+    // 보드(멤버/상태/팟) 일괄 + 내 상태 + 공유설정 병렬 — 그룹 수와 무관하게 상수 횟수 쿼리
+    const [board, myStatuses, shareRows] = await Promise.all([
+      getTodayBoard(groupIds, forDateStr, user.id),
+      getMyStatuses(user.id, forDateStr),
+      getGroupShareSettings(user.id, forDateStr).catch(() => []),
+    ])
+
+    // 기본 밥팟 자동 생성
+    await Promise.all(myGroups.map(async g => {
+      const configs = await getGroupDefaultPotConfigs(g.id)
+      await ensureDefaultPots(g.id, forDateStr, configs)
+    }))
+    // 자동 생성 후 팟 목록 재조회
+    const refreshed = await getTodayBoard(groupIds, forDateStr, user.id)
+
+    // 내 상태 (사용자 의향 원본)
+    const slots = {}
+    myStatuses.forEach(s => {
+      slots[s.slot] = { status: s.status, time: s.meal_time, end_time: s.end_time, menu: s.menu }
+    })
+
+    // 그룹 공유 설정
+    const settingsMap = {}
+    shareRows.forEach(row => { settingsMap[row.group_id] = row.is_shared })
+
+    const snap = {
+      groups: myGroups,
+      membersMap: board.membersMap,
+      statusesMap: board.statusesMap,
+      potsMap: refreshed.potsMap,
+      mySlots: slots,
+      shareSettingsMap: settingsMap,
+    }
+    setCache(key, snap)
+    return snap
+  }, [user])
+
   // 데이터 로드 — 캐시 우선(stale-while-revalidate)
   const loadData = useCallback(async ({ force = false } = {}) => {
     if (!user) return
@@ -300,58 +349,28 @@ export default function TodayPage() {
 
     // 2) 백그라운드 재검증(또는 최초 로드)
     try {
-      const myGroups = await getMyGroups(user.id)
-      if (myGroups.length === 0) {
-        const snap = { groups: [], membersMap: {}, statusesMap: {}, potsMap: {}, mySlots: {}, shareSettingsMap: {} }
-        applySnapshot(snap)
-        setCache(key, snap)
-        return
-      }
-
-      const groupIds = myGroups.map(g => g.id)
-      // 보드(멤버/상태/팟) 일괄 + 내 상태 + 공유설정 병렬 — 그룹 수와 무관하게 상수 횟수 쿼리
-      const [board, myStatuses, shareRows] = await Promise.all([
-        getTodayBoard(groupIds, dateStr, user.id),
-        getMyStatuses(user.id, dateStr),
-        getGroupShareSettings(user.id, dateStr).catch(() => []),
-      ])
-
-      // 기본 밥팟 자동 생성
-      await Promise.all(myGroups.map(async g => {
-        const configs = await getGroupDefaultPotConfigs(g.id)
-        await ensureDefaultPots(g.id, dateStr, configs)
-      }))
-      // 자동 생성 후 팟 목록 재조회
-      const refreshed = await getTodayBoard(groupIds, dateStr, user.id)
-
-      // 내 상태 (사용자 의향 원본)
-      const slots = {}
-      myStatuses.forEach(s => {
-        slots[s.slot] = { status: s.status, time: s.meal_time, end_time: s.end_time, menu: s.menu }
-      })
-
-      // 그룹 공유 설정
-      const settingsMap = {}
-      shareRows.forEach(row => { settingsMap[row.group_id] = row.is_shared })
-
-      const snap = {
-        groups: myGroups,
-        membersMap: board.membersMap,
-        statusesMap: board.statusesMap,
-        potsMap: refreshed.potsMap,
-        mySlots: slots,
-        shareSettingsMap: settingsMap,
-      }
+      const snap = await fetchBoardSnapshot(dateStr)
       applySnapshot(snap)
-      setCache(key, snap)
     } catch (e) {
       console.error(e)
     } finally {
       setLoading(false)
     }
-  }, [user, dateStr, applySnapshot])
+  }, [user, dateStr, applySnapshot, fetchBoardSnapshot])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // 스와이프로 넘기자마자 화면이 바로 뜨도록, 전후 날짜의 보드 데이터를 미리 캐시에 채워둔다.
+  useEffect(() => {
+    if (!user) return
+    ;[addDays(currentDate, -1), addDays(currentDate, 1)].forEach(d => {
+      const adjDateStr = toDateStr(d)
+      const key = `board:${user.id}:${adjDateStr}`
+      const cached = getCache(key)
+      if (cached && !cached.stale) return
+      fetchBoardSnapshot(adjDateStr).catch(() => {})
+    })
+  }, [user, currentDate, fetchBoardSnapshot])
 
   useEffect(() => () => clearTimeout(toastTimer.current), [])
 
