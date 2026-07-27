@@ -19,6 +19,13 @@ if ('serviceWorker' in navigator) {
   })
 }
 
+// 저장공간 부족 시 브라우저/OS가 로그인 세션(localStorage)을 지우지 않도록 영구 저장 요청.
+// 홈 화면에 설치해두고 뜸하게 여는 사용 패턴에서 세션이 사라져 재로그인이 필요해지는
+// 경우를 줄이기 위함 — 승인 여부는 브라우저가 결정하므로 완전한 보장은 아니다.
+if (navigator.storage?.persist) {
+  navigator.storage.persist().catch(() => {})
+}
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
     <App />
