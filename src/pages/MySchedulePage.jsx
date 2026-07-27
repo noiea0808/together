@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMySchedule } from '../lib/db'
@@ -64,6 +64,33 @@ export default function MySchedulePage() {
       .finally(() => setLoading(false))
   }, [user, fromDate, toDate])
 
+  // 스와이프로 넘기자마자 화면이 바로 뜨도록, 전후 2주 구간을 미리 캐시에 채워둔다.
+  useEffect(() => {
+    if (!user) return
+    ;[weekOffset - 1, weekOffset + 1].forEach(offset => {
+      const adjDates = getTwoWeekDates(offset)
+      const f = toDateStr(adjDates[0])
+      const t = toDateStr(adjDates[adjDates.length - 1])
+      const key = `schedule:${user.id}:${f}:${t}`
+      const cached = getCache(key)
+      if (cached && !cached.stale) return
+      getMySchedule(user.id, f, t).then(data => setCache(key, data)).catch(() => {})
+    })
+  }, [user, weekOffset])
+
+  // 목록 영역 좌우 스와이프로 이전/다음 2주 이동 (세로 스크롤과 헷갈리지 않도록 가로 이동이
+  // 더 뚜렷할 때만 반응한다)
+  const weekSwipeStart = useRef(null)
+  const handleWeekSwipeStart = (e) => { weekSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleWeekSwipeEnd = (e) => {
+    if (!weekSwipeStart.current) return
+    const dx = e.clientX - weekSwipeStart.current.x
+    const dy = e.clientY - weekSwipeStart.current.y
+    weekSwipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    setWeekOffset(o => o + (dx < 0 ? 1 : -1))
+  }
+
   const byDate = {}
   statuses.forEach(s => {
     if (!byDate[s.date]) byDate[s.date] = {}
@@ -80,7 +107,12 @@ export default function MySchedulePage() {
         <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
       </div>
 
-      <div style={S.list}>
+      <div
+        style={{ ...S.list, touchAction: 'pan-y' }}
+        onPointerDown={handleWeekSwipeStart}
+        onPointerUp={handleWeekSwipeEnd}
+        onPointerCancel={() => { weekSwipeStart.current = null }}
+      >
         {loading ? (
           <div style={S.empty}><RiceBowlIcon size={40} /></div>
         ) : dates.map((date, idx) => {

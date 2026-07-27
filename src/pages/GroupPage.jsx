@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
+import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
@@ -140,8 +141,21 @@ export default function GroupPage() {
 
   useEffect(() => {
     if (groups.length === 0) return
-    setStatusLoading(true)
-    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr, user.id).then(s => [g.id, s])))
+    const cachedEntries = groups.map(g => {
+      const cached = getCache(`groupStatus:${g.id}:${dateStr}`)
+      return cached ? { id: g.id, data: cached.data, stale: cached.stale } : null
+    })
+    const allCached = cachedEntries.every(Boolean)
+    if (allCached) {
+      setStatusesMap(Object.fromEntries(cachedEntries.map(({ id, data }) => [id, data])))
+      if (!cachedEntries.some(e => e.stale)) return
+    } else {
+      setStatusLoading(true)
+    }
+    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr, user.id).then(s => {
+      setCache(`groupStatus:${g.id}:${dateStr}`, s)
+      return [g.id, s]
+    })))
       .then(entries => {
         setStatusesMap(Object.fromEntries(entries))
         setStatusLoading(false)
@@ -149,10 +163,34 @@ export default function GroupPage() {
   }, [groups, dateStr])
 
   useEffect(() => {
+    const key = `pendingInv:${user.id}:${dateStr}`
+    const cached = getCache(key)
+    if (cached) {
+      setPendingInvitations(cached.data)
+      if (!cached.stale) return
+    }
     getMyPendingInvitationsForDate(user.id, dateStr)
-      .then(setPendingInvitations)
+      .then(data => { setPendingInvitations(data); setCache(key, data) })
       .catch(e => console.error(e))
   }, [user.id, dateStr])
+
+  // 스와이프로 넘기자마자 화면이 바로 뜨도록, 전후 날짜의 상태/제안 현황을 미리 캐시에 채워둔다.
+  useEffect(() => {
+    if (groups.length === 0) return
+    ;[addDays(currentDate, -1), addDays(currentDate, 1)].forEach(d => {
+      const adjDateStr = toDateStr(d)
+      groups.forEach(g => {
+        const key = `groupStatus:${g.id}:${adjDateStr}`
+        const cached = getCache(key)
+        if (cached && !cached.stale) return
+        getGroupStatuses(g.id, adjDateStr, user.id).then(s => setCache(key, s)).catch(() => {})
+      })
+      const invKey = `pendingInv:${user.id}:${adjDateStr}`
+      const invCached = getCache(invKey)
+      if (invCached && !invCached.stale) return
+      getMyPendingInvitationsForDate(user.id, adjDateStr).then(data => setCache(invKey, data)).catch(() => {})
+    })
+  }, [groups, currentDate, user.id])
 
   const findPendingInvitation = (friendId, slot) =>
     pendingInvitations.find(inv => inv.to_user_id === friendId && inv.slot === slot)
@@ -391,7 +429,13 @@ export default function GroupPage() {
           </div>
         )}
 
-        {/* 친구 목록 */}
+        {/* 친구 목록 — 가로 스크롤 필터 칩과 겹치지 않도록 이 영역에만 좌우 스와이프로 날짜 이동을 붙인다 */}
+        <div
+          style={{ touchAction: 'pan-y' }}
+          onPointerDown={handleDateSwipeStart}
+          onPointerUp={handleDateSwipeEnd}
+          onPointerCancel={() => { dateSwipeStart.current = null }}
+        >
         {friends.length === 0 ? (
           <div style={styles.empty}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -463,6 +507,7 @@ export default function GroupPage() {
             })}
           </div>
         )}
+        </div>
       </div>
 
       {selectedFriend && (
