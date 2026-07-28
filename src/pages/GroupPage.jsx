@@ -693,24 +693,26 @@ export default function GroupPage() {
                       >
                         <span style={styles.statusSlotName}>
                           <span style={styles.slotIconWrapper}>
-                            <SlotIcon slot={slot} size={30} />
+                            <SlotIcon slot={slot} size={40} />
                           </span>
                           {slot}
                         </span>
-                        {opt ? (
-                          <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                            {opt.emoji} {opt.label}
-                          </span>
-                        ) : (
-                          <span style={styles.statusDash}>미설정</span>
-                        )}
-                        {pendingInv ? (
-                          <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
-                            제안함 ✓ · 취소
-                          </button>
-                        ) : invited ? (
-                          <span style={styles.statusInvitedTag}>초대함 ✓</span>
-                        ) : null}
+                        <div style={styles.statusCellRight}>
+                          {opt ? (
+                            <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
+                              {opt.emoji} {opt.label}
+                            </span>
+                          ) : (
+                            <span style={styles.statusDash}>미설정</span>
+                          )}
+                          {pendingInv ? (
+                            <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
+                              제안함 ✓ · 취소
+                            </button>
+                          ) : invited ? (
+                            <span style={styles.statusInvitedTag}>초대함 ✓</span>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
@@ -889,15 +891,16 @@ const styles = {
     fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
     whiteSpace: 'nowrap',
   },
-  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
+  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
+  statusCell: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },
-  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 },
-  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0 },
+  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 },
+  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0 },
+  statusCellRight: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
   statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
   statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
   statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
-  statusCancelBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
+  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
   sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
   unfriendBtn: { marginTop: 10, padding: '10px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', cursor: 'pointer' },
