@@ -27,6 +27,7 @@ import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
 import DailyTipModal from './components/DailyTipModal'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
+import NativeDeepLinkHandler from './components/NativeDeepLinkHandler'
 
 // 정지 기간이 지났으면 클라이언트에서는 정지 아님으로 취급 (DB의 is_suspended 갱신은 관리자 해제 시점에 이뤄짐)
 function isCurrentlySuspended(user) {
@@ -139,6 +140,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <InAppBrowserGuard />
+      <NativeDeepLinkHandler />
       <Routes>
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/*" element={<ConsumerApp />} />

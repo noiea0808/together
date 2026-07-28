@@ -1,13 +1,14 @@
 import { useState } from 'react'
 import { SendIcon } from './GroupIcons'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { getPublicOrigin } from '../lib/db'
 
 // 그룹을 막 만든 직후 보여주는 초대 화면 — 혼자 그룹을 만들고 끝나는 걸 막기 위해
 // 생성 완료 지점에 강제로 끼워 넣는다. 모달/전체 페이지 양쪽에서 재사용하도록
 // 바깥 카드/다이얼로그 배경은 호출부가 제공하고, 이 컴포넌트는 내용만 그린다.
 export default function GroupInviteShare({ group, onDone }) {
   const [copied, setCopied] = useState(null)
-  const inviteLink = `${window.location.origin}/join/${group.invite_code}`
+  const inviteLink = `${getPublicOrigin()}/join/${group.invite_code}`
 
   const copyText = (text, type) => {
     navigator.clipboard?.writeText(text)

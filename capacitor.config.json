@@ -1,0 +1,8 @@
+{
+  "appId": "com.gachimeokja.app",
+  "appName": "같이 먹자",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  }
+}

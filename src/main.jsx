@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import './lib/installPrompt' // beforeinstallprompt를 React 렌더 전에 최대한 빨리 캡처
+import { Capacitor } from '@capacitor/core'
 import { isAndroidInAppBrowser, openInChromeAndroid } from './lib/inAppBrowser'
 import App from './App.jsx'
 
@@ -10,7 +11,9 @@ import App from './App.jsx'
 // URL을 먼저 바꿔버릴 수 있어(예: /join/:code → /onboarding), 크롬으로 넘어갈 때 초대
 // 코드가 담긴 원래 URL을 놓치는 레이스가 생긴다. 앱 진입 즉시, 아무 것도 실행되기 전에
 // 원본 URL 그대로 캡처해 넘겨서 이 레이스를 원천 차단한다.
-if (isAndroidInAppBrowser()) openInChromeAndroid()
+// 커패시터 네이티브 앱은 이 우회가 필요 없다(원래 자체 UA가 카톡 패턴에 안 걸리긴 하지만,
+// 우연에 기대지 않고 명시적으로 막아 앱이 스스로를 크롬으로 튕겨내는 일을 방지한다).
+if (!Capacitor.isNativePlatform() && isAndroidInAppBrowser()) openInChromeAndroid()
 
 // 서비스 워커 등록 (PWA 설치 지원)
 if ('serviceWorker' in navigator) {

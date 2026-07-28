@@ -1,5 +1,19 @@
+import { Capacitor } from '@capacitor/core'
+import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
+
+// 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
+// https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
+const PUBLIC_ORIGIN = 'https://www.eat-together.net'
+export function getPublicOrigin() {
+  return Capacitor.isNativePlatform() ? PUBLIC_ORIGIN : window.location.origin
+}
+
+// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml의 intent-filter와
+// 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로 돌아오면
+// AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
+const NATIVE_OAUTH_REDIRECT = 'gachimeokja://oauth-callback'
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {
@@ -38,7 +52,7 @@ export async function signOut() {
 // 비밀번호 재설정 메일 발송. 링크를 열면 /reset-password 로 돌아와 새 비밀번호를 입력한다.
 export async function requestPasswordReset(email) {
   const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: window.location.origin + '/reset-password',
+    redirectTo: getPublicOrigin() + '/reset-password',
   })
   if (error) throw error
 }
@@ -73,7 +87,20 @@ function oauthReturnPath() {
   return '/today'
 }
 
+// 네이티브 앱 안에서 WebView로 그대로 리다이렉트하면 구글이 403(disallowed_useragent)으로
+// 막는다 — 카톡 인앱 브라우저와 같은 문제라 같은 해법을 쓴다: Chrome Custom Tab(시스템
+// 브라우저)에서 로그인시키고, 커스텀 스킴으로 앱에 돌아오면 NativeDeepLinkHandler가 이어받는다.
+async function signInWithOAuthNative(provider) {
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider,
+    options: { redirectTo: NATIVE_OAUTH_REDIRECT, skipBrowserRedirect: true },
+  })
+  if (error) throw error
+  await Browser.open({ url: data.url })
+}
+
 export async function signInWithGoogle() {
+  if (Capacitor.isNativePlatform()) return signInWithOAuthNative('google')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin + oauthReturnPath() },
@@ -82,10 +109,26 @@ export async function signInWithGoogle() {
 }
 
 export async function signInWithKakao() {
+  if (Capacitor.isNativePlatform()) return signInWithOAuthNative('kakao')
   const { error } = await supabase.auth.signInWithOAuth({
     provider: 'kakao',
     options: { redirectTo: window.location.origin + oauthReturnPath() },
   })
+  if (error) throw error
+}
+
+// NativeDeepLinkHandler가 gachimeokja://oauth-callback 딥링크를 받으면 호출한다.
+// PKCE 플로우라 code 쿼리 파라미터 하나만 교환하면 세션이 생기고, UserContext의
+// onAuthStateChange 구독이 SIGNED_IN을 받아 나머지(라우팅 등)는 기존 흐름 그대로 이어진다.
+export async function handleNativeOAuthCallback(url) {
+  const params = new URL(url).searchParams
+  const errorDescription = params.get('error_description') || params.get('error')
+  if (errorDescription) throw new Error(errorDescription)
+
+  const code = params.get('code')
+  if (!code) throw new Error('OAuth 콜백에 code가 없습니다.')
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code)
   if (error) throw error
 }
 
