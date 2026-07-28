@@ -729,7 +729,7 @@ export default function TodayPage() {
   }
 
   if (loading) {
-    return <div style={styles.loadingPage}><RiceBowlIcon size={40} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
+    return <div style={styles.loadingPage}><RiceBowlIcon size={72} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
 
@@ -962,7 +962,7 @@ export default function TodayPage() {
 
         {groups.length === 0 && (
           <div style={styles.emptyGroup}>
-            <div style={{ fontSize: 36 }}>👥</div>
+            <UsersIcon size={36} strokeWidth={1.6} style={{ color: 'var(--color-text-muted)' }} />
             <div style={{ fontWeight: 700 }}>아직 그룹이 없어요</div>
             <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
               그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
@@ -2438,7 +2438,7 @@ const styles = {
   subSlotLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, whiteSpace: 'nowrap', letterSpacing: '-0.3px' },
   sectionTitleRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   sectionTitle: { fontWeight: 900, fontSize: 'var(--font-size-base)', letterSpacing: '-0.4px' },
-  groupCard: { marginBottom: 22, padding: '12px 12px 10px', background: 'var(--color-surface-2)', borderRadius: 16, transition: 'opacity 0.2s' },
+  groupCard: { marginBottom: 11, padding: '12px 12px 10px', background: 'var(--color-surface-2)', borderRadius: 16, transition: 'opacity 0.2s' },
   groupHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   groupName: { fontWeight: 800, fontSize: 'var(--font-size-sm)', letterSpacing: '-0.3px', color: 'var(--color-text)' },
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },

@@ -216,6 +216,12 @@ img {
   border-color: var(--color-primary);
 }
 
+input::placeholder,
+textarea::placeholder {
+  color: var(--color-text-muted);
+  opacity: 0.6;
+}
+
 .text-muted { color: var(--color-text-muted); font-size: var(--font-size-sm); }
 .text-center { text-align: center; }
 

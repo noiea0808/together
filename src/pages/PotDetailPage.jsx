@@ -401,7 +401,7 @@ export default function PotDetailPage() {
   const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
 
   if (!user) return <GuestGate potId={id} onJoined={login} navigate={navigate} />
-  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={40} /></div>
+  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={72} /></div>
   if (!pot) return <div style={S.loadingPage}>밥팟을 찾을 수 없어요.</div>
 
   const timeStr = pot.meal_time ? `${pot.meal_time.slice(0,5)}${pot.end_time ? ` ~ ${pot.end_time.slice(0,5)}` : ''}` : '미정'

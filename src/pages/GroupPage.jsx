@@ -393,7 +393,7 @@ export default function GroupPage() {
   const selectedFriend = friends.find(f => f.id === selectedFriendId) ?? null
   const relLabel = getRelativeLabel(currentDate)
 
-  if (loading) return <div style={styles.loadingPage}><RiceBowlIcon size={40} /></div>
+  if (loading) return <div style={styles.loadingPage}><RiceBowlIcon size={72} /></div>
 
   return (
     <div style={styles.page}>

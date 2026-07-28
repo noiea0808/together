@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getActiveTerms, completeOnboarding } from '../lib/db'
+import { parseBirthId } from '../lib/birthId'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
@@ -12,7 +13,8 @@ export default function ProfileSetupPage() {
   const { user, login } = useUser()
 
   const [nickname, setNickname] = useState('')
-  const [birthdate, setBirthdate] = useState('')
+  const [birthFront, setBirthFront] = useState('')
+  const [birthGenderDigit, setBirthGenderDigit] = useState('')
   const [lifestyle, setLifestyle] = useState('')
   const [terms, setTerms] = useState([])
   const [agreed, setAgreed] = useState({}) // { [termId]: true }
@@ -41,7 +43,12 @@ export default function ProfileSetupPage() {
 
   const toggle = (id) => setAgreed(a => ({ ...a, [id]: !a[id] }))
 
-  const canSubmit = nickname.trim().length > 0 && requiredAllChecked && !loading
+  const birthTouched = birthFront.length > 0 || birthGenderDigit.length > 0
+  const birthComplete = birthFront.length === 6 && birthGenderDigit.length === 1
+  const parsedBirth = birthComplete ? parseBirthId(birthFront, birthGenderDigit) : null
+  const birthError = birthTouched && (!birthComplete || !parsedBirth)
+
+  const canSubmit = nickname.trim().length > 0 && requiredAllChecked && !birthError && !loading
 
   const handleSubmit = async () => {
     if (!canSubmit) return
@@ -50,7 +57,7 @@ export default function ProfileSetupPage() {
       const agreedTerms = terms.filter(t => agreed[t.id]).map(t => ({ id: t.id, version: t.version }))
       const profile = await completeOnboarding(
         user.id,
-        { nickname, birthdate, lifestyle },
+        { nickname, birthdate: parsedBirth?.birthdate ?? null, gender: parsedBirth?.gender ?? null, lifestyle },
         agreedTerms,
       )
       login(profile)
@@ -90,20 +97,39 @@ export default function ProfileSetupPage() {
             autoFocus
             disabled={loading}
           />
-          <span style={styles.hint}>{nickname.length}/8</span>
+          <span style={{ ...styles.hint, textAlign: 'right' }}>{nickname.length}/8</span>
         </div>
 
-        {/* 생년월일 (선택) */}
+        {/* 생년월일 (선택) — 주민등록번호 앞 6자리 + 성별 구분용 첫 번째 자리만 입력받는다 */}
         <div style={styles.field}>
           <label style={styles.label}>생년월일 <span style={styles.optional}>(선택)</span></label>
-          <input
-            style={styles.input}
-            type="date"
-            value={birthdate}
-            max={new Date().toISOString().split('T')[0]}
-            onChange={e => setBirthdate(e.target.value)}
-            disabled={loading}
-          />
+          <div style={styles.birthRow}>
+            <input
+              style={styles.birthFrontInput}
+              type="text"
+              inputMode="numeric"
+              placeholder="990101"
+              maxLength={6}
+              value={birthFront}
+              onChange={e => setBirthFront(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              disabled={loading}
+            />
+            <span style={styles.birthDash}>—</span>
+            <input
+              style={styles.birthGenderInput}
+              type="text"
+              inputMode="numeric"
+              placeholder="●"
+              maxLength={1}
+              value={birthGenderDigit}
+              onChange={e => setBirthGenderDigit(e.target.value.replace(/\D/g, '').slice(0, 1))}
+              disabled={loading}
+            />
+            <span style={styles.birthMask}>●●●●●●</span>
+          </div>
+          <span style={styles.hint}>
+            {birthError ? <span style={styles.birthErrorText}>생년월일을 올바르게 입력해주세요.</span> : '주민등록번호 앞자리와 성별 구분 숫자 1자리만 입력돼요. 나머지는 수집하지 않아요.'}
+          </span>
         </div>
 
         {/* 라이프스타일 (선택) */}
@@ -212,7 +238,21 @@ const styles = {
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
   },
-  hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
+  hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
+  birthErrorText: { color: 'var(--color-danger)' },
+  birthRow: { display: 'flex', alignItems: 'center', gap: 6 },
+  birthFrontInput: {
+    flex: 1, minWidth: 0, padding: '13px var(--spacing-md)',
+    border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', letterSpacing: 1,
+  },
+  birthDash: { color: 'var(--color-text-muted)', flexShrink: 0 },
+  birthGenderInput: {
+    width: 40, flexShrink: 0, padding: '13px 0', textAlign: 'center',
+    border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box',
+  },
+  birthMask: { flexShrink: 0, color: 'var(--color-text-muted)', letterSpacing: 2, fontSize: 'var(--font-size-sm)' },
   chipRow: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 },
   chip: {
     padding: '8px 14px', border: '1.5px solid var(--color-border)',

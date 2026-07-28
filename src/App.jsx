@@ -59,7 +59,7 @@ function ConsumerRoutes() {
   }, [user?.id, user?.onboarded, user?.is_guest])
 
   if (user === undefined) {
-    return <div style={styles.loading}><RiceBowlIcon size={48} /></div>
+    return <div style={styles.loading}><RiceBowlIcon size={84} /></div>
   }
 
   if (isCurrentlySuspended(user)) {
@@ -78,7 +78,7 @@ function ConsumerRoutes() {
 
   // 온보딩까지 마친 사용자는 재동의 필요 여부가 확인될 때까지 대기 (레거시 미동의자 포함)
   if (user && user.onboarded && !user.is_guest && missingTerms === undefined) {
-    return <div style={styles.loading}><RiceBowlIcon size={48} /></div>
+    return <div style={styles.loading}><RiceBowlIcon size={84} /></div>
   }
   if (user && user.onboarded && !user.is_guest && missingTerms?.length > 0) {
     return <TermsConsentPage onDone={() => setMissingTerms([])} />

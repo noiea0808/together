@@ -145,13 +145,14 @@ async function upsertTermAgreements(userId, agreedTerms = []) {
   if (error) throw error
 }
 
-// 온보딩 완료: 닉네임·생년월일·라이프스타일 저장 + 약관 동의 기록 + onboarded 처리
-export async function completeOnboarding(userId, { nickname, birthdate, lifestyle }, agreedTerms = []) {
+// 온보딩 완료: 닉네임·생년월일·성별·라이프스타일 저장 + 약관 동의 기록 + onboarded 처리
+export async function completeOnboarding(userId, { nickname, birthdate, gender, lifestyle }, agreedTerms = []) {
   const { data: profile, error } = await supabase
     .from('users')
     .update({
       nickname: nickname.trim(),
       birthdate: birthdate || null,
+      gender: gender || null,
       lifestyle: lifestyle || null,
       onboarded: true,
     })

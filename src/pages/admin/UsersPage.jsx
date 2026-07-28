@@ -134,6 +134,7 @@ export default function UsersPage() {
               <th style={s.th}>최근 로그인</th>
               <th style={s.th}>상태</th>
               <th style={s.th}>생년월일</th>
+              <th style={s.th}>성별</th>
               <th style={s.th}>라이프스타일</th>
               <th style={s.th}>약관동의</th>
               <th style={s.th}>그룹 수</th>
@@ -166,6 +167,9 @@ export default function UsersPage() {
                   )}
                 </td>
                 <td style={s.td}>{formatDate(u.birthdate)}</td>
+                <td style={s.td}>
+                  {u.gender === 'male' ? <span style={s.badgeMale}>남자</span> : u.gender === 'female' ? <span style={s.badgeFemale}>여자</span> : '—'}
+                </td>
                 <td style={s.td}>{u.lifestyle || '—'}</td>
                 <td style={s.td}>
                   {u.required_total_count === 0 ? (
@@ -216,6 +220,8 @@ const s = {
   badgeDone: { fontSize: 11, fontWeight: 700, color: '#34A853', background: '#EAF7EE', padding: '2px 8px', borderRadius: 4 },
   badgePending: { fontSize: 11, fontWeight: 700, color: '#E65100', background: '#FFF3E0', padding: '2px 8px', borderRadius: 4 },
   badgeGuest: { fontSize: 11, fontWeight: 700, color: '#7070A0', background: '#F0F0F8', padding: '2px 8px', borderRadius: 4 },
+  badgeMale: { fontSize: 11, fontWeight: 700, color: '#1565C0', background: '#E3F2FD', padding: '2px 8px', borderRadius: 4 },
+  badgeFemale: { fontSize: 11, fontWeight: 700, color: '#C2185B', background: '#FCE4EC', padding: '2px 8px', borderRadius: 4 },
   toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
   toggleOn: { borderColor: '#FF6B35', background: '#FF6B35', color: '#fff' },
 }

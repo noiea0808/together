@@ -129,7 +129,7 @@ export default function MySchedulePage() {
           style={{ animation: `${weekSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out` }}
         >
         {loading ? (
-          <div style={S.empty}><RiceBowlIcon size={40} /></div>
+          <div style={S.empty}><RiceBowlIcon size={72} /></div>
         ) : dates.map((date, idx) => {
           const dateStr = toDateStr(date)
           const dayStatuses = byDate[dateStr] ?? {}

@@ -35,7 +35,7 @@ function ToggleSwitch({ on, onClick, disabled, label }) {
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      style={{ ...styles.toggleTrack, background: on ? 'var(--color-primary)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
+      style={{ ...styles.toggleTrack, background: on ? 'var(--color-success)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
     >
       <span style={{ ...styles.toggleThumb, transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
     </button>

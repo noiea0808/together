@@ -220,7 +220,7 @@ export default function GroupSettingsPage() {
     finally { setSaving(false) }
   }
 
-  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={40} /></div>
+  if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={72} /></div>
 
   const presets = SLOT_TIME_PRESETS[form.slot] ?? []
   const isCustomTime = !presets.includes(form.meal_time)
