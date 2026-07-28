@@ -26,6 +26,7 @@ import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
 import DailyTipModal from './components/DailyTipModal'
+import PushOptInBanner from './components/PushOptInBanner'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 import NativeDeepLinkHandler from './components/NativeDeepLinkHandler'
 
@@ -127,6 +128,7 @@ function ConsumerApp() {
           <NotificationToast />
           <GroupInviteModal />
           <DailyTipModal />
+          <PushOptInBanner />
           <ConsumerRoutes />
         </NavBadgeProvider>
       </NotificationSyncProvider>
