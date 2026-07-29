@@ -296,7 +296,7 @@ export default function MomentPage() {
 
       <div style={S.list}>
         {isLoading ? (
-          <div style={S.loadingState}><RiceBowlIcon size={40} /></div>
+          <div style={S.loadingState}><RiceBowlIcon size={72} /></div>
         ) : items.length === 0 ? (
           <div style={S.emptyState}>
             <div style={{ fontSize: 40 }}>📸</div>

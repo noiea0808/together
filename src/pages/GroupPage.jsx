@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
+import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import BottomNav from '../components/BottomNav'
@@ -73,6 +74,15 @@ export default function GroupPage() {
   const [loading, setLoading] = useState(true)
   const [statusLoading, setStatusLoading] = useState(false)
   const [currentDate, setCurrentDate] = useState(TODAY)
+  // 날짜 전환 시 목록이 밀려나는 방향 — next(다음 날짜 방향)/prev(이전 날짜 방향)
+  const [dateSlideDir, setDateSlideDir] = useState('next')
+  const goToDate = (updater) => {
+    setCurrentDate(d => {
+      const next = updater(d)
+      setDateSlideDir(next > d ? 'next' : 'prev')
+      return next
+    })
+  }
   // 날짜 네비 바 좌우 스와이프로 날짜 이동
   const dateSwipeStart = useRef(null)
   const handleDateSwipeStart = (e) => { dateSwipeStart.current = { x: e.clientX, y: e.clientY } }
@@ -82,7 +92,7 @@ export default function GroupPage() {
     const dy = e.clientY - dateSwipeStart.current.y
     dateSwipeStart.current = null
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
-    setCurrentDate(d => addDays(d, dx < 0 ? 1 : -1))
+    goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
   const [friendGroupFilter, setFriendGroupFilter] = useState(null) // null = 전체, 아니면 group.id
   const [selectedFriendId, setSelectedFriendId] = useState(null)
@@ -140,8 +150,21 @@ export default function GroupPage() {
 
   useEffect(() => {
     if (groups.length === 0) return
-    setStatusLoading(true)
-    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr, user.id).then(s => [g.id, s])))
+    const cachedEntries = groups.map(g => {
+      const cached = getCache(`groupStatus:${g.id}:${dateStr}`)
+      return cached ? { id: g.id, data: cached.data, stale: cached.stale } : null
+    })
+    const allCached = cachedEntries.every(Boolean)
+    if (allCached) {
+      setStatusesMap(Object.fromEntries(cachedEntries.map(({ id, data }) => [id, data])))
+      if (!cachedEntries.some(e => e.stale)) return
+    } else {
+      setStatusLoading(true)
+    }
+    Promise.all(groups.map(g => getGroupStatuses(g.id, dateStr, user.id).then(s => {
+      setCache(`groupStatus:${g.id}:${dateStr}`, s)
+      return [g.id, s]
+    })))
       .then(entries => {
         setStatusesMap(Object.fromEntries(entries))
         setStatusLoading(false)
@@ -149,10 +172,34 @@ export default function GroupPage() {
   }, [groups, dateStr])
 
   useEffect(() => {
+    const key = `pendingInv:${user.id}:${dateStr}`
+    const cached = getCache(key)
+    if (cached) {
+      setPendingInvitations(cached.data)
+      if (!cached.stale) return
+    }
     getMyPendingInvitationsForDate(user.id, dateStr)
-      .then(setPendingInvitations)
+      .then(data => { setPendingInvitations(data); setCache(key, data) })
       .catch(e => console.error(e))
   }, [user.id, dateStr])
+
+  // 스와이프로 넘기자마자 화면이 바로 뜨도록, 전후 날짜의 상태/제안 현황을 미리 캐시에 채워둔다.
+  useEffect(() => {
+    if (groups.length === 0) return
+    ;[addDays(currentDate, -1), addDays(currentDate, 1)].forEach(d => {
+      const adjDateStr = toDateStr(d)
+      groups.forEach(g => {
+        const key = `groupStatus:${g.id}:${adjDateStr}`
+        const cached = getCache(key)
+        if (cached && !cached.stale) return
+        getGroupStatuses(g.id, adjDateStr, user.id).then(s => setCache(key, s)).catch(() => {})
+      })
+      const invKey = `pendingInv:${user.id}:${adjDateStr}`
+      const invCached = getCache(invKey)
+      if (invCached && !invCached.stale) return
+      getMyPendingInvitationsForDate(user.id, adjDateStr).then(data => setCache(invKey, data)).catch(() => {})
+    })
+  }, [groups, currentDate, user.id])
 
   const findPendingInvitation = (friendId, slot) =>
     pendingInvitations.find(inv => inv.to_user_id === friendId && inv.slot === slot)
@@ -346,7 +393,7 @@ export default function GroupPage() {
   const selectedFriend = friends.find(f => f.id === selectedFriendId) ?? null
   const relLabel = getRelativeLabel(currentDate)
 
-  if (loading) return <div style={styles.loadingPage}><RiceBowlIcon size={40} /></div>
+  if (loading) return <div style={styles.loadingPage}><RiceBowlIcon size={72} /></div>
 
   return (
     <div style={styles.page}>
@@ -361,15 +408,15 @@ export default function GroupPage() {
         onPointerUp={handleDateSwipeEnd}
         onPointerCancel={() => { dateSwipeStart.current = null }}
       >
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
           <span style={{ ...styles.relBadge, background: relLabel.color }}>{relLabel.label}</span>
           {!isToday && (
-            <button style={styles.todayBtn} onClick={() => setCurrentDate(TODAY)}>오늘로</button>
+            <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
         </div>
-        <button style={styles.navBtn} onClick={() => setCurrentDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
+        <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
       </div>
 
       <div style={styles.body}>
@@ -391,7 +438,15 @@ export default function GroupPage() {
           </div>
         )}
 
-        {/* 친구 목록 */}
+        {/* 친구 목록 — 가로 스크롤 필터 칩과 겹치지 않도록 이 영역에만 좌우 스와이프로 날짜 이동을 붙인다.
+            key가 dateStr이라 날짜가 바뀔 때마다 방향에 맞춰 슬라이드-인 애니메이션이 재생된다. */}
+        <div
+          key={dateStr}
+          style={{ touchAction: 'pan-y', animation: `${dateSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out` }}
+          onPointerDown={handleDateSwipeStart}
+          onPointerUp={handleDateSwipeEnd}
+          onPointerCancel={() => { dateSwipeStart.current = null }}
+        >
         {friends.length === 0 ? (
           <div style={styles.empty}>
             <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--color-text-muted)" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
@@ -463,6 +518,7 @@ export default function GroupPage() {
             })}
           </div>
         )}
+        </div>
       </div>
 
       {selectedFriend && (
@@ -637,24 +693,26 @@ export default function GroupPage() {
                       >
                         <span style={styles.statusSlotName}>
                           <span style={styles.slotIconWrapper}>
-                            <SlotIcon slot={slot} size={30} />
+                            <SlotIcon slot={slot} size={40} />
                           </span>
                           {slot}
                         </span>
-                        {opt ? (
-                          <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
-                            {opt.emoji} {opt.label}
-                          </span>
-                        ) : (
-                          <span style={styles.statusDash}>미설정</span>
-                        )}
-                        {pendingInv ? (
-                          <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
-                            제안함 ✓ · 취소
-                          </button>
-                        ) : invited ? (
-                          <span style={styles.statusInvitedTag}>초대함 ✓</span>
-                        ) : null}
+                        <div style={styles.statusCellRight}>
+                          {opt ? (
+                            <span style={{ ...styles.statusBadge, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}` }}>
+                              {opt.emoji} {opt.label}
+                            </span>
+                          ) : (
+                            <span style={styles.statusDash}>미설정</span>
+                          )}
+                          {pendingInv ? (
+                            <button style={styles.statusCancelBtn} onClick={e => handleCancelInvitation(e, pendingInv.id)}>
+                              제안함 ✓ · 취소
+                            </button>
+                          ) : invited ? (
+                            <span style={styles.statusInvitedTag}>초대함 ✓</span>
+                          ) : null}
+                        </div>
                       </div>
                     )
                   })}
@@ -833,15 +891,16 @@ const styles = {
     fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
     whiteSpace: 'nowrap',
   },
-  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 8 },
-  statusCell: { display: 'flex', flexDirection: 'column', gap: 4, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
+  statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
+  statusCell: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
   statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },
-  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 3 },
-  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 30, height: 30, flexShrink: 0 },
+  statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 },
+  slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0 },
+  statusCellRight: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
   statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
   statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
   statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
-  statusCancelBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
+  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
   sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
   unfriendBtn: { marginTop: 10, padding: '10px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', cursor: 'pointer' },

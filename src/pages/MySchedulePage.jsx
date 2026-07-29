@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getMySchedule } from '../lib/db'
@@ -64,6 +64,43 @@ export default function MySchedulePage() {
       .finally(() => setLoading(false))
   }, [user, fromDate, toDate])
 
+  // 스와이프로 넘기자마자 화면이 바로 뜨도록, 전후 2주 구간을 미리 캐시에 채워둔다.
+  useEffect(() => {
+    if (!user) return
+    ;[weekOffset - 1, weekOffset + 1].forEach(offset => {
+      const adjDates = getTwoWeekDates(offset)
+      const f = toDateStr(adjDates[0])
+      const t = toDateStr(adjDates[adjDates.length - 1])
+      const key = `schedule:${user.id}:${f}:${t}`
+      const cached = getCache(key)
+      if (cached && !cached.stale) return
+      getMySchedule(user.id, f, t).then(data => setCache(key, data)).catch(() => {})
+    })
+  }, [user, weekOffset])
+
+  // 2주 구간 전환 시 목록이 밀려나는 방향 — next(다음 구간 방향)/prev(이전 구간 방향)
+  const [weekSlideDir, setWeekSlideDir] = useState('next')
+  const goToWeek = (updater) => {
+    setWeekOffset(o => {
+      const next = updater(o)
+      setWeekSlideDir(next > o ? 'next' : 'prev')
+      return next
+    })
+  }
+
+  // 목록 영역 좌우 스와이프로 이전/다음 2주 이동 (세로 스크롤과 헷갈리지 않도록 가로 이동이
+  // 더 뚜렷할 때만 반응한다)
+  const weekSwipeStart = useRef(null)
+  const handleWeekSwipeStart = (e) => { weekSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleWeekSwipeEnd = (e) => {
+    if (!weekSwipeStart.current) return
+    const dx = e.clientX - weekSwipeStart.current.x
+    const dy = e.clientY - weekSwipeStart.current.y
+    weekSwipeStart.current = null
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
+    goToWeek(o => o + (dx < 0 ? 1 : -1))
+  }
+
   const byDate = {}
   statuses.forEach(s => {
     if (!byDate[s.date]) byDate[s.date] = {}
@@ -75,14 +112,24 @@ export default function MySchedulePage() {
       <AppHeader title="일정" />
 
       <div style={S.dateNav}>
-        <button style={S.navBtn} onClick={() => setWeekOffset(o => o - 1)} aria-label="이전 2주">‹</button>
+        <button style={S.navBtn} onClick={() => goToWeek(o => o - 1)} aria-label="이전 2주">‹</button>
         <span style={S.dateNavLabel}>{rangeLabel}</span>
-        <button style={S.navBtn} onClick={() => setWeekOffset(o => o + 1)} aria-label="다음 2주">›</button>
+        <button style={S.navBtn} onClick={() => goToWeek(o => o + 1)} aria-label="다음 2주">›</button>
       </div>
 
-      <div style={S.list}>
+      <div
+        style={{ ...S.list, touchAction: 'pan-y' }}
+        onPointerDown={handleWeekSwipeStart}
+        onPointerUp={handleWeekSwipeEnd}
+        onPointerCancel={() => { weekSwipeStart.current = null }}
+      >
+        {/* key가 weekOffset이라 구간이 바뀔 때마다 방향에 맞춰 슬라이드-인 애니메이션이 재생된다 */}
+        <div
+          key={weekOffset}
+          style={{ animation: `${weekSlideDir === 'next' ? 'pageSlideNext' : 'pageSlidePrev'} 0.22s ease-out` }}
+        >
         {loading ? (
-          <div style={S.empty}><RiceBowlIcon size={40} /></div>
+          <div style={S.empty}><RiceBowlIcon size={72} /></div>
         ) : dates.map((date, idx) => {
           const dateStr = toDateStr(date)
           const dayStatuses = byDate[dateStr] ?? {}
@@ -134,6 +181,7 @@ export default function MySchedulePage() {
             </div>
           )
         })}
+        </div>
       </div>
 
       <BottomNav />

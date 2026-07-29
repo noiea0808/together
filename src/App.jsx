@@ -6,6 +6,7 @@ import { NotificationSyncProvider } from './lib/NotificationSyncContext'
 import { NavBadgeProvider } from './lib/NavBadgeContext'
 import { getActiveTerms, getMyTermAgreements } from './lib/db'
 import OnboardingPage from './pages/OnboardingPage'
+import ResetPasswordPage from './pages/ResetPasswordPage'
 import ProfileSetupPage from './pages/ProfileSetupPage'
 import TermsConsentPage from './pages/TermsConsentPage'
 import TodayPage from './pages/TodayPage'
@@ -25,7 +26,9 @@ import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
 import DailyTipModal from './components/DailyTipModal'
+import PushOptInBanner from './components/PushOptInBanner'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
+import NativeDeepLinkHandler from './components/NativeDeepLinkHandler'
 
 // 정지 기간이 지났으면 클라이언트에서는 정지 아님으로 취급 (DB의 is_suspended 갱신은 관리자 해제 시점에 이뤄짐)
 function isCurrentlySuspended(user) {
@@ -58,7 +61,7 @@ function ConsumerRoutes() {
   }, [user?.id, user?.onboarded, user?.is_guest])
 
   if (user === undefined) {
-    return <div style={styles.loading}><RiceBowlIcon size={48} /></div>
+    return <div style={styles.loading}><RiceBowlIcon size={84} /></div>
   }
 
   if (isCurrentlySuspended(user)) {
@@ -77,7 +80,7 @@ function ConsumerRoutes() {
 
   // 온보딩까지 마친 사용자는 재동의 필요 여부가 확인될 때까지 대기 (레거시 미동의자 포함)
   if (user && user.onboarded && !user.is_guest && missingTerms === undefined) {
-    return <div style={styles.loading}><RiceBowlIcon size={48} /></div>
+    return <div style={styles.loading}><RiceBowlIcon size={84} /></div>
   }
   if (user && user.onboarded && !user.is_guest && missingTerms?.length > 0) {
     return <TermsConsentPage onDone={() => setMissingTerms([])} />
@@ -99,6 +102,7 @@ function ConsumerRoutes() {
   return (
     <Routes>
       <Route path="/onboarding" element={!user ? <OnboardingPage /> : <Navigate to={user.onboarded ? '/today' : '/welcome'} replace />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route path="/welcome" element={!user ? <Navigate to="/onboarding" replace /> : (user.onboarded ? <Navigate to="/today" replace /> : <ProfileSetupPage />)} />
       <Route path="/today"    element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
@@ -124,6 +128,7 @@ function ConsumerApp() {
           <NotificationToast />
           <GroupInviteModal />
           <DailyTipModal />
+          <PushOptInBanner />
           <ConsumerRoutes />
         </NavBadgeProvider>
       </NotificationSyncProvider>
@@ -137,6 +142,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <InAppBrowserGuard />
+      <NativeDeepLinkHandler />
       <Routes>
         <Route path="/admin/*" element={<AdminApp />} />
         <Route path="/*" element={<ConsumerApp />} />

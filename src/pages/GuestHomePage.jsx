@@ -52,7 +52,7 @@ export default function GuestHomePage() {
   })
 
   if (loading) {
-    return <div style={styles.loadingPage}><RiceBowlIcon size={40} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
+    return <div style={styles.loadingPage}><RiceBowlIcon size={72} /><br /><span style={{ fontSize: 14, marginTop: 8 }}>불러오는 중...</span></div>
   }
 
   return (

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { signUp, signIn, signInWithGoogle, signInWithKakao } from '../lib/db'
+import { signUp, signIn, signInWithGoogle, signInWithKakao, requestPasswordReset } from '../lib/db'
 import { useUser } from '../lib/UserContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import InstallAppPrompt from '../components/InstallAppPrompt'
@@ -15,6 +15,7 @@ const ERROR_MESSAGES = {
 }
 
 function parseError(e) {
+  if (e.message?.startsWith('For security purposes')) return '잠시 후 다시 시도해주세요.'
   return ERROR_MESSAGES[e.message] ?? '오류가 발생했어요. 다시 시도해주세요.'
 }
 
@@ -46,8 +47,69 @@ function LoginSelect({ onEmail, hasPendingInvite }) {
   )
 }
 
+// 비밀번호 재설정 메일 요청 폼
+function ForgotPasswordForm({ onBack }) {
+  const [email, setEmail] = useState(localStorage.getItem('rememberedEmail') || '')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState(null)
+  const [sent, setSent] = useState(false)
+
+  const handleSend = async () => {
+    if (!email || loading) return
+    setLoading(true); setError(null)
+    try {
+      await requestPasswordReset(email.trim())
+      setSent(true)
+    } catch (e) {
+      setError(parseError(e))
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div style={styles.card}>
+      <div style={styles.emailFormHeader}>
+        <button style={styles.backBtn} onClick={onBack} aria-label="뒤로가기">←</button>
+        <span style={styles.forgotTitle}>비밀번호 찾기</span>
+      </div>
+
+      {sent ? (
+        <p style={styles.forgotDesc}>
+          {email} 주소로 재설정 링크를 보냈어요.{'\n'}메일함을 확인해주세요.
+        </p>
+      ) : (
+        <>
+          <p style={styles.forgotDesc}>가입한 이메일로 비밀번호 재설정 링크를 보내드려요.</p>
+          <div style={styles.field}>
+            <label style={styles.label}>이메일</label>
+            <input
+              style={styles.input}
+              type="email"
+              placeholder="hello@example.com"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleSend()}
+              autoFocus
+              disabled={loading}
+            />
+          </div>
+          {error && <p style={styles.error}>{error}</p>}
+          <button
+            style={{ ...PRIMARY_ACTION_BUTTON, marginTop: 4, opacity: email && !loading ? 1 : 0.4 }}
+            onClick={handleSend}
+            disabled={loading}
+          >
+            {loading ? '전송 중...' : '재설정 링크 보내기'}
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 // 이메일 로그인/가입 폼
-function EmailForm({ hasPendingInvite, onBack }) {
+function EmailForm({ hasPendingInvite, onBack, onForgot }) {
   const navigate = useNavigate()
   const { login } = useUser()
   const [tab, setTab] = useState('login')
@@ -153,6 +215,12 @@ function EmailForm({ hasPendingInvite, onBack }) {
         />
       </div>
 
+      {tab === 'login' && (
+        <button type="button" style={styles.forgotLink} onClick={onForgot}>
+          비밀번호를 잊으셨나요?
+        </button>
+      )}
+
       {tab === 'signup' && (
         <div style={styles.field}>
           <label style={styles.label}>비밀번호 확인</label>
@@ -189,7 +257,7 @@ function EmailForm({ hasPendingInvite, onBack }) {
 
 export default function OnboardingPage() {
   const hasPendingInvite = !!localStorage.getItem('pendingInviteCode')
-  const [view, setView] = useState('select') // 'select' | 'email'
+  const [view, setView] = useState('select') // 'select' | 'email' | 'forgot'
 
   return (
     <div style={styles.page}>
@@ -199,10 +267,15 @@ export default function OnboardingPage() {
         <h1 style={styles.title}>같이 먹자</h1>
       </div>
 
-      {view === 'select'
-        ? <LoginSelect hasPendingInvite={hasPendingInvite} onEmail={() => setView('email')} />
-        : <EmailForm hasPendingInvite={hasPendingInvite} onBack={() => setView('select')} />
-      }
+      {view === 'select' && (
+        <LoginSelect hasPendingInvite={hasPendingInvite} onEmail={() => setView('email')} />
+      )}
+      {view === 'email' && (
+        <EmailForm hasPendingInvite={hasPendingInvite} onBack={() => setView('select')} onForgot={() => setView('forgot')} />
+      )}
+      {view === 'forgot' && (
+        <ForgotPasswordForm onBack={() => setView('email')} />
+      )}
 
       <div style={styles.installSection}>
         <InstallAppPrompt variant="subtle" hideDesc />
@@ -283,6 +356,13 @@ const styles = {
   },
   hint: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'right' },
   error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 },
+  forgotLink: {
+    background: 'none', border: 'none', padding: 0, alignSelf: 'flex-end',
+    fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer',
+    textDecoration: 'underline',
+  },
+  forgotTitle: { fontSize: 'var(--font-size-base)', fontWeight: 700 },
+  forgotDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 },
   installSection: {
     width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',

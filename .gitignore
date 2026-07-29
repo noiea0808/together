@@ -28,3 +28,10 @@ supabase/.temp
 *.sw?
 .vercel
 .env*
+
+# Capacitor / Android
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/release

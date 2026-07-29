@@ -143,7 +143,7 @@ export default function NotificationsPage() {
 
       <div style={S.list}>
         {loading ? (
-          <div style={S.empty}><RiceBowlIcon size={40} /></div>
+          <div style={S.empty}><RiceBowlIcon size={72} /></div>
         ) : notifications.length === 0 ? (
           <div style={S.emptyState}>
             <div style={{ fontSize: 36, marginBottom: 8 }}>🔔</div>
