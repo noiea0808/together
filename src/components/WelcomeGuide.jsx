@@ -130,11 +130,17 @@ const styles = {
   track: { flex: 1, overflow: 'hidden', touchAction: 'pan-y' },
   slide: {
     width: '100%', height: '100%', boxSizing: 'border-box',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
+    display: 'flex', flexDirection: 'column', alignItems: 'center',
     padding: '48px var(--spacing-lg) var(--spacing-lg)', textAlign: 'center',
     overflowY: 'auto',
   },
-  iconWrap: { marginBottom: 24 },
+  // 남는 공간을 전부 차지해서 그 안에서 사진이 가운데 오도록 하는 스페이서 겸 컨테이너.
+  // 텍스트 영역은 자기 높이만큼만 차지하니 자연히 하단에 남는다.
+  iconWrap: {
+    flex: '1 1 0%', minHeight: 0, width: '100%', overflow: 'hidden',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    marginBottom: 24,
+  },
   shot: { width: 'min(85vw, 340px)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-border)' },
   tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
   title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px', whiteSpace: 'pre-line' },
