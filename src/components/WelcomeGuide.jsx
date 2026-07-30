@@ -130,7 +130,7 @@ const styles = {
   track: { flex: 1, overflow: 'hidden', touchAction: 'pan-y' },
   slide: {
     width: '100%', height: '100%', boxSizing: 'border-box',
-    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end',
     padding: '48px var(--spacing-lg) var(--spacing-lg)', textAlign: 'center',
     overflowY: 'auto',
   },
