@@ -184,6 +184,18 @@ img {
   from { transform: translateX(-28px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
+/* 온보딩 가이드 페이지 전환 — 스샷/아이콘, 제목, 본문이 순서대로 살며시 떠오르는 느낌 */
+/* to에서 transform/filter를 실제 none으로 되돌려야 애니메이션이 끝난 뒤에도 해당 요소가
+   fixed 포지션 자식(모달 등)의 containing block으로 눌러앉는 걸 막을 수 있다.
+   translateY(0) 같은 "no-op" 값도 non-none이라 그 문제가 그대로 발생한다. */
+@keyframes guideItemRise {
+  from { transform: translateY(16px); opacity: 0; filter: blur(3px); }
+  to   { transform: none; opacity: 1; filter: none; }
+}
+@keyframes guideShotReveal {
+  from { transform: translateY(24px) scale(0.96); opacity: 0; filter: blur(6px); }
+  to   { transform: none; opacity: 1; filter: none; }
+}
 
 /* ===== 공통 유틸 ===== */
 .page {
@@ -295,7 +307,7 @@ button:not(:disabled):active, [role="button"]:active {
   text-overflow: ellipsis;
 }
 
-.app-header__brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.app-header__brand { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
 .app-header__brand-label {
   font-family: var(--font-title);
   font-weight: 700;

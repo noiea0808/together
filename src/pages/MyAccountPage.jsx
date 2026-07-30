@@ -105,6 +105,7 @@ export default function MyAccountPage() {
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
+  const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
   const [tab, setTab] = useState(() => searchParams.get('tab') === 'wish' ? 'wish' : 'info') // 'info' | 'wish'
   const [wishPlaces, setWishPlaces] = useState([])
@@ -573,24 +574,24 @@ export default function MyAccountPage() {
         {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
         {!isInstalled && (
           <div style={styles.fixedInstallBar}>
-            <InstallAppPrompt hideDesc />
+            <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" />
           </div>
         )}
 
         {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
 
-        {/* 회원 탈퇴 · 로그아웃 — 화면 아래쪽으로 밀어 스크롤해야 보이게 해서, 실수로 누르기
-            쉬운 위치(헤더)를 피한다 */}
-        <div style={{ marginTop: '50vh' }}>
-          <div style={styles.withdrawWrap}>
-            <button style={styles.withdrawLink} onClick={handleLogout}>
-              로그아웃
-            </button>
-            <span style={styles.withdrawDivider}>·</span>
-            <button style={styles.withdrawLink} onClick={() => setShowWithdraw(true)}>
-              회원 탈퇴
-            </button>
-          </div>
+        {/* 로그아웃 — 다른 설정 섹션과 같은 카드 스타일 */}
+        <div style={{ marginTop: 'var(--spacing-xl)' }}>
+          <SettingsSection title="계정">
+            <SettingsRow title="로그아웃" onClick={() => setShowLogoutConfirm(true)} right={<ChevronRight />} last />
+          </SettingsSection>
+        </div>
+
+        {/* 회원 탈퇴 — 실수로 누르기 쉬운 카드 형태를 피해 텍스트 링크로만 표시한다 */}
+        <div style={styles.withdrawWrap}>
+          <button style={styles.withdrawLink} onClick={() => setShowWithdraw(true)}>
+            회원 탈퇴
+          </button>
         </div>
 
         {/* 회원 탈퇴 경고 모달 */}
@@ -814,6 +815,18 @@ export default function MyAccountPage() {
       </div>
       )}
 
+      {showLogoutConfirm && (
+        <div style={styles.overlay} onClick={() => setShowLogoutConfirm(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={styles.dialogTitle}>로그아웃할까요?</div>
+            <div style={styles.dialogBtns}>
+              <button style={styles.dialogBtnPrimary} onClick={handleLogout}>로그아웃</button>
+              <button style={styles.dialogBtnCancel} onClick={() => setShowLogoutConfirm(false)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {confirmDeleteWishId && (
         <div style={styles.overlay} onClick={() => setConfirmDeleteWishId(null)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
@@ -1007,9 +1020,8 @@ const styles = {
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
-  withdrawWrap: { display: 'flex', alignItems: 'center', justifyContent: 'center', marginTop: 14 },
-  withdrawLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.6 },
-  withdrawDivider: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-2xs)', opacity: 0.5 },
+  withdrawWrap: { display: 'flex', justifyContent: 'center', marginTop: 14 },
+  withdrawLink: { background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.55 },
   withdrawIcon: { fontSize: 40, textAlign: 'center', marginBottom: 8 },
   withdrawTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.6, marginBottom: 'var(--spacing-md)' },
