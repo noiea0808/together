@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react'
 import RiceBowlIcon from './RiceBowlIcon'
-import PotIcon from './PotIcon'
-import WishCategoryIcon from './WishCategoryIcon'
 import InstallAppPrompt from './InstallAppPrompt'
 import AskRejectedIllustration from './AskRejectedIllustration'
+import guideGroup from '../assets/guide/guide-group.png'
+import guideMoment from '../assets/guide/guide-moment.png'
+import guideWish from '../assets/guide/guide-wish.png'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 // 비로그인 사용자가 /onboarding 진입 시 매번 보는 전체화면 소개 — 기능 나열이 아니라
@@ -14,17 +15,17 @@ const PAGES = [
     body: '먼저 물어보기 어색해서, 결국 혼자 먹은 적 있으시죠.\n그런 순간들이 조금 더 쉬워졌으면 해서 만들었어요.',
   },
   {
-    icon: <PotIcon icon="together" size={84} />,
+    shot: guideGroup,
     title: '그룹을 만들어요',
     body: '팀이나 친구들과 그룹을 만들면\n서로의 오늘 상황이 자연스럽게 보여요.\n굳이 묻지 않아도, 같이 먹을 사람을 쉽게 찾을 수 있어요.',
   },
   {
-    icon: <PotIcon icon="chat" size={84} />,
+    shot: guideMoment,
     title: '기록이 추억이 돼요',
     body: '함께한 밥팟에 사진이나 한마디를 남겨보세요.\n그 순간들이 모먼트에 차곡차곡 쌓여요.',
   },
   {
-    icon: <WishCategoryIcon category="together" size={84} />,
+    shot: guideWish,
     title: '가고 싶던 곳, 같이 가요',
     body: '평소 가보고 싶었던 곳을 등록해보세요.\n그룹원과 공유되고, 다음엔 정말 같이 갈 수 있어요.',
   },
@@ -81,7 +82,19 @@ export default function WelcomeGuide({ onDone }) {
         >
           {PAGES.map((p, i) => (
             <div key={i} style={styles.slide}>
-              <div style={styles.iconWrap}>{p.icon}</div>
+              <div style={styles.iconWrap}>
+                {p.icon}
+                {p.shot && (
+                  <img
+                    src={p.shot}
+                    alt=""
+                    style={{
+                      ...styles.shot,
+                      animation: i === index ? 'guideShotRise 0.5s ease-out both' : 'none',
+                    }}
+                  />
+                )}
+              </div>
               {p.tagline && <p style={styles.tagline}>{p.tagline}</p>}
               {p.title && <h1 style={styles.title}>{p.title}</h1>}
               <p style={styles.body}>{p.body}</p>
@@ -130,6 +143,7 @@ const styles = {
     overflowY: 'auto',
   },
   iconWrap: { marginBottom: 24 },
+  shot: { width: 'min(85vw, 340px)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-border)' },
   tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
   title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px' },
   body: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-line', margin: 0 },

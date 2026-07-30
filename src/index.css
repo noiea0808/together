@@ -184,6 +184,10 @@ img {
   from { transform: translateX(-28px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
+@keyframes guideShotRise {
+  from { transform: translateY(28px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
 
 /* ===== 공통 유틸 ===== */
 .page {
