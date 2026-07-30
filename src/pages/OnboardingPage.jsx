@@ -4,6 +4,7 @@ import { signUp, signIn, signInWithGoogle, signInWithKakao, requestPasswordReset
 import { useUser } from '../lib/UserContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import InstallAppPrompt from '../components/InstallAppPrompt'
+import WelcomeGuide from '../components/WelcomeGuide'
 import { MailIcon } from '../components/GroupIcons'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
@@ -258,6 +259,12 @@ function EmailForm({ hasPendingInvite, onBack, onForgot }) {
 export default function OnboardingPage() {
   const hasPendingInvite = !!localStorage.getItem('pendingInviteCode')
   const [view, setView] = useState('select') // 'select' | 'email' | 'forgot'
+  // 비로그인 진입 시 매번 보여주는 전체화면 소개 — 건너뛰기로 언제든 로그인 화면으로 넘어갈 수 있다
+  const [showGuide, setShowGuide] = useState(true)
+
+  if (showGuide) {
+    return <WelcomeGuide onDone={() => setShowGuide(false)} />
+  }
 
   return (
     <div style={styles.page}>

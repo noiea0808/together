@@ -57,7 +57,7 @@ export default function GuestHomePage() {
 
   return (
     <div style={styles.wrap}>
-      <AppHeader brand={{ icon: <RiceBowlIcon size={24} />, label: '같이 먹자' }} hidden={headerHidden} />
+      <AppHeader brand={{ icon: <RiceBowlIcon size={40} />, label: '같이 먹자' }} hidden={headerHidden} />
       <div style={styles.page}>
         {/* 날짜 — 이동 불가, 게스트 표시. 헤더가 접히면 그 자리까지 따라 올라간다 */}
         <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 'var(--header-height)' }}>

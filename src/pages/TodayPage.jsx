@@ -735,7 +735,7 @@ export default function TodayPage() {
 
   return (
     <div style={styles.wrap}>
-    <AppHeader brand={{ icon: <RiceBowlIcon size={24} />, label: '같이 먹자' }} hidden={headerHidden} />
+    <AppHeader brand={{ icon: <RiceBowlIcon size={40} />, label: '같이 먹자' }} hidden={headerHidden} />
     <div
       style={styles.page}
       onPointerDown={handlePageSwipeStart}
