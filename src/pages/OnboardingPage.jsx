@@ -285,7 +285,12 @@ export default function OnboardingPage() {
       )}
 
       <div style={styles.installSection}>
-        <InstallAppPrompt variant="subtle" hideDesc />
+        <InstallAppPrompt
+          variant="subtle"
+          hideDesc
+          buttonLabel="바로가기 안내"
+          style={{ width: 'min(78vw, calc(var(--max-width) * 0.78))' }}
+        />
       </div>
     </div>
   )

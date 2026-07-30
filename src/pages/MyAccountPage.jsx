@@ -574,7 +574,7 @@ export default function MyAccountPage() {
         {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
         {!isInstalled && (
           <div style={styles.fixedInstallBar}>
-            <InstallAppPrompt hideDesc />
+            <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" />
           </div>
         )}
 

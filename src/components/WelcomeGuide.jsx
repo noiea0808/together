@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react'
 import RiceBowlIcon from './RiceBowlIcon'
 import InstallAppPrompt from './InstallAppPrompt'
-import AskRejectedIllustration from './AskRejectedIllustration'
+import guideAsk from '../assets/guide/guide-ask.png'
 import guideGroup from '../assets/guide/guide-group.png'
 import guideMoment from '../assets/guide/guide-moment.png'
 import guideWish from '../assets/guide/guide-wish.png'
@@ -11,13 +11,14 @@ import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 // 서비스를 만든 마음과 쓰임을 감성적으로 전달하는 데 목적이 있다. 스킵 가능.
 const PAGES = [
   {
-    icon: <AskRejectedIllustration />,
-    body: '먼저 물어보기 어색해서, 결국 혼자 먹은 적 있으시죠.\n그런 순간들이 조금 더 쉬워졌으면 해서 만들었어요.',
+    shot: guideAsk,
+    title: '점약있어요?',
+    body: '점심을 제안했다가\n이미 약속이 있다는 답에\n괜히 머쓱해진 순간들.\n\n그런 사소한 어려움을\n조금 더 편하게 풀고 싶었어요.',
   },
   {
     shot: guideGroup,
     title: '그룹을 만들어요',
-    body: '팀이나 친구들과 그룹을 만들면\n서로의 오늘 상황이 자연스럽게 보여요.\n굳이 묻지 않아도, 같이 먹을 사람을 쉽게 찾을 수 있어요.',
+    body: '팀이나 친구들과 그룹을 만들면\n서로의 오늘 상황이 자연스럽게 보여요.\n\n굳이 묻지 않아도,\n같이 먹을 사람을 쉽게 찾을 수 있어요.',
   },
   {
     shot: guideMoment,
@@ -27,80 +28,72 @@ const PAGES = [
   {
     shot: guideWish,
     title: '가고 싶던 곳, 같이 가요',
-    body: '평소 가보고 싶었던 곳을 등록해보세요.\n그룹원과 공유되고, 다음엔 정말 같이 갈 수 있어요.',
+    body: '평소 가보고 싶었던 곳을 등록해보세요.\n같이 가고 싶은 친구들과 공유돼요.\n맘이 맞는 친구와 같이 가도록 해요.',
   },
   {
     icon: <RiceBowlIcon size={88} />,
-    title: '매일, 자연스럽게',
-    body: '앱스토어 없이 홈 화면에 추가해두면\n언제든 바로 열 수 있어요.',
-    extra: <InstallAppPrompt hideDesc />,
+    title: '함께 먹을 사람을\n더 편하게 찾도록',
+    body: '같이 먹자를 홈 화면에 두고\n필요할 때 가볍게 열어보세요.',
+    extra: <InstallAppPrompt hideDesc variant="subtle" />,
   },
 ]
 
+// 슬라이드 안 요소(스샷/제목/본문)가 한 덩어리가 아니라 순서대로 살짝 지연되며 떠오르게
+const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
+const ANIM = {
+  shot: { animation: `guideShotReveal 1.4s ${EASE} both` },
+  item: { animation: `guideItemRise 1.2s ${EASE} both` },
+}
+
 export default function WelcomeGuide({ onDone }) {
   const [index, setIndex] = useState(0)
-  const [dragX, setDragX] = useState(0)
   const drag = useRef({ active: false, startX: 0 })
   const total = PAGES.length
   const isLast = index === total - 1
+  const page = PAGES[index]
 
   const onPointerDown = (e) => {
     drag.current = { active: true, startX: e.clientX }
     e.currentTarget.setPointerCapture?.(e.pointerId)
   }
-  const onPointerMove = (e) => {
+  const endDrag = (e) => {
     if (!drag.current.active) return
-    setDragX(e.clientX - drag.current.startX)
-  }
-  const endDrag = () => {
-    if (!drag.current.active) return
+    const deltaX = e.clientX - drag.current.startX
     const THRESHOLD = 50
-    if (dragX < -THRESHOLD && index < total - 1) setIndex(i => i + 1)
-    else if (dragX > THRESHOLD && index > 0) setIndex(i => i - 1)
+    if (deltaX < -THRESHOLD && index < total - 1) setIndex(i => i + 1)
+    else if (deltaX > THRESHOLD && index > 0) setIndex(i => i - 1)
     drag.current.active = false
-    setDragX(0)
   }
 
   const goNext = () => { if (isLast) onDone(); else setIndex(i => i + 1) }
   const goBack = () => setIndex(i => Math.max(0, i - 1))
+
+  let delay = 0
+  const nextDelay = (step) => { const d = delay; delay += step; return `${d}ms` }
 
   return (
     <div style={styles.overlay}>
       <div
         style={styles.track}
         onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerCancel={endDrag}
+        onPointerCancel={() => { drag.current.active = false }}
       >
-        <div
-          style={{
-            ...styles.slides,
-            transform: `translateX(calc(${-index * 100}% + ${dragX}px))`,
-            transition: drag.current.active ? 'none' : 'transform 0.3s ease',
-          }}
-        >
-          {PAGES.map((p, i) => (
-            <div key={i} style={styles.slide}>
-              <div style={styles.iconWrap}>
-                {p.icon}
-                {p.shot && (
-                  <img
-                    src={p.shot}
-                    alt=""
-                    style={{
-                      ...styles.shot,
-                      animation: i === index ? 'guideShotRise 0.5s ease-out both' : 'none',
-                    }}
-                  />
-                )}
-              </div>
-              {p.tagline && <p style={styles.tagline}>{p.tagline}</p>}
-              {p.title && <h1 style={styles.title}>{p.title}</h1>}
-              <p style={styles.body}>{p.body}</p>
-              {p.extra && <div style={styles.extra}>{p.extra}</div>}
-            </div>
-          ))}
+        <div key={index} style={styles.slide}>
+          <div style={{ ...styles.iconWrap, ...ANIM.shot, animationDelay: nextDelay(220) }}>
+            {page.icon}
+            {page.shot && <img src={page.shot} alt="" style={styles.shot} />}
+          </div>
+          {page.tagline && (
+            <p style={{ ...styles.tagline, ...ANIM.item, animationDelay: nextDelay(180) }}>{page.tagline}</p>
+          )}
+          {page.title && (
+            <h1 style={{ ...styles.title, ...ANIM.item, animationDelay: nextDelay(180) }}>{page.title}</h1>
+          )}
+          <p style={{ ...styles.body, ...ANIM.item, animationDelay: nextDelay(180) }}>{page.body}</p>
+          {page.extra && (
+            <div style={{ ...styles.extra, ...ANIM.item, animationDelay: nextDelay(180) }}>{page.extra}</div>
+          )}
         </div>
       </div>
 
@@ -135,9 +128,8 @@ const styles = {
     fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', padding: 8,
   },
   track: { flex: 1, overflow: 'hidden', touchAction: 'pan-y' },
-  slides: { display: 'flex', width: '100%', height: '100%' },
   slide: {
-    flex: '0 0 100%', width: '100%', height: '100%', boxSizing: 'border-box',
+    width: '100%', height: '100%', boxSizing: 'border-box',
     display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
     padding: '48px var(--spacing-lg) var(--spacing-lg)', textAlign: 'center',
     overflowY: 'auto',
@@ -145,12 +137,12 @@ const styles = {
   iconWrap: { marginBottom: 24 },
   shot: { width: 'min(85vw, 340px)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-border)' },
   tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
-  title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px' },
+  title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px', whiteSpace: 'pre-line' },
   body: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-line', margin: 0 },
   extra: { marginTop: 'var(--spacing-xl)', width: 'min(78vw, calc(var(--max-width) * 0.78))' },
   footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md) var(--spacing-lg) var(--spacing-lg)' },
   dots: { display: 'flex', gap: 6 },
-  dot: { width: 6, height: 6, borderRadius: '50%', background: 'var(--color-border)' },
+  dot: { width: 6, height: 6, borderRadius: '50%', background: 'var(--color-border)', transition: 'all 0.7s cubic-bezier(0.16, 1, 0.3, 1)' },
   dotActive: { background: 'var(--color-primary)', width: 16 },
   buttonsRow: { display: 'flex', gap: 8, width: 'min(78vw, calc(var(--max-width) * 0.78))' },
   backBtn: {
