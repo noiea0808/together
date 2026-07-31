@@ -142,7 +142,7 @@ const styles = {
   overlay: {
     position: 'fixed', inset: 0, zIndex: 200,
     background: 'var(--color-bg)', display: 'flex', flexDirection: 'column',
-    paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)',
+    paddingTop: 'var(--safe-area-inset-top)', paddingBottom: 'var(--safe-area-inset-bottom)',
   },
   skip: {
     background: 'none', border: 'none', color: 'var(--color-text-muted)',

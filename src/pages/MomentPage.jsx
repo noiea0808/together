@@ -4,12 +4,13 @@ import { useUser } from '../lib/UserContext'
 import { getMyGroups, getGroupMomentPots, getPublicMomentPots } from '../lib/db'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { useNavBadges } from '../lib/NavBadgeContext'
-import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotSocialSection from '../components/PotSocialSection'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
 import ReportModal from '../components/ReportModal'
-import AppHeader, { SegmentedControl } from '../components/AppHeader'
+import { SegmentedControl } from '../components/AppHeader'
+import { usePageHeader } from '../lib/HeaderConfigContext'
+import { useHideOnScrollContainer } from '../lib/useHideOnScroll'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -277,24 +278,26 @@ export default function MomentPage() {
     return acc
   }, { items: [], lastDate: null }).items
 
+  const [headerHidden, bindScroll] = useHideOnScrollContainer()
+  usePageHeader({
+    title: '모먼트',
+    hidden: headerHidden,
+    centerContent: (
+      <SegmentedControl
+        ariaLabel="모먼트 범위"
+        value={tab}
+        onChange={setTab}
+        options={[
+          { value: 'mine', label: '내 그룹', dot: dotSnapshot.mine },
+          { value: 'public', label: '전체', dot: dotSnapshot.public },
+        ]}
+      />
+    ),
+  })
+
   return (
     <div style={S.page}>
-      <AppHeader
-        title="모먼트"
-        centerContent={
-          <SegmentedControl
-            ariaLabel="모먼트 범위"
-            value={tab}
-            onChange={setTab}
-            options={[
-              { value: 'mine', label: '내 그룹', dot: dotSnapshot.mine },
-              { value: 'public', label: '전체', dot: dotSnapshot.public },
-            ]}
-          />
-        }
-      />
-
-      <div style={S.list}>
+      <div ref={bindScroll} style={S.list}>
         {isLoading ? (
           <div style={S.loadingState}><RiceBowlIcon size={72} /></div>
         ) : items.length === 0 ? (
@@ -326,8 +329,6 @@ export default function MomentPage() {
           </>
         )}
       </div>
-
-      <BottomNav />
     </div>
   )
 }

@@ -4,10 +4,10 @@ import { useUser } from '../lib/UserContext'
 import { getMySchedule } from '../lib/db'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
-import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import AppHeader from '../components/AppHeader'
 import SlotStatusBadge from '../components/SlotStatusBadge'
+import { usePageHeader } from '../lib/HeaderConfigContext'
+import { useHideOnScrollContainer } from '../lib/useHideOnScroll'
 
 const SLOT_ORDER = ['아침', '오전간식', '점심', '오후간식', '저녁', '야식']
 
@@ -41,6 +41,8 @@ export default function MySchedulePage() {
   const [statuses, setStatuses] = useState([])
   const [loading, setLoading] = useState(true)
   const [weekOffset, setWeekOffset] = useState(0)
+  const [headerHidden, bindScroll] = useHideOnScrollContainer()
+  usePageHeader({ title: '일정', hidden: headerHidden })
 
   const dates = getTwoWeekDates(weekOffset)
   const fromDate = toDateStr(dates[0])
@@ -109,8 +111,6 @@ export default function MySchedulePage() {
 
   return (
     <div style={S.page}>
-      <AppHeader title="일정" />
-
       <div style={S.dateNav}>
         <button style={S.navBtn} onClick={() => goToWeek(o => o - 1)} aria-label="이전 2주">‹</button>
         <span style={S.dateNavLabel}>{rangeLabel}</span>
@@ -118,6 +118,7 @@ export default function MySchedulePage() {
       </div>
 
       <div
+        ref={bindScroll}
         style={{ ...S.list, touchAction: 'pan-y' }}
         onPointerDown={handleWeekSwipeStart}
         onPointerUp={handleWeekSwipeEnd}
@@ -184,7 +185,6 @@ export default function MySchedulePage() {
         </div>
       </div>
 
-      <BottomNav />
     </div>
   )
 }

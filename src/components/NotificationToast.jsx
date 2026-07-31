@@ -108,7 +108,7 @@ export default function NotificationToast() {
 const styles = {
   wrap: {
     position: 'fixed',
-    top: 'calc(env(safe-area-inset-top, 0px) + 10px)',
+    top: 'calc(var(--safe-area-inset-top) + 10px)',
     left: '50%',
     transform: 'translateX(-50%)',
     width: '100%',

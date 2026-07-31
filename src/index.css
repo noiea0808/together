@@ -85,6 +85,13 @@
   --header-height: 56px;
   --header-padding-x: 20px;
   --header-padding-x-narrow: 16px;
+
+  /* Android WebView는 env(safe-area-inset-*)가 디스플레이 컷아웃에만 반응하고 상태바/내비게이션
+     바 높이는 반영하지 않는다(iOS Safari와 다른 부분이라 targetSdk 35+ 엣지투엣지에서 상단/하단이
+     시스템 바에 가려짐). 그래서 실제 사용처는 전부 이 변수를 참조하게 하고, 네이티브 쪽
+     (android/.../MainActivity.java)에서 Android일 때만 실측 인셋 px로 덮어쓴다. iOS/웹은 env() 그대로. */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ===== 기본 타이포 & 바디 ===== */
@@ -197,7 +204,7 @@ img {
 .page {
   flex: 1;
   padding: var(--spacing-md);
-  padding-bottom: calc(var(--spacing-xl) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--spacing-xl) + var(--safe-area-inset-bottom));
 }
 
 .card {
@@ -285,7 +292,7 @@ button:not(:disabled):active, [role="button"]:active {
   flex-shrink: 0;
   overflow: hidden;
   box-sizing: border-box;
-  transition: height 0.22s ease, opacity 0.18s ease, border-color 0.18s ease;
+  transition: height 0.22s ease, padding-top 0.22s ease, opacity 0.18s ease, border-color 0.18s ease;
 }
 
 .app-header__left { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }

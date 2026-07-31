@@ -445,7 +445,7 @@ export default function CreatePotPage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
   header: {
-    padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 16px', paddingTop: 'calc(10px + var(--safe-area-inset-top))', display: 'flex', alignItems: 'center', gap: 10,
     position: 'sticky', top: 0, background: 'rgba(250,248,245,0.95)', zIndex: 10,
     borderBottom: '1px solid var(--color-border)', backdropFilter: 'blur(8px)',
   },

@@ -7,12 +7,11 @@ import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
-import BottomNav from '../components/BottomNav'
-import AppHeader from '../components/AppHeader'
 import GroupSetupModal from '../components/GroupSetupModal'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { useHideOnScroll } from '../lib/useHideOnScroll'
+import { usePageHeader } from '../lib/HeaderConfigContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
@@ -134,6 +133,7 @@ export default function TodayPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const { user } = useUser()
   const headerHidden = useHideOnScroll()
+  usePageHeader({ brand: { icon: <RiceBowlIcon size={40} />, label: '같이 먹자' }, hidden: headerHidden })
 
   const initialDate = (() => {
     const d = searchParams.get('date')
@@ -735,7 +735,6 @@ export default function TodayPage() {
 
   return (
     <div style={styles.wrap}>
-    <AppHeader brand={{ icon: <RiceBowlIcon size={40} />, label: '같이 먹자' }} hidden={headerHidden} />
     <div
       style={styles.page}
       onPointerDown={handlePageSwipeStart}
@@ -744,7 +743,7 @@ export default function TodayPage() {
     >
       {/* 날짜 네비 — sticky 고정, 헤더가 접히면 그 자리(top:0)까지 따라 올라간다 */}
       <div
-        style={{ ...styles.dateNav, top: headerHidden ? 0 : 'var(--header-height)', touchAction: 'pan-y' }}
+        style={{ ...styles.dateNav, top: headerHidden ? 0 : 'calc(var(--header-height) + var(--safe-area-inset-top))', touchAction: 'pan-y' }}
       >
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))}>
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1017,7 +1016,6 @@ export default function TodayPage() {
       </div>
       </div>
     </div>
-    <BottomNav />
 
     {/* 주요 CTA — 밥팟별/그룹별 보기 공통 원형 플로팅 버튼 */}
     {groups.length > 0 && (
@@ -2378,7 +2376,7 @@ const styles = {
   slotPopupSave: { ...PRIMARY_ACTION_BUTTON, width: 'auto', flex: 1 },
   slotPopupCancel: { padding: '13px 20px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
   floatingToast: {
-    position: 'fixed', bottom: 'calc(76px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+    position: 'fixed', bottom: 'calc(76px + var(--safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
     maxWidth: 'calc(var(--max-width) - 32px)', zIndex: 400, background: 'rgba(30,25,20,0.8)', color: '#fff',
     fontSize: 'var(--font-size-xs)', fontWeight: 600, padding: '10px 18px', borderRadius: 'var(--radius-lg)',
     boxShadow: '0 4px 14px rgba(0,0,0,0.2)', textAlign: 'center', backdropFilter: 'blur(4px)',
@@ -2528,7 +2526,7 @@ const styles = {
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   fabWrap: {
-    position: 'fixed', bottom: 'calc(72px + env(safe-area-inset-bottom, 0px))', left: '50%', transform: 'translateX(-50%)',
+    position: 'fixed', bottom: 'calc(72px + var(--safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
     width: '100%', maxWidth: 'var(--max-width)', zIndex: 90, pointerEvents: 'none',
   },
   fabBtn: {

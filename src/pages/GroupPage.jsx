@@ -6,7 +6,6 @@ import { useNavBadges } from '../lib/NavBadgeContext'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
-import BottomNav from '../components/BottomNav'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import SlotIcon from '../components/SlotIcon'
 import SlotStatusBadge from '../components/SlotStatusBadge'
@@ -16,7 +15,8 @@ import { WISH_CATEGORY_OPTIONS } from '../lib/potConstants'
 import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/LinkPreviewCard'
 import ReportModal from '../components/ReportModal'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
-import AppHeader from '../components/AppHeader'
+import { usePageHeader } from '../lib/HeaderConfigContext'
+import { useHideOnScrollContainer } from '../lib/useHideOnScroll'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function toDateStr(d) {
@@ -58,6 +58,8 @@ export default function GroupPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [friendsModalTab, setFriendsModalTab] = useState('search')
+  const [headerHidden, bindScroll] = useHideOnScrollContainer()
+  usePageHeader({ title: '친구', hidden: headerHidden, action: { label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } } })
 
   // 친구 요청 알림(/group?friend_requests=1)을 눌러 들어온 경우, 요청 탭이 열린 채로 바로 뜬다.
   useEffect(() => {
@@ -397,11 +399,6 @@ export default function GroupPage() {
 
   return (
     <div style={styles.page}>
-      <AppHeader
-        title="친구"
-        action={{ label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } }}
-      />
-
       <div
         style={{ ...styles.dateNav, touchAction: 'pan-y' }}
         onPointerDown={handleDateSwipeStart}
@@ -419,7 +416,7 @@ export default function GroupPage() {
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, 1))} aria-label="다음 날짜">›</button>
       </div>
 
-      <div style={styles.body}>
+      <div ref={bindScroll} style={styles.body}>
 
         {/* 그룹별 필터 칩 — 그룹이 하나라도 있어야 의미가 있으므로 없으면 숨긴다 */}
         {groups.length > 0 && friends.length > 0 && (
@@ -798,8 +795,6 @@ export default function GroupPage() {
           onClose={() => setReportTarget(null)}
         />
       )}
-
-      <BottomNav />
     </div>
   )
 }
