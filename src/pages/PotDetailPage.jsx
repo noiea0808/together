@@ -797,7 +797,7 @@ export default function PotDetailPage() {
             <span style={S.membersTitle}>참여 멤버</span>
             <span style={S.membersCount}>{participants.length} / {pot.max_people}명</span>
           </div>
-          <div style={S.membersList}>
+          <div className="no-scrollbar" style={S.membersList}>
             {Array.from({ length: pot.max_people }).map((_, i) => {
               const member = participants[i]
               const isMe = member?.id === user?.id
@@ -831,7 +831,7 @@ export default function PotDetailPage() {
           </div>
         </div>
 
-        <PotSocialSection potId={pot.id} currentUserId={user?.id} canPost={isJoined} onChange={invalidateBoard} />
+        <PotSocialSection potId={pot.id} currentUserId={user?.id} canPost={isJoined} momentScope={pot.moment_scope} onChange={invalidateBoard} />
 
         {/* Action buttons — 초대(같이 먹자고 하기)는 이 밥팟을 키우는 액션이라 한 행에서
             더 넓은 쪽을 차지하고, 나가기/삭제처럼 이 밥팟을 떠나는 유형의 액션은 왼쪽 좁은 칸에
@@ -1204,8 +1204,8 @@ const S = {
   membersHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   membersTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   membersCount: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
-  membersList: { display: 'flex', gap: 10, flexWrap: 'wrap' },
-  memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 },
+  membersList: { display: 'flex', gap: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' },
+  memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 },
   memberCircle: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-base)', position: 'relative' },
   guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
   kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--color-danger)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
