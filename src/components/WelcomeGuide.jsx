@@ -31,8 +31,8 @@ const PAGES = [
     body: '평소 가보고 싶었던 곳을 등록해보세요.\n같이 가고 싶은 친구들과 공유돼요.\n맘이 맞는 친구와 같이 가도록 해요.',
   },
   {
-    icon: <RiceBowlIcon size={88} />,
-    title: '함께 먹을 사람을\n더 편하게 찾도록',
+    icon: <RiceBowlIcon size={88} style={{ marginBottom: 40 }} />,
+    title: '점심시간,\n누구와 먹을지\n고민하지 않도록',
     body: '같이 먹자를 홈 화면에 두고\n필요할 때 가볍게 열어보세요.',
     extra: <InstallAppPrompt hideDesc variant="subtle" />,
   },
