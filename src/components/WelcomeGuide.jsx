@@ -47,21 +47,42 @@ const ANIM = {
 export default function WelcomeGuide({ onDone }) {
   const [index, setIndex] = useState(0)
   const drag = useRef({ active: false, startX: 0 })
+  const slideRef = useRef(null)
   const total = PAGES.length
   const isLast = index === total - 1
   const page = PAGES[index]
 
   const onPointerDown = (e) => {
+    // 버튼(설치 안내 등) 위에서 시작한 포인터는 여기서 캡처하면 클릭이 막혀버리니 드래그 대상에서 제외
+    if (e.target.closest('button, a')) return
     drag.current = { active: true, startX: e.clientX }
+    if (slideRef.current) slideRef.current.style.transition = 'none'
     e.currentTarget.setPointerCapture?.(e.pointerId)
+  }
+  // 손가락을 따라 슬라이드가 실시간으로 움직여야 "스와이프된다"는 느낌이 생긴다.
+  // pointerup에서 델타만 재는 방식은 판정은 되지만 시각적 반응이 없어 먹통처럼 느껴진다.
+  const onPointerMove = (e) => {
+    if (!drag.current.active || !slideRef.current) return
+    slideRef.current.style.transform = `translateX(${e.clientX - drag.current.startX}px)`
+  }
+  const snapBack = () => {
+    if (!slideRef.current) return
+    slideRef.current.style.transition = `transform 0.25s ${EASE}`
+    slideRef.current.style.transform = 'translateX(0)'
   }
   const endDrag = (e) => {
     if (!drag.current.active) return
+    drag.current.active = false
     const deltaX = e.clientX - drag.current.startX
     const THRESHOLD = 50
-    if (deltaX < -THRESHOLD && index < total - 1) setIndex(i => i + 1)
-    else if (deltaX > THRESHOLD && index > 0) setIndex(i => i - 1)
-    drag.current.active = false
+    const goNext = deltaX < -THRESHOLD && index < total - 1
+    const goPrev = deltaX > THRESHOLD && index > 0
+    if (!goNext && !goPrev) { snapBack(); return }
+    if (slideRef.current) {
+      slideRef.current.style.transition = `transform 0.25s ${EASE}`
+      slideRef.current.style.transform = `translateX(${goNext ? '-100%' : '100%'})`
+    }
+    setTimeout(() => setIndex(i => i + (goNext ? 1 : -1)), 220)
   }
 
   const goNext = () => { if (isLast) onDone(); else setIndex(i => i + 1) }
@@ -75,10 +96,11 @@ export default function WelcomeGuide({ onDone }) {
       <div
         style={styles.track}
         onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
         onPointerUp={endDrag}
-        onPointerCancel={() => { drag.current.active = false }}
+        onPointerCancel={() => { if (drag.current.active) { drag.current.active = false; snapBack() } }}
       >
-        <div key={index} style={styles.slide}>
+        <div key={index} ref={slideRef} style={styles.slide}>
           <div style={{ ...styles.iconWrap, ...ANIM.item, animationDelay: nextDelay(220) }}>
             {page.icon}
             {page.shot && <img src={page.shot} alt="" style={styles.shot} />}
