@@ -6,10 +6,10 @@ import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
-import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
+import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { MegaphoneIcon } from '../components/GroupIcons'
+import { MegaphoneIcon, MoreHorizontalIcon } from '../components/GroupIcons'
 import LinkPreviewCard from '../components/LinkPreviewCard'
 import AutoTextarea from '../components/AutoTextarea'
 import PotSocialSection from '../components/PotSocialSection'
@@ -125,7 +125,9 @@ export default function PotDetailPage() {
   const [invitedFriendIds, setInvitedFriendIds] = useState(new Set())
   const [copied, setCopied] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [confirmLeave, setConfirmLeave] = useState(false)
   const [confirmKick, setConfirmKick] = useState(null)
+  const [showMoreActions, setShowMoreActions] = useState(false)
   const [draft, setDraft] = useState(null)
   const [draftScope, setDraftScope] = useState('all') // 'all' | 'time' | 'menu' | 'max_people' | 'memo'
   const [timePicker, setTimePicker] = useState(null)
@@ -133,15 +135,17 @@ export default function PotDetailPage() {
   const [momentScopeLoading, setMomentScopeLoading] = useState(false)
 
   const isQuickEdit = !!draft && draftScope !== 'all'
-  useScrollLock(!!(confirmDelete || conflict || confirmKick || timePicker || showShare || isQuickEdit))
+  useScrollLock(!!(confirmDelete || confirmLeave || conflict || confirmKick || timePicker || showShare || isQuickEdit))
   useEscKey(useCallback(() => {
     if (timePicker) { cancelDetailTimePicker(); return }
     if (confirmKick) { setConfirmKick(null); return }
     if (confirmDelete) { setConfirmDelete(false); return }
+    if (confirmLeave) { setConfirmLeave(false); return }
     if (conflict) { setConflict(null); return }
     if (showShare) { setShowShare(false); return }
+    if (showMoreActions) { setShowMoreActions(false); return }
     if (isQuickEdit) { cancelDraft(); return }
-  }, [timePicker, confirmKick, confirmDelete, conflict, showShare, isQuickEdit]))
+  }, [timePicker, confirmKick, confirmDelete, confirmLeave, conflict, showShare, showMoreActions, isQuickEdit]))
 
   const invalidateBoard = () => {
     if (user) invalidateCache(`board:${user.id}:`, { prefix: true })
@@ -181,8 +185,13 @@ export default function PotDetailPage() {
   const canEdit = isMaster || pot?.is_default
   const canKick = isMaster || isDefaultPotAdmin
 
+  // 지난 날짜의 밥팟은 무조건 종료로 보고, 오늘 날짜 밥팟은 종료 시각이 지났을 때만 종료로
+  // 본다(시간 미정 밥팟은 당일엔 종료로 치지 않음) — MomentPage의 isPotEnded와 동일한 규칙.
   const isPotExpired = (() => {
-    if (!pot?.end_time || !pot?.date) return false
+    if (!pot?.date) return false
+    const todayStr = toDateStr(new Date())
+    if (pot.date < todayStr) return true
+    if (pot.date > todayStr || !pot.end_time) return false
     const [h, m] = pot.end_time.slice(0, 5).split(':').map(Number)
     const expiry = new Date(`${pot.date}T${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:00`)
     return new Date() > expiry
@@ -824,29 +833,73 @@ export default function PotDetailPage() {
 
         <PotSocialSection potId={pot.id} currentUserId={user?.id} canPost={isJoined} onChange={invalidateBoard} />
 
-        {/* Action buttons */}
-        {isPotExpired ? (
+        {/* Action buttons — 초대(같이 먹자고 하기)는 이 밥팟을 키우는 액션이라 한 행에서
+            더 넓은 쪽을 차지하고, 나가기/삭제처럼 이 밥팟을 떠나는 유형의 액션은 왼쪽 좁은 칸에
+            둔다(방장은 나가기+삭제를 '더보기'로 묶어서 같은 자리에). 종료된 밥팟은 참여할 수도
+            초대할 수도 없지만, 이미 참여했던 사람이 나가거나(방장이면 삭제도) 정리할 수는
+            있어야 해서 나가기/더보기만 남기고 초대 버튼만 뺀다. */}
+        {isPotExpired && !isJoined ? (
           <div style={S.expiredCard}>종료된 밥팟이에요</div>
         ) : isJoined ? (
-          <button style={S.leaveBtn} onClick={handleJoinToggle} disabled={actionLoading}>
-            {actionLoading ? '처리 중...' : '밥팟 나가기'}
-          </button>
+          user?.is_guest ? (
+            <button style={S.leaveBtn} onClick={() => setConfirmLeave(true)} disabled={actionLoading}>
+              밥팟 나가기
+            </button>
+          ) : (
+            <div style={S.actionRow}>
+              {isMaster && !draft ? (
+                <div style={{ ...S.moreActionsWrap, ...(isPotExpired ? S.moreActionsWrapFull : {}) }}>
+                  <button style={S.moreActionsTrigger} onClick={() => setShowMoreActions(v => !v)}>
+                    <MoreHorizontalIcon size={16} /> 더보기
+                  </button>
+                  {showMoreActions && (
+                    <>
+                      <div style={S.moreActionsOverlay} onClick={() => setShowMoreActions(false)} />
+                      <div style={S.moreActionsDropdown}>
+                        <button
+                          style={S.moreActionsItem}
+                          onClick={() => { setShowMoreActions(false); setConfirmLeave(true) }}
+                          disabled={actionLoading}
+                        >
+                          밥팟 나가기
+                        </button>
+                        <button
+                          style={{ ...S.moreActionsItem, ...S.moreActionsItemDanger }}
+                          onClick={() => { setShowMoreActions(false); setConfirmDelete(true) }}
+                        >
+                          🗑️ 밥팟 삭제
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                <button
+                  style={isPotExpired ? S.leaveBtn : S.leaveBtnRow}
+                  onClick={() => setConfirmLeave(true)}
+                  disabled={actionLoading}
+                >
+                  {isPotExpired ? '밥팟 나가기' : '나가기'}
+                </button>
+              )}
+              {!isPotExpired && (
+                <button style={S.shareBtnPrimaryRow} onClick={() => { setShowShare(true); setShareTab('friend') }}>
+                  <MegaphoneIcon size={16} strokeWidth={2} /> 같이 먹자고 하기
+                </button>
+              )}
+            </div>
+          )
         ) : (
-          <button style={{ ...S.joinBtn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
-            {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '같이 먹기 🙋'}
-          </button>
-        )}
-
-        {!isPotExpired && !user?.is_guest && (
-          <button style={S.shareBtn} onClick={() => { setShowShare(true); setShareTab('friend') }}>
-            <MegaphoneIcon size={16} strokeWidth={2} /> 같이 먹자고 하기
-          </button>
-        )}
-
-        {isMaster && !draft && (
-          <button style={S.deleteBtn} onClick={() => setConfirmDelete(true)}>
-            🗑️ 밥팟 삭제
-          </button>
+          <>
+            <button style={{ ...S.joinBtn, opacity: isFull ? 0.4 : 1 }} onClick={handleJoinToggle} disabled={isFull || actionLoading}>
+              {actionLoading ? '처리 중...' : isFull ? '마감됐어요' : '같이 먹기 🙋'}
+            </button>
+            {!user?.is_guest && (
+              <button style={S.shareBtn} onClick={() => { setShowShare(true); setShareTab('friend') }}>
+                <MegaphoneIcon size={16} strokeWidth={2} /> 같이 먹자고 하기
+              </button>
+            )}
+          </>
         )}
       </div>
 
@@ -963,6 +1016,26 @@ export default function PotDetailPage() {
                 {actionLoading ? '처리 중...' : '퇴장시키기'}
               </button>
               <button style={S.dialogBtnCancel} onClick={() => setConfirmKick(null)}>취소</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 밥팟 나가기 확인 */}
+      {confirmLeave && (
+        <div style={S.overlay}>
+          <div style={S.dialog}>
+            <div style={{ fontSize: 36 }}>👋</div>
+            <div style={S.dialogTitle}>밥팟에서 나갈까요?</div>
+            <div style={S.dialogBtns}>
+              <button
+                style={{ ...S.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }}
+                onClick={() => { setConfirmLeave(false); handleJoinToggle() }}
+                disabled={actionLoading}
+              >
+                {actionLoading ? '처리 중...' : '나가기'}
+              </button>
+              <button style={S.dialogBtnCancel} onClick={() => setConfirmLeave(false)}>취소</button>
             </div>
           </div>
         </div>
@@ -1140,10 +1213,38 @@ const S = {
 
   /* Action buttons */
   joinBtn: { ...PRIMARY_ACTION_BUTTON },
-  leaveBtn: { width: '100%', padding: 16, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  leaveBtn: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   expiredCard: { background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 15, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
   shareBtn: { width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  deleteBtn: { ...DESTRUCTIVE_ACTION_BUTTON, padding: 14 },
+
+  // 참여 중일 땐 나가기/더보기(좁은 칸)와 '같이 먹자고 하기'(넓은 칸)를 한 행에 배치해
+  // 초대가 이 화면의 주된 다음 행동이라는 걸 폭 차이로 드러낸다.
+  actionRow: { display: 'flex', gap: 8, width: '100%' },
+  leaveBtnRow: { flex: '0 0 34%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  shareBtnPrimaryRow: { ...PRIMARY_ACTION_BUTTON, flex: 1, width: 'auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6 },
+
+  // 방장 전용 '더보기' — 나가기/삭제처럼 이 밥팟을 떠나는 유형의 액션을 한데 묶어
+  // 초대 버튼과 같은 행의 좁은 칸에 둔다.
+  moreActionsWrap: { position: 'relative', flex: '0 0 34%' },
+  // 종료된 밥팟은 초대 버튼이 없어 더보기 혼자 행을 채워야 한다.
+  moreActionsWrapFull: { flex: '1 1 100%' },
+  moreActionsTrigger: {
+    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4, width: '100%',
+    padding: 13, background: 'none', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)',
+    color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit',
+  },
+  moreActionsOverlay: { position: 'fixed', inset: 0, zIndex: 90, background: 'transparent' },
+  moreActionsDropdown: {
+    position: 'absolute', bottom: 'calc(100% + 6px)', left: '50%', transform: 'translateX(-50%)', zIndex: 91,
+    minWidth: 160, background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.12)', overflow: 'hidden',
+  },
+  moreActionsItem: {
+    display: 'block', width: '100%', boxSizing: 'border-box', padding: '11px 14px', background: 'none',
+    border: 'none', borderBottom: '1px solid var(--color-border)', textAlign: 'center',
+    fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  moreActionsItemDanger: { color: 'var(--color-danger)', borderBottom: 'none' },
 
   /* Share panel */
   sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },

@@ -10,7 +10,6 @@ import { MoreHorizontalIcon } from '../components/GroupIcons'
 import ReportModal from '../components/ReportModal'
 import { SegmentedControl } from '../components/AppHeader'
 import { usePageHeader } from '../lib/HeaderConfigContext'
-import { useHideOnScrollContainer } from '../lib/useHideOnScroll'
 
 const MOMENT_CACHE_MAX_AGE_MS = 30000
 
@@ -278,10 +277,8 @@ export default function MomentPage() {
     return acc
   }, { items: [], lastDate: null }).items
 
-  const [headerHidden, bindScroll] = useHideOnScrollContainer()
   usePageHeader({
     title: '모먼트',
-    hidden: headerHidden,
     centerContent: (
       <SegmentedControl
         ariaLabel="모먼트 범위"
@@ -297,7 +294,7 @@ export default function MomentPage() {
 
   return (
     <div style={S.page}>
-      <div ref={bindScroll} style={S.list}>
+      <div style={S.list}>
         {isLoading ? (
           <div style={S.loadingState}><RiceBowlIcon size={72} /></div>
         ) : items.length === 0 ? (

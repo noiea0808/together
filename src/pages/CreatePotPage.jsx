@@ -506,12 +506,11 @@ const S = {
   /* Hero card — 밥팟 상세 화면과 동일한 스타일 */
   heroCard: { margin: '0 16px', background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
 
-  // 그룹·시간대 선택 — 토글 스위치 on 상태와 같은 색(--color-success)을 재사용해서
-  // "지금 켜져 있는/선택된 값"이라는 느낌을 앱 전반의 관용과 맞춘다.
+  // 그룹·시간대 선택 — 주황 히어로 카드 배경과 선명하게 대비되도록 클린 틸 톤을 쓴다.
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
   chipWrap: { position: 'relative', display: 'inline-flex' },
   chipBtn: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: 'var(--color-success)', borderRadius: 999,
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: '#0D9488', borderRadius: 999,
     padding: '6px 14px', color: '#fff', border: 'none',
     cursor: 'pointer', fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif",
     display: 'inline-flex', alignItems: 'center', gap: 5,

@@ -12,7 +12,6 @@ import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
 import { usePageHeader } from '../lib/HeaderConfigContext'
-import { useHideOnScrollContainer } from '../lib/useHideOnScroll'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AutoTextarea from '../components/AutoTextarea'
@@ -84,8 +83,7 @@ export default function MyAccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, logout, login } = useUser()
-  const [headerHidden, bindScroll] = useHideOnScrollContainer()
-  usePageHeader({ title: '내 계정', hidden: headerHidden, action: { label: '사용법', onClick: () => openDailyTipModal('guide') } })
+  usePageHeader({ title: '내 계정', action: { label: '사용법', onClick: () => openDailyTipModal('guide') } })
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const { isInstalled, isIOS } = useInstallPrompt()
   const [editing, setEditing] = useState(false)
@@ -485,7 +483,7 @@ export default function MyAccountPage() {
       </div>
 
       {tab === 'info' && (
-      <div ref={bindScroll} style={styles.body}>
+      <div style={styles.body}>
         <div style={styles.settingsGroup}>
           {/* 프로필 — 카드 전체를 눌러 닉네임 수정으로 이동, 사진은 별도로 탭 */}
           <div style={styles.profileCard} onClick={() => setEditing(true)} role="button" tabIndex={0}>
@@ -641,7 +639,7 @@ export default function MyAccountPage() {
       )}
 
       {tab === 'wish' && (
-      <div ref={bindScroll} style={styles.body}>
+      <div style={styles.body}>
         <div style={styles.wishHeader}>
           <span style={styles.wishCount}>{wishPlaces.length}곳</span>
           <div style={styles.wishHeaderBtns}>
