@@ -12,8 +12,9 @@ function HeaderSlot() {
   return <AppHeader {...config} />
 }
 
-// /today 전용 레이아웃 — TodayPage/GuestHomePage는 헤더가 스크롤에 반응해 접히므로
-// (useHideOnScroll) 문서(window) 스크롤 모델을 그대로 쓴다. 게스트는 BottomNav를 안 보여준다.
+// /today 전용 레이아웃 — 헤더는 다른 탭들처럼 항상 고정 노출이고, 본문은 문서(window)
+// 스크롤을 그대로 쓴다(TabLayout처럼 내부 스크롤 컨테이너로 감싸지 않음). 게스트는
+// BottomNav를 안 보여준다.
 export default function TodayLayout() {
   const { user } = useUser()
   return (

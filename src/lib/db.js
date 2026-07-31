@@ -1076,11 +1076,15 @@ export async function cancelPotInvitation(invitationId, userId) {
 
 // ── 알림함 ──────────────────────────────────────────
 // 날짜/그룹/밥팟 제목을 함께 보여주기 위해 밥팟·그룹 정보를 조인해서 가져온다.
+// lunch_reminder는 그날 상태를 정하라는 당일 한정 넛지라 하루 지나면 다시 볼 이유가 없고,
+// 알림함 배지 매핑(NotificationsPage의 EVENT_META)에도 없어 어중간하게 보인다. insert 자체는
+// (실시간 토스트가 이 테이블 INSERT를 구독하므로) 그대로 두고, 알림함 목록/뱃지에서만 뺀다.
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
     .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name))')
     .eq('user_id', userId)
+    .neq('event_type', 'lunch_reminder')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -1093,6 +1097,7 @@ export async function getUnreadNotificationCount(userId) {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_read', false)
+    .neq('event_type', 'lunch_reminder')
   if (error) throw error
   return count ?? 0
 }
