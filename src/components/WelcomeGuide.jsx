@@ -13,7 +13,7 @@ const PAGES = [
   {
     shot: guideAsk,
     title: '점약있어요?',
-    body: '점심을 제안했다가\n이미 약속이 있다는 답에\n괜히 머쓱해진 순간들.\n\n그런 사소한 어려움을\n조금 더 편하게 풀고 싶었어요.',
+    body: '점심을 제안했다가 괜히 머쓱했던 순간들.\n\n그런 순간을 조금 더\n편하게 만들고 싶었어요.',
   },
   {
     shot: guideGroup,
@@ -41,7 +41,6 @@ const PAGES = [
 // 슬라이드 안 요소(스샷/제목/본문)가 한 덩어리가 아니라 순서대로 살짝 지연되며 떠오르게
 const EASE = 'cubic-bezier(0.16, 1, 0.3, 1)'
 const ANIM = {
-  shot: { animation: `guideShotReveal 1.4s ${EASE} both` },
   item: { animation: `guideItemRise 1.2s ${EASE} both` },
 }
 
@@ -80,7 +79,7 @@ export default function WelcomeGuide({ onDone }) {
         onPointerCancel={() => { drag.current.active = false }}
       >
         <div key={index} style={styles.slide}>
-          <div style={{ ...styles.iconWrap, ...ANIM.shot, animationDelay: nextDelay(220) }}>
+          <div style={{ ...styles.iconWrap, ...ANIM.item, animationDelay: nextDelay(220) }}>
             {page.icon}
             {page.shot && <img src={page.shot} alt="" style={styles.shot} />}
           </div>
@@ -131,14 +130,14 @@ const styles = {
   slide: {
     width: '100%', height: '100%', boxSizing: 'border-box',
     display: 'flex', flexDirection: 'column', alignItems: 'center',
-    padding: '48px var(--spacing-lg) var(--spacing-lg)', textAlign: 'center',
-    overflowY: 'auto',
+    padding: '0 var(--spacing-lg) calc(var(--spacing-lg) / 2)', textAlign: 'center',
   },
-  // 남는 공간을 전부 차지해서 그 안에서 사진이 가운데 오도록 하는 스페이서 겸 컨테이너.
-  // 텍스트 영역은 자기 높이만큼만 차지하니 자연히 하단에 남는다.
+  // 남는 공간을 전부 차지해서 그 안에서 사진이 오도록 하는 스페이서 겸 컨테이너.
+  // 텍스트는 항상 자기 높이만큼 확보되어야 하니, 사진이 넘치면 위쪽을 잘라내고
+  // 사진 하단이 텍스트 바로 위에 오도록 아래쪽 기준으로 붙인다.
   iconWrap: {
     flex: '1 1 0%', minHeight: 0, width: '100%', overflow: 'hidden',
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
     marginBottom: 24,
   },
   shot: { width: 'min(85vw, 340px)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-border)' },
@@ -146,7 +145,7 @@ const styles = {
   title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px', whiteSpace: 'pre-line' },
   body: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-line', margin: 0 },
   extra: { marginTop: 'var(--spacing-xl)', width: 'min(78vw, calc(var(--max-width) * 0.78))' },
-  footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-md) var(--spacing-lg) var(--spacing-lg)' },
+  footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-md) var(--spacing-lg) var(--spacing-lg)' },
   dots: { display: 'flex', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: '50%', background: 'var(--color-border)', transition: 'all 0.7s cubic-bezier(0.16, 1, 0.3, 1)' },
   dotActive: { background: 'var(--color-primary)', width: 16 },

@@ -192,10 +192,6 @@ img {
   from { transform: translateY(16px); opacity: 0; filter: blur(3px); }
   to   { transform: none; opacity: 1; filter: none; }
 }
-@keyframes guideShotReveal {
-  from { transform: translateY(24px) scale(0.96); opacity: 0; filter: blur(6px); }
-  to   { transform: none; opacity: 1; filter: none; }
-}
 
 /* ===== 공통 유틸 ===== */
 .page {
