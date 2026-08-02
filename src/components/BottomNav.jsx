@@ -139,7 +139,7 @@ const styles = {
     width: '100%', maxWidth: 'var(--max-width)',
     display: 'flex', borderTop: '1px solid var(--color-border)',
     background: 'var(--color-surface)',
-    paddingBottom: 'env(safe-area-inset-bottom)',
+    paddingBottom: 'var(--safe-area-inset-bottom)',
     zIndex: 100,
   },
   tab: {

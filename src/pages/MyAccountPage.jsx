@@ -8,11 +8,10 @@ import {
   getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
 import FeedbackModal from '../components/FeedbackModal'
-import AppHeader from '../components/AppHeader'
 import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { isPushSupported, getPushSubscription, subscribeToPush, unsubscribeFromPush } from '../lib/push'
-import BottomNav from '../components/BottomNav'
+import { usePageHeader } from '../lib/HeaderConfigContext'
 import InstallAppPrompt from '../components/InstallAppPrompt'
 import AvatarCropModal from '../components/AvatarCropModal'
 import AutoTextarea from '../components/AutoTextarea'
@@ -84,6 +83,7 @@ export default function MyAccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const { user, logout, login } = useUser()
+  usePageHeader({ title: '내 계정', action: { label: '사용법', onClick: () => openDailyTipModal('guide') } })
   const [nickname, setNickname] = useState(user?.nickname ?? '')
   const { isInstalled, isIOS } = useInstallPrompt()
   const [editing, setEditing] = useState(false)
@@ -477,8 +477,6 @@ export default function MyAccountPage() {
 
   return (
     <div style={styles.page}>
-      <AppHeader title="내 계정" action={{ label: '사용법', onClick: () => openDailyTipModal('guide') }} />
-
       <div style={styles.tabs}>
         <button style={{ ...styles.tabBtn, ...(tab === 'info' ? styles.tabBtnActive : {}) }} onClick={() => setTab('info')}>내 정보</button>
         <button style={{ ...styles.tabBtn, ...(tab === 'wish' ? styles.tabBtnActive : {}) }} onClick={() => setTab('wish')}>가고 싶은 곳</button>
@@ -942,8 +940,6 @@ export default function MyAccountPage() {
           </div>
         </div>
       )}
-
-      <BottomNav />
     </div>
   )
 }
@@ -953,10 +949,10 @@ const styles = {
   // 이 페이지는 내부 스크롤 컨테이너가 아니라 문서(페이지) 자체가 스크롤되는 구조라
   // position:sticky가 걸리지 않는다 — 그래서 fixed로 고정하고, 아래 paddingBottom을
   // 넉넉히 잡아 끝까지 스크롤하면 로그아웃/회원 탈퇴가 이 바 위로 완전히 올라오게 한다.
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(150px + env(safe-area-inset-bottom))' },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(150px + var(--safe-area-inset-bottom))' },
 
   fixedInstallBar: {
-    position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(72px + env(safe-area-inset-bottom))',
+    position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(72px + var(--safe-area-inset-bottom))',
     width: '100%', maxWidth: 'var(--max-width)', boxSizing: 'border-box',
     padding: '10px var(--spacing-md)', background: 'rgba(250,248,245,0.95)', backdropFilter: 'blur(8px)',
     borderTop: '1px solid var(--color-border)', zIndex: 90,

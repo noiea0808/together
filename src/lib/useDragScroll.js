@@ -8,6 +8,11 @@ export function useDragScroll() {
   return useMemo(() => ({
     onPointerDown: (e) => {
       if (e.pointerType !== 'mouse') return
+      // 버튼 위에서 누른 경우까지 포인터를 캡처해버리면, mouseup이 이 컨테이너로
+      // 리다이렉트되면서 버튼과 클릭 대상이 갈려 click 이벤트가 아예 발생하지 않는다
+      // (사진 카드의 '⋯' 편집 버튼이 마우스로는 안 눌리던 원인). 버튼 위에서는 드래그
+      // 스크롤을 개입시키지 않고 클릭이 정상 동작하도록 그대로 통과시킨다.
+      if (e.target.closest('button')) return
       const el = e.currentTarget
       drag.current = { active: true, startX: e.clientX, startScrollLeft: el.scrollLeft }
       el.setPointerCapture?.(e.pointerId)

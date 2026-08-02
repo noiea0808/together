@@ -4,6 +4,9 @@ import './index.css'
 import { UserProvider, useUser } from './lib/UserContext'
 import { NotificationSyncProvider } from './lib/NotificationSyncContext'
 import { NavBadgeProvider } from './lib/NavBadgeContext'
+import { HeaderConfigProvider } from './lib/HeaderConfigContext'
+import TodayLayout from './components/TodayLayout'
+import TabLayout from './components/TabLayout'
 import { getActiveTerms, getMyTermAgreements } from './lib/db'
 import OnboardingPage from './pages/OnboardingPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
@@ -21,12 +24,13 @@ import GroupSetupPage from './pages/GroupSetupPage'
 import GroupSettingsPage from './pages/GroupSettingsPage'
 import JoinPage from './pages/JoinPage'
 import NotificationsPage from './pages/NotificationsPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
+import ChildSafetyPage from './pages/ChildSafetyPage'
 import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
 import DailyTipModal from './components/DailyTipModal'
-import PushOptInBanner from './components/PushOptInBanner'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 import NativeDeepLinkHandler from './components/NativeDeepLinkHandler'
 
@@ -103,14 +107,23 @@ function ConsumerRoutes() {
     <Routes>
       <Route path="/onboarding" element={!user ? <OnboardingPage /> : <Navigate to={user.onboarded ? '/today' : '/welcome'} replace />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
+      <Route path="/child-safety" element={<ChildSafetyPage />} />
       <Route path="/welcome" element={!user ? <Navigate to="/onboarding" replace /> : (user.onboarded ? <Navigate to="/today" replace /> : <ProfileSetupPage />)} />
-      <Route path="/today"    element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
-      <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
-      <Route path="/moment"   element={guestSafe(<MomentPage />)} />
-      <Route path="/account"  element={guestSafe(<MyAccountPage />)} />
+
+      <Route element={<TodayLayout />}>
+        <Route path="/today" element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
+      </Route>
+
+      <Route element={<TabLayout />}>
+        <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
+        <Route path="/moment"   element={guestSafe(<MomentPage />)} />
+        <Route path="/account"  element={guestSafe(<MyAccountPage />)} />
+        <Route path="/group"    element={guestSafe(<GroupPage />)} />
+      </Route>
+
       <Route path="/create"   element={guestSafe(<CreatePotPage />)} />
       <Route path="/pot/:id"  element={<PotDetailPage />} />
-      <Route path="/group"    element={guestSafe(<GroupPage />)} />
       <Route path="/group-setup" element={guestSafe(<GroupSetupPage />)} />
       <Route path="/group/:id/settings" element={guestSafe(<GroupSettingsPage />)} />
       <Route path="/join/:code"  element={<JoinPage />} />
@@ -125,11 +138,12 @@ function ConsumerApp() {
     <UserProvider>
       <NotificationSyncProvider>
         <NavBadgeProvider>
-          <NotificationToast />
-          <GroupInviteModal />
-          <DailyTipModal />
-          <PushOptInBanner />
-          <ConsumerRoutes />
+          <HeaderConfigProvider>
+            <NotificationToast />
+            <GroupInviteModal />
+            <DailyTipModal />
+            <ConsumerRoutes />
+          </HeaderConfigProvider>
         </NavBadgeProvider>
       </NotificationSyncProvider>
     </UserProvider>

@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "com.gachimeokja.app",
+      "package_name": "app.eat_together.mobile",
       "sha256_cert_fingerprints": [
-        "REPLACE_WITH_YOUR_UPLOAD_KEY_SHA256_FINGERPRINT",
+        "B1:67:DD:37:5D:E7:B3:52:25:32:F7:56:31:A7:E1:0E:3F:E7:E8:4E:04:89:31:F7:90:2E:BA:3E:4C:EA:DF:33",
         "REPLACE_WITH_YOUR_PLAY_APP_SIGNING_SHA256_FINGERPRINT"
       ]
     }

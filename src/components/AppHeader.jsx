@@ -8,7 +8,8 @@ export default function AppHeader({ title, brand, centerContent, action, showNot
     <header
       className="app-header"
       style={{
-        height: hidden ? 0 : 'var(--header-height)',
+        height: hidden ? 0 : 'calc(var(--header-height) + var(--safe-area-inset-top))',
+        paddingTop: hidden ? 0 : 'var(--safe-area-inset-top)',
         opacity: hidden ? 0 : 1,
         borderBottomColor: hidden ? 'transparent' : 'var(--color-border)',
       }}

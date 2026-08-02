@@ -35,3 +35,12 @@ android/build
 android/.gradle
 android/local.properties
 android/app/release
+android/keystore.properties
+*.keystore
+*.jks
+
+# Firebase — google-services.json은 클라이언트 설정값이라 관례상 커밋하기도 하지만,
+# 이 프로젝트는 비공개로 두고 각자 로컬에 배치한다. 서비스 계정 키는 private key가
+# 들어있어 절대 커밋하면 안 된다.
+android/app/google-services.json
+android/app/*firebase-adminsdk*.json

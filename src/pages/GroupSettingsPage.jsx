@@ -461,7 +461,7 @@ const S = {
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
 
   header: {
-    padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 16px', paddingTop: 'calc(10px + var(--safe-area-inset-top))', display: 'flex', alignItems: 'center', gap: 10,
     position: 'sticky', top: 0, zIndex: 10, background: 'rgba(250,248,245,0.95)',
     borderBottom: '1px solid var(--color-border)', backdropFilter: 'blur(8px)',
   },
@@ -527,7 +527,7 @@ const S = {
   hint: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 },
 
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
-  footer: { flexShrink: 0, padding: '10px 16px calc(10px + env(safe-area-inset-bottom, 0px))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },
+  footer: { flexShrink: 0, padding: '10px 16px calc(10px + var(--safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },
   deleteBtn: { ...DESTRUCTIVE_ACTION_BUTTON, padding: 14 },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },

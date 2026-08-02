@@ -2,6 +2,6 @@
 <resources>
     <string name="app_name">같이 먹자</string>
     <string name="title_activity_main">같이 먹자</string>
-    <string name="package_name">com.gachimeokja.app</string>
+    <string name="package_name">app.eat_together.mobile</string>
     <string name="custom_url_scheme">com.gachimeokja.app</string>
 </resources>
