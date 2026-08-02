@@ -1,4 +1,4 @@
-package com.gachimeokja.app;
+package app.eat_together.mobile;
 
 import com.getcapacitor.BridgeActivity;
 
