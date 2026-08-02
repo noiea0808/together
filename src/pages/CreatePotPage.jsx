@@ -7,7 +7,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotIcon from '../components/PotIcon'
 import AutoTextarea from '../components/AutoTextarea'
@@ -96,6 +96,7 @@ export default function CreatePotPage() {
   const [groups, setGroups] = useState([])
   const [groupId, setGroupId] = useState(searchParams.get('group_id') ?? '')
   const [showGroupPicker, setShowGroupPicker] = useState(false)
+  const [showSlotPicker, setShowSlotPicker] = useState(false)
 
   useEffect(() => {
     getMyGroups(user.id).then(list => {
@@ -129,8 +130,9 @@ export default function CreatePotPage() {
   useEscKey(useCallback(() => {
     if (timePicker) { cancelTimePicker(); return }
     if (editField) { setEditField(null); return }
-    if (showGroupPicker) setShowGroupPicker(false)
-  }, [timePicker, editField, showGroupPicker]))
+    if (showGroupPicker) { setShowGroupPicker(false); return }
+    if (showSlotPicker) setShowSlotPicker(false)
+  }, [timePicker, editField, showGroupPicker, showSlotPicker]))
 
   const set = (key, val) => setForm(f => ({ ...f, [key]: val }))
 
@@ -170,6 +172,22 @@ export default function CreatePotPage() {
   }))
 
   const stepPeople = (delta) => set('max_people', Math.max(MIN_PEOPLE, Math.min(MAX_PEOPLE, form.max_people + delta)))
+
+  // 슬롯이 바뀌면 그 시간대에 맞는 기본 시간·제목·아이콘 프리셋으로 다시 채운다
+  const changeSlot = (newSlot) => {
+    setShowSlotPicker(false)
+    if (newSlot === form.slot) return
+    const preset = randomTitlePreset(newSlot)
+    const newTime = defaultTimeForSlot(newSlot)
+    setForm(f => ({
+      ...f,
+      slot: newSlot,
+      meal_time: newTime,
+      end_time: addMins(newTime, f.duration_minutes > 0 ? f.duration_minutes : 60),
+      title: preset.title,
+      icon: preset.icon,
+    }))
+  }
 
   const doCreate = async () => {
     setLoading(true)
@@ -226,9 +244,34 @@ export default function CreatePotPage() {
 
         <div style={S.heroCard}>
           <div style={S.heroTagRow}>
-            <span style={S.slotTag}>{form.slot}</span>
-            <div style={S.groupPickerWrap}>
-              <button type="button" style={S.groupTagBtn} onClick={() => setShowGroupPicker(v => !v)}>
+            <div style={S.chipWrap}>
+              <button type="button" style={S.chipBtn} onClick={() => { setShowSlotPicker(v => !v); setShowGroupPicker(false) }}>
+                {form.slot}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {showSlotPicker && (
+                <>
+                  <div style={S.groupPickerOverlay} onClick={() => setShowSlotPicker(false)} />
+                  <div style={S.groupPickerDropdown}>
+                    {SLOT_KEYS.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        style={{ ...S.groupPickerItem, ...(slot === form.slot ? S.groupPickerItemActive : {}) }}
+                        onClick={() => changeSlot(slot)}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div style={S.chipWrap}>
+              <button type="button" style={S.chipBtn} onClick={() => { setShowGroupPicker(v => !v); setShowSlotPicker(false) }}>
                 {selectedGroup?.name ?? '그룹 선택'}
                 <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                   <path d="M6 9l6 6 6-6" />
@@ -445,7 +488,7 @@ export default function CreatePotPage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column' },
   header: {
-    padding: '10px 16px', display: 'flex', alignItems: 'center', gap: 10,
+    padding: '10px 16px', paddingTop: 'calc(10px + var(--safe-area-inset-top))', display: 'flex', alignItems: 'center', gap: 10,
     position: 'sticky', top: 0, background: 'rgba(250,248,245,0.95)', zIndex: 10,
     borderBottom: '1px solid var(--color-border)', backdropFilter: 'blur(8px)',
   },
@@ -462,20 +505,19 @@ const S = {
 
   /* Hero card — 밥팟 상세 화면과 동일한 스타일 */
   heroCard: { margin: '0 16px', background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
+
+  // 그룹·시간대 선택 — 주황 히어로 카드 배경과 선명하게 대비되도록 클린 틸 톤을 쓴다.
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
-  slotTag: {
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, background: 'rgba(255,255,255,0.85)', borderRadius: 6,
-    padding: '3px 9px', color: 'var(--color-primary-dark)', border: '1px solid rgba(255,107,53,0.3)',
-  },
-  groupPickerWrap: { position: 'relative', display: 'inline-flex' },
-  groupTagBtn: {
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, background: 'rgba(255,255,255,0.85)', borderRadius: 6,
-    padding: '3px 9px', color: 'var(--color-primary-dark)', border: '1px solid rgba(255,107,53,0.3)',
-    cursor: 'pointer', fontFamily: 'inherit', display: 'inline-flex', alignItems: 'center', gap: 3,
+  chipWrap: { position: 'relative', display: 'inline-flex' },
+  chipBtn: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: '#0D9488', borderRadius: 999,
+    padding: '6px 14px', color: '#fff', border: 'none',
+    cursor: 'pointer', fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif",
+    display: 'inline-flex', alignItems: 'center', gap: 5,
   },
   groupPickerOverlay: { position: 'fixed', inset: 0, zIndex: 90, background: 'transparent' },
   groupPickerDropdown: {
-    position: 'absolute', top: 26, left: 0, zIndex: 91, minWidth: 140,
+    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 91, minWidth: 140, maxWidth: 220,
     background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     boxShadow: '0 4px 14px rgba(0,0,0,0.12)', padding: 4,
   },

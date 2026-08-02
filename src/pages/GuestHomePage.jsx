@@ -4,10 +4,9 @@ import { useUser } from '../lib/UserContext'
 import { getGuestHome } from '../lib/db'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
-import { useHideOnScroll } from '../lib/useHideOnScroll'
 import PotCard from '../components/PotCard'
-import AppHeader from '../components/AppHeader'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import { usePageHeader } from '../lib/HeaderConfigContext'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const SLOT_ORDER = ['아침', '점심', '저녁', '오전간식', '오후간식', '야식']
@@ -28,7 +27,7 @@ export default function GuestHomePage() {
   const { user, logout } = useUser()
   const [home, setHome] = useState(null)
   const [loading, setLoading] = useState(true)
-  const headerHidden = useHideOnScroll()
+  usePageHeader({ brand: { icon: <RiceBowlIcon size={40} />, label: '같이 먹자' } })
 
   useEffect(() => {
     if (!user?.guest_pot_id) { setLoading(false); return }
@@ -57,10 +56,9 @@ export default function GuestHomePage() {
 
   return (
     <div style={styles.wrap}>
-      <AppHeader brand={{ icon: <RiceBowlIcon size={24} />, label: '같이 먹자' }} hidden={headerHidden} />
       <div style={styles.page}>
-        {/* 날짜 — 이동 불가, 게스트 표시. 헤더가 접히면 그 자리까지 따라 올라간다 */}
-        <div style={{ ...styles.dateNav, top: headerHidden ? 0 : 'var(--header-height)' }}>
+        {/* 날짜 — 이동 불가, 게스트 표시. 헤더 바로 아래에 sticky 고정 */}
+        <div style={{ ...styles.dateNav, top: 'calc(var(--header-height) + var(--safe-area-inset-top))' }}>
           <span style={styles.datePrimary}>{formatDate(home?.date)}</span>
           <span style={styles.guestTag}>게스트</span>
         </div>
@@ -134,9 +132,10 @@ export default function GuestHomePage() {
 const styles = {
   loadingPage: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', fontSize: 40, gap: 8, color: 'var(--color-text-muted)' },
   wrap: { flex: 1, display: 'flex', flexDirection: 'column' },
-  page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 'calc(var(--spacing-xl) + env(safe-area-inset-bottom))' },
+  page: { flex: 1, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', padding: 'var(--spacing-md)', paddingBottom: 'calc(var(--spacing-xl) + var(--safe-area-inset-bottom))' },
 
-  dateNav: { position: 'sticky', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'rgba(250,248,245,0.96)', backdropFilter: 'blur(8px)', margin: '0 calc(-1 * var(--spacing-md))', width: 'calc(100% + 2 * var(--spacing-md))', transition: 'top 0.22s ease' },
+  // TodayPage.dateNav와 동일한 이유로 margin-top을 음수로 줘서 .page의 top padding을 상쇄한다.
+  dateNav: { position: 'sticky', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'rgba(250,248,245,0.96)', backdropFilter: 'blur(8px)', margin: 'calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) 0', width: 'calc(100% + 2 * var(--spacing-md))' },
   datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)', letterSpacing: '-0.3px' },
   guestTag: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#fff', background: '#FF9800', borderRadius: 'var(--radius-full)', padding: '2px 10px' },
 

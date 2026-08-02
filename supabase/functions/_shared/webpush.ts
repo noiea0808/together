@@ -2,6 +2,7 @@
 
 import type { SupabaseClient } from 'jsr:@supabase/supabase-js@2'
 import webpush from 'npm:web-push@3.6.7'
+import { sendFcmToUsers } from './fcm.ts'
 
 // VAPID 설정이 잘못되면 setVapidDetails가 즉시 throw하는데, 이걸 모듈 최상단에서 그대로 던지면
 // 함수 전체가 매 요청마다 부팅조차 못 하고 죽어서 로그에만 남고 호출자는 원인을 알 방법이 없다.
@@ -24,10 +25,11 @@ export function getVapidInitError(): string | null {
 export type SendPushResult = {
   sent: number
   failed: number
-  failures: { endpoint: string; statusCode?: number; message: string }[]
+  failures: { target: string; statusCode?: number; message: string }[]
 }
 
 // admin: service_role 클라이언트 (RLS 우회 — push_subscriptions/notifications 조회·정리에 필요)
+// 웹 푸시(push_subscriptions)와 네이티브 FCM(fcm_tokens) 양쪽 구독자에게 함께 발송하고 결과를 합친다.
 export async function sendPushToUsers(
   admin: SupabaseClient,
   userIds: string[],
@@ -74,7 +76,7 @@ export async function sendPushToUsers(
       if (statusCode === 404 || statusCode === 410) staleEndpoints.push(subs![i].endpoint)
       // endpoint 전체는 구독자 식별에 쓰일 수 있어 응답엔 끝 8자만 남긴다.
       failures.push({
-        endpoint: '...' + subs![i].endpoint.slice(-8),
+        target: '...' + subs![i].endpoint.slice(-8),
         statusCode,
         message: reason?.body || reason?.message || String(reason),
       })
@@ -84,9 +86,16 @@ export async function sendPushToUsers(
     await admin.from('push_subscriptions').delete().in('endpoint', staleEndpoints)
   }
 
+  // FCM 시크릿이 없으면 sendFcmToUsers가 즉시 빈 결과를 돌려주므로 웹 푸시만 있어도 그대로 동작한다.
+  const fcmResult = await sendFcmToUsers(admin, userIds, payload).catch((e) => ({
+    sent: 0,
+    failed: 1,
+    failures: [{ target: 'fcm', message: e instanceof Error ? e.message : String(e) }],
+  }))
+
   return {
-    sent: results.filter((r) => r.status === 'fulfilled').length,
-    failed: results.filter((r) => r.status === 'rejected').length,
-    failures,
+    sent: results.filter((r) => r.status === 'fulfilled').length + fcmResult.sent,
+    failed: results.filter((r) => r.status === 'rejected').length + fcmResult.failed,
+    failures: [...failures, ...fcmResult.failures],
   }
 }

@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react'
-import { getPotComments, addPotComment, deletePotComment, getPotPhotos, addPotPhoto, deletePotPhoto } from '../lib/db'
+import {
+  getPotComments, getPotCommentsCount, addPotComment, deletePotComment,
+  getPotPhotos, getPotPhotosCount, addPotPhoto, deletePotPhoto,
+} from '../lib/db'
 import { resizeImageFile } from '../lib/resizeImage'
 import { useDragScroll } from '../lib/useDragScroll'
 import PhotoAdjustModal from './PhotoAdjustModal'
@@ -24,16 +27,24 @@ function timeAgo(iso) {
 
 // 밥팟 사진/코멘트 — 밥팟 상세와 모먼트 화면에서 공용으로 쓴다.
 // canPost: 해당 밥팟 참여자만 true (사진/코멘트 등록 가능)
+// momentScope: 밥팟 상세(비-compact)에서만 의미 있음 — '참여자만' 범위인데 아직 참여 전이면
+//              사진/코멘트 본문 대신 개수만 보여준다(오늘 보드에서 참여 전에 미리 들어와보는
+//              경우 내용이 새는 걸 막기 위함). 모먼트 피드(compact)는 애초에 '참여자만' 밥팟이
+//              목록에 안 뜨므로 이 제한이 필요 없다.
 // compact: 카드 테두리·"사진"/"코멘트" 라벨 없이 이어붙는 형태로 렌더링(모먼트 피드용).
 //          사진 등록 버튼은 숨기고 openPhotoPicker()를 ref로 노출해 바깥(⋯ 메뉴)에서 파일 선택창을 열 수 있게 한다.
 // footer: 사진과 코멘트 사이에 끼워 넣을 요소(모먼트 피드의 아바타·댓글수·⋯메뉴 액션바 용도).
 // lazy: true면 화면에 실제로 보이기 전까지 사진/코멘트 쿼리를 미룬다(모먼트 피드처럼 카드가
 //       한 번에 여러 개 렌더링되는 화면에서 N+1 쿼리가 전부 즉시 발사되는 걸 막기 위함).
-const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, onChange, compact = false, footer = null, lazy = false }, ref) {
+const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUserId, canPost, momentScope, onChange, compact = false, footer = null, lazy = false }, ref) {
+  const restricted = !compact && momentScope === 'participants' && !canPost
+
   const [comments, setComments] = useState([])
+  const [commentCount, setCommentCount] = useState(0)
   const [commentText, setCommentText] = useState('')
   const [postingComment, setPostingComment] = useState(false)
   const [photos, setPhotos] = useState([])
+  const [photoCount, setPhotoCount] = useState(0)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [activePhotoIndex, setActivePhotoIndex] = useState(0)
   const [pendingFile, setPendingFile] = useState(null)
@@ -59,14 +70,38 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
     openPhotoPicker: () => photoInputRef.current?.click(),
   }))
 
+  // 사진 메뉴의 '바깥 클릭 시 닫기'는 보통 전체화면 backdrop div로 처리하는데, 이 메뉴는
+  // 가로 스크롤 캐러셀(overflow-x:auto) 안에 있어서 backdrop을 fixed로 깔아도 캐러셀 박스
+  // 밖으로는 페인트/히트테스트가 안 돼(overflow가 fixed 자손까지 잘라버림) 다른 곳을 눌러도
+  // 안 닫혔다. 그래서 여기만 document 클릭 감지로 바깥 클릭을 판별한다.
+  useEffect(() => {
+    if (photoMenuOpenId == null) return
+    const onPointerDown = (e) => {
+      const wrap = e.target.closest?.('[data-photo-menu-id]')
+      if (!wrap || wrap.dataset.photoMenuId !== photoMenuOpenId) {
+        setPhotoMenuOpenId(null)
+        setConfirmDeleteId(null)
+      }
+    }
+    document.addEventListener('pointerdown', onPointerDown)
+    return () => document.removeEventListener('pointerdown', onPointerDown)
+  }, [photoMenuOpenId])
+
   const loadComments = async () => {
-    try { setComments(await getPotComments(potId)) } catch (e) { console.error(e) }
+    try {
+      if (restricted) { setComments([]); setCommentCount(await getPotCommentsCount(potId)); return }
+      setComments(await getPotComments(potId))
+    } catch (e) { console.error(e) }
   }
   const loadPhotos = async () => {
-    try { setPhotos(await getPotPhotos(potId)) } catch (e) { console.error(e) }
+    try {
+      if (restricted) { setPhotos([]); setPhotoCount(await getPotPhotosCount(potId)); return }
+      setPhotos(await getPotPhotos(potId))
+    } catch (e) { console.error(e) }
   }
 
   // lazy가 아니면 바로 로드. lazy면 카드가 뷰포트 근처(200px)에 들어올 때 한 번만 로드.
+  // restricted가 참여 전후로 바뀌면(참여/탈퇴) 개수 전용 ↔ 본문 전체 조회를 다시 태운다.
   useEffect(() => {
     setConfirmDeleteCommentId(null)
     if (!lazy) { loadComments(); loadPhotos(); return }
@@ -79,12 +114,12 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
     )
     observer.observe(el)
     return () => observer.disconnect()
-  }, [potId, lazy])
+  }, [potId, lazy, restricted])
 
   useEffect(() => {
     if (!visible) return
     loadComments(); loadPhotos()
-  }, [visible, potId])
+  }, [visible, potId, restricted])
 
   const handlePostComment = async () => {
     if (!commentText.trim() || postingComment) return
@@ -159,11 +194,21 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
       <div style={cardStyle}>
         {!compact && (
           <div style={S.header}>
-            <span style={S.title}>사진</span>
-            <span style={S.count}>{photos.length}장</span>
+            <span style={S.title}>사진 <span style={S.countInline}>{restricted ? photoCount : photos.length}장</span></span>
+            {canPost && (
+              <button
+                style={{ ...S.addBtnInline, opacity: (uploadingPhoto || batchUploading) ? 0.6 : 1 }}
+                onClick={() => photoInputRef.current?.click()}
+                disabled={uploadingPhoto || !!batchUploading}
+              >
+                {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록'}
+              </button>
+            )}
           </div>
         )}
-        {photos.length === 0 ? (
+        {restricted ? (
+          <p style={S.empty}>{photoCount > 0 ? '참여하면 사진을 볼 수 있어요.' : '아직 등록된 사진이 없어요.'}</p>
+        ) : photos.length === 0 ? (
           !compact && <p style={S.empty}>아직 등록된 사진이 없어요.</p>
         ) : (
           <>
@@ -171,8 +216,9 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
               {photos.map(p => (
                 <div key={p.id} style={S.photoItem}>
                   <img src={p.photo_url} alt="" style={S.photoImg} loading="lazy" decoding="async" />
+                  <span style={S.photoUploaderChip}>{p.users?.nickname ?? '탈퇴한 사용자'}</span>
                   {p.user_id === currentUserId && (
-                    <div style={S.photoMenuWrap}>
+                    <div style={S.photoMenuWrap} data-photo-menu-id={p.id}>
                       <button
                         style={S.photoEditBtn}
                         onClick={() => { setPhotoMenuOpenId(id => id === p.id ? null : p.id); setConfirmDeleteId(null) }}
@@ -181,20 +227,17 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
                         <MoreHorizontalIcon size={14} />
                       </button>
                       {photoMenuOpenId === p.id && (
-                        <>
-                          <div style={S.menuBackdrop} onClick={() => { setPhotoMenuOpenId(null); setConfirmDeleteId(null) }} />
-                          <div style={S.photoMenuDropdown}>
-                            {confirmDeleteId === p.id ? (
-                              <>
-                                <div style={S.photoMenuConfirmText}>사진을 삭제할까요?</div>
-                                <button style={S.photoMenuItemDanger} onClick={() => handleDeletePhoto(p.id)}>삭제</button>
-                                <button style={S.photoMenuItem} onClick={() => setConfirmDeleteId(null)}>취소</button>
-                              </>
-                            ) : (
-                              <button style={S.photoMenuItemDanger} onClick={() => setConfirmDeleteId(p.id)}>🗑️ 사진 삭제</button>
-                            )}
-                          </div>
-                        </>
+                        <div style={S.photoMenuDropdown}>
+                          {confirmDeleteId === p.id ? (
+                            <>
+                              <div style={S.photoMenuConfirmText}>사진을 삭제할까요?</div>
+                              <button style={S.photoMenuItemDanger} onClick={() => handleDeletePhoto(p.id)}>삭제</button>
+                              <button style={S.photoMenuItem} onClick={() => setConfirmDeleteId(null)}>취소</button>
+                            </>
+                          ) : (
+                            <button style={S.photoMenuItemDanger} onClick={() => setConfirmDeleteId(p.id)}>🗑️ 사진 삭제</button>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -209,17 +252,6 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
               </div>
             )}
           </>
-        )}
-        {canPost && !compact && (
-          <div style={S.addRow}>
-            <button
-              style={{ ...S.addBtn, opacity: (uploadingPhoto || batchUploading) ? 0.6 : 1 }}
-              onClick={() => photoInputRef.current?.click()}
-              disabled={uploadingPhoto || !!batchUploading}
-            >
-              {batchUploading ? `${batchUploading.done}/${batchUploading.total} 업로드 중...` : uploadingPhoto ? '업로드 중...' : '📷 사진 등록'}
-            </button>
-          </div>
         )}
         {canPost && compact && batchUploading && (
           <p style={S.batchStatusCompact}>{batchUploading.done}/{batchUploading.total} 업로드 중...</p>
@@ -243,10 +275,14 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
         {!compact && (
           <div style={S.header}>
             <span style={S.title}>한마디 남기기</span>
-            <span style={S.count}>{comments.length}개</span>
+            <span style={S.count}>{restricted ? commentCount : comments.length}개</span>
           </div>
         )}
         <div style={S.commentsList}>
+          {restricted ? (
+            <p style={S.empty}>{commentCount > 0 ? '참여하면 코멘트를 볼 수 있어요.' : '아직 한마디도 없어요.'}</p>
+          ) : (
+            <>
           {comments.length === 0 && !compact && <p style={S.empty}>아직 한마디도 없어요.</p>}
           {comments.map(c => (
             <div key={c.id} style={S.commentItem}>
@@ -298,6 +334,8 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
               )}
             </div>
           ))}
+            </>
+          )}
         </div>
         {canPost && (
           <div style={{ ...S.commentInputRow, ...(compact ? S.commentInputRowCompact : {}) }}>
@@ -345,6 +383,7 @@ const S = {
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
   title: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   count: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  countInline: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   empty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
 
   /* Photos — SNS 스타일 풀폭 캐러셀 (밥팟 상세/모먼트 공용) */
@@ -356,6 +395,11 @@ const S = {
   dotActive: { width: 14, background: 'var(--color-primary)' },
 
   photoMenuWrap: { position: 'absolute', top: 8, right: 8 },
+  photoUploaderChip: {
+    position: 'absolute', bottom: 8, right: 8, maxWidth: 'calc(100% - 16px)', overflow: 'hidden', textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap', padding: '3px 9px', background: 'rgba(0,0,0,0.5)', color: '#fff',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 600, borderRadius: 'var(--radius-full)',
+  },
   photoEditBtn: {
     width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.5)',
     color: '#fff', fontSize: 15, fontWeight: 900, cursor: 'pointer', display: 'flex',
@@ -379,8 +423,10 @@ const S = {
   },
   photoMenuConfirmText: { padding: '8px 12px 2px', fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
 
-  addRow: { marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
-  addBtn: { width: '100%', padding: 10, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
+  addBtnInline: {
+    flexShrink: 0, whiteSpace: 'nowrap', padding: '6px 12px', background: 'var(--color-surface-2)', color: 'var(--color-text)',
+    border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 600, cursor: 'pointer',
+  },
   batchStatusCompact: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', textAlign: 'center', margin: '4px 0 0' },
 
   /* Comments */

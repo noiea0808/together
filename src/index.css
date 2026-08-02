@@ -14,6 +14,14 @@
   font-display: swap;
 }
 
+@font-face {
+  font-family: 'Pretendard';
+  src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/Pretendard-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* ===== 디자인 토큰 ===== */
 :root {
   --color-primary: #FF6B35;
@@ -85,6 +93,13 @@
   --header-height: 56px;
   --header-padding-x: 20px;
   --header-padding-x-narrow: 16px;
+
+  /* Android WebView는 env(safe-area-inset-*)가 디스플레이 컷아웃에만 반응하고 상태바/내비게이션
+     바 높이는 반영하지 않는다(iOS Safari와 다른 부분이라 targetSdk 35+ 엣지투엣지에서 상단/하단이
+     시스템 바에 가려짐). 그래서 실제 사용처는 전부 이 변수를 참조하게 하고, 네이티브 쪽
+     (android/.../MainActivity.java)에서 Android일 때만 실측 인셋 px로 덮어쓴다. iOS/웹은 env() 그대로. */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
 }
 
 /* ===== 기본 타이포 & 바디 ===== */
@@ -184,12 +199,20 @@ img {
   from { transform: translateX(-28px); opacity: 0; }
   to   { transform: translateX(0);     opacity: 1; }
 }
+/* 온보딩 가이드 페이지 전환 — 스샷/아이콘, 제목, 본문이 순서대로 살며시 떠오르는 느낌 */
+/* to에서 transform/filter를 실제 none으로 되돌려야 애니메이션이 끝난 뒤에도 해당 요소가
+   fixed 포지션 자식(모달 등)의 containing block으로 눌러앉는 걸 막을 수 있다.
+   translateY(0) 같은 "no-op" 값도 non-none이라 그 문제가 그대로 발생한다. */
+@keyframes guideItemRise {
+  from { transform: translateY(16px); opacity: 0; filter: blur(3px); }
+  to   { transform: none; opacity: 1; filter: none; }
+}
 
 /* ===== 공통 유틸 ===== */
 .page {
   flex: 1;
   padding: var(--spacing-md);
-  padding-bottom: calc(var(--spacing-xl) + env(safe-area-inset-bottom));
+  padding-bottom: calc(var(--spacing-xl) + var(--safe-area-inset-bottom));
 }
 
 .card {
@@ -277,7 +300,7 @@ button:not(:disabled):active, [role="button"]:active {
   flex-shrink: 0;
   overflow: hidden;
   box-sizing: border-box;
-  transition: height 0.22s ease, opacity 0.18s ease, border-color 0.18s ease;
+  transition: height 0.22s ease, padding-top 0.22s ease, opacity 0.18s ease, border-color 0.18s ease;
 }
 
 .app-header__left { display: flex; align-items: center; justify-content: flex-start; min-width: 0; }
@@ -295,7 +318,7 @@ button:not(:disabled):active, [role="button"]:active {
   text-overflow: ellipsis;
 }
 
-.app-header__brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.app-header__brand { display: flex; align-items: flex-end; gap: 8px; min-width: 0; }
 .app-header__brand-label {
   font-family: var(--font-title);
   font-weight: 700;

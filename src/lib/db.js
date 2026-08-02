@@ -1076,11 +1076,15 @@ export async function cancelPotInvitation(invitationId, userId) {
 
 // ── 알림함 ──────────────────────────────────────────
 // 날짜/그룹/밥팟 제목을 함께 보여주기 위해 밥팟·그룹 정보를 조인해서 가져온다.
+// lunch_reminder는 그날 상태를 정하라는 당일 한정 넛지라 하루 지나면 다시 볼 이유가 없고,
+// 알림함 배지 매핑(NotificationsPage의 EVENT_META)에도 없어 어중간하게 보인다. insert 자체는
+// (실시간 토스트가 이 테이블 INSERT를 구독하므로) 그대로 두고, 알림함 목록/뱃지에서만 뺀다.
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
     .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name))')
     .eq('user_id', userId)
+    .neq('event_type', 'lunch_reminder')
     .order('created_at', { ascending: false })
     .limit(limit)
   if (error) throw error
@@ -1093,6 +1097,7 @@ export async function getUnreadNotificationCount(userId) {
     .select('id', { count: 'exact', head: true })
     .eq('user_id', userId)
     .eq('is_read', false)
+    .neq('event_type', 'lunch_reminder')
   if (error) throw error
   return count ?? 0
 }
@@ -1514,6 +1519,16 @@ export async function getPotComments(potId) {
   return data
 }
 
+// 참여 전 '참여자만' 범위 밥팟은 내용은 안 주고 개수만 보여줘야 하는데, pot_comments의
+// SELECT RLS(add_moment_scope.sql)가 비참여자에겐 행 자체를 안 내려줘서 일반 select로는
+// head:true를 써도 0만 나온다. RLS를 우회하는 RPC(scripts/add_pot_content_counts.sql)로
+// 개수만 따로 받아온다.
+export async function getPotCommentsCount(potId) {
+  const { data, error } = await supabase.rpc('get_pot_comments_count', { p_pot_id: potId })
+  if (error) throw error
+  return data ?? 0
+}
+
 export async function addPotComment(potId, userId, content) {
   const trimmed = content.trim()
   const { data, error } = await supabase
@@ -1550,6 +1565,14 @@ export async function getPotPhotos(potId) {
     .order('created_at', { ascending: true })
   if (error) throw error
   return data
+}
+
+// getPotCommentsCount와 동일한 이유로 RPC를 쓴다 — '참여자만' 범위에서 참여 전엔 RLS가
+// pot_photos 행 자체를 안 내려줘서 일반 select로는 개수도 못 센다.
+export async function getPotPhotosCount(potId) {
+  const { data, error } = await supabase.rpc('get_pot_photos_count', { p_pot_id: potId })
+  if (error) throw error
+  return data ?? 0
 }
 
 // blob: PhotoAdjustModal에서 정사각형으로 잘라 재인코딩한 JPEG 이미지
