@@ -21,6 +21,7 @@ import GroupSetupPage from './pages/GroupSetupPage'
 import GroupSettingsPage from './pages/GroupSettingsPage'
 import JoinPage from './pages/JoinPage'
 import NotificationsPage from './pages/NotificationsPage'
+import PrivacyPolicyPage from './pages/PrivacyPolicyPage'
 import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
@@ -103,6 +104,7 @@ function ConsumerRoutes() {
     <Routes>
       <Route path="/onboarding" element={!user ? <OnboardingPage /> : <Navigate to={user.onboarded ? '/today' : '/welcome'} replace />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/privacy" element={<PrivacyPolicyPage />} />
       <Route path="/welcome" element={!user ? <Navigate to="/onboarding" replace /> : (user.onboarded ? <Navigate to="/today" replace /> : <ProfileSetupPage />)} />
       <Route path="/today"    element={auth(user?.is_guest ? <GuestHomePage /> : <TodayPage />)} />
       <Route path="/schedule" element={guestSafe(<MySchedulePage />)} />
