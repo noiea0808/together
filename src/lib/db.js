@@ -382,6 +382,37 @@ export async function updateGroupName(groupId, name) {
   if (error) throw error
 }
 
+// 그룹 이름 검색(4자 이상, 부분일치) — 검색 허용(allow_search)된 그룹만, 이름+멤버수만 반환.
+// scripts/add_group_search.sql의 SECURITY DEFINER 함수를 거친다 (비밀번호 해시는 노출되지 않음).
+export async function searchGroups(query) {
+  const { data, error } = await supabase.rpc('search_groups', { p_query: query })
+  if (error) throw error
+  return data
+}
+
+// 방장이 그룹 설정 시트에서 검색 허용 상태를 확인. 비밀번호 자체는 내려받지 않고 설정 여부만 확인.
+export async function getGroupSearchSettings(groupId) {
+  const { data, error } = await supabase.rpc('get_group_search_settings', { p_group_id: groupId })
+  if (error) throw error
+  return data?.[0] ?? { allow_search: false, has_password: false }
+}
+
+export async function setGroupPassword(groupId, password) {
+  const { error } = await supabase.rpc('set_group_password', { p_group_id: groupId, p_password: password })
+  if (error) throw error
+}
+
+export async function setGroupAllowSearch(groupId, allow) {
+  const { error } = await supabase.rpc('set_group_allow_search', { p_group_id: groupId, p_allow: allow })
+  if (error) throw error
+}
+
+// 검색으로 찾은 그룹에 비밀번호로 참여. 실패 시 RPC가 던지는 한국어 에러 메시지를 그대로 노출한다.
+export async function joinGroupByPassword(groupId, password) {
+  const { error } = await supabase.rpc('join_group_by_password', { p_group_id: groupId, p_password: password })
+  if (error) throw error
+}
+
 export async function leaveGroup(groupId, userId) {
   const { error } = await supabase
     .from('group_members')

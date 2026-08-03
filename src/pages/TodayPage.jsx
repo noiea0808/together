@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend, getPublicOrigin } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
@@ -12,7 +12,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon } from '../components/GroupIcons'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon, SearchIcon, LockIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import PotIcon from '../components/PotIcon'
@@ -1538,6 +1538,59 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
 
+  // 그룹 검색 허용 + 비밀번호 (방장 전용) — 켜려면 비밀번호가 먼저 설정돼 있어야 함
+  const [showSearchSettings, setShowSearchSettings] = useState(false)
+  const [searchSettingsLoading, setSearchSettingsLoading] = useState(false)
+  const [searchAllow, setSearchAllow] = useState(false)
+  const [searchHasPassword, setSearchHasPassword] = useState(false)
+  const [searchPasswordInput, setSearchPasswordInput] = useState('')
+  const [searchSettingsSaving, setSearchSettingsSaving] = useState(false)
+  const [searchSettingsError, setSearchSettingsError] = useState(null)
+
+  useEffect(() => {
+    if (!showSearchSettings) return
+    setSearchSettingsLoading(true)
+    setSearchSettingsError(null)
+    getGroupSearchSettings(group.id)
+      .then(s => { setSearchAllow(s.allow_search); setSearchHasPassword(s.has_password) })
+      .catch(() => setSearchSettingsError('불러오지 못했어요.'))
+      .finally(() => setSearchSettingsLoading(false))
+  }, [showSearchSettings, group.id])
+
+  const handleToggleAllowSearch = async () => {
+    if (searchSettingsSaving) return
+    const next = !searchAllow
+    if (next && !searchHasPassword) {
+      setSearchSettingsError('먼저 비밀번호를 설정해주세요')
+      return
+    }
+    setSearchSettingsSaving(true)
+    setSearchSettingsError(null)
+    try {
+      await setGroupAllowSearch(group.id, next)
+      setSearchAllow(next)
+    } catch (e) {
+      setSearchSettingsError(e.message || '저장하지 못했어요.')
+    } finally {
+      setSearchSettingsSaving(false)
+    }
+  }
+
+  const handleSaveSearchPassword = async () => {
+    if (searchSettingsSaving || searchPasswordInput.trim().length < 4) return
+    setSearchSettingsSaving(true)
+    setSearchSettingsError(null)
+    try {
+      await setGroupPassword(group.id, searchPasswordInput.trim())
+      setSearchHasPassword(true)
+      setSearchPasswordInput('')
+    } catch (e) {
+      setSearchSettingsError(e.message || '저장하지 못했어요.')
+    } finally {
+      setSearchSettingsSaving(false)
+    }
+  }
+
   // 그룹 초대하기 — 친구 선택(내 다른 그룹 멤버) / 초대 코드 / 링크
   const [inviteTab, setInviteTab] = useState('friend')
   const [inviteFriends, setInviteFriends] = useState([])
@@ -1626,7 +1679,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   }
 
   // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showInvite || confirmRemoveMember || proposeTarget))
+  useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showSearchSettings || showInvite || confirmRemoveMember || proposeTarget))
 
   // 참여 중인 슬롯은 무조건 공유 상태라 끌 수 없다 — 시도하면 이유를 토스트로 알려주고 끝낸다.
   // (정상적으로 토글이 적용됐을 때의 안내 토스트는 상위 handleToggleShare가 띄운다)
@@ -1641,7 +1694,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const isMaster = group.created_by === myUserId
 
   const handleSaveName = async () => {
-    if (!nameValue.trim()) return
+    if (nameValue.trim().length < 4) return
     await updateGroupName(group.id, nameValue.trim())
     setEditingName(false)
     setShowSettings(false)
@@ -1800,7 +1853,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
       {/* 그룹 설정 바텀시트 */}
       {showSettings && (
-        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowInvite(false) }}>
+        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowSearchSettings(false); setShowInvite(false) }}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
 
             {/* 타이틀 */}
@@ -1846,6 +1899,15 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               </button>
             )}
 
+            {/* 3.5 그룹 검색 허용 (방장만) */}
+            {isMaster && (
+              <button style={styles.sheetRow} onClick={() => setShowSearchSettings(true)}>
+                <span style={styles.sheetRowIcon}><SearchIcon size={17} /></span>
+                <span style={styles.sheetRowLabel}>그룹 검색 허용</span>
+                <span style={styles.sheetRowChevron}>›</span>
+              </button>
+            )}
+
             {/* 4. 기본 밥팟 추가 */}
             <button style={styles.sheetRow} onClick={() => { setShowSettings(false); onNavigate(`/group/${group.id}/settings`) }}>
               <span style={styles.sheetRowIcon}><RiceBowlIcon size={18} /></span>
@@ -1886,10 +1948,10 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               maxLength={20}
               autoFocus
               onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-              placeholder="새 그룹명"
+              placeholder="새 그룹명 (4자 이상)"
             />
             <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleSaveName}>저장</button>
+              <button style={{ ...styles.dialogBtnPrimary, opacity: nameValue.trim().length >= 4 ? 1 : 0.4 }} onClick={handleSaveName} disabled={nameValue.trim().length < 4}>저장</button>
               <button style={styles.dialogBtnCancel} onClick={() => { setEditingName(false); setNameValue(group.name) }}>취소</button>
             </div>
           </div>
@@ -1955,6 +2017,65 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               ))}
             </div>
             <button style={styles.dialogBtnCancel} onClick={() => setShowMemberManage(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+
+      {/* 그룹 검색 허용 팝업 (방장 전용) */}
+      {showSearchSettings && (
+        <div style={styles.overlay} onClick={() => setShowSearchSettings(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={styles.dialogIconBadge}><SearchIcon size={22} /></div>
+            <div style={styles.dialogTitle}>그룹 검색 허용</div>
+            <p style={styles.dialogDesc}>켜면 그룹 이름 검색으로 누구나 찾을 수 있어요.{'\n'}참여하려면 비밀번호를 입력해야 해요.</p>
+
+            {searchSettingsLoading ? (
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+            ) : (
+              <>
+                <div style={styles.searchToggleRow}>
+                  <button
+                    style={{ ...styles.searchToggleBtn, ...(!searchAllow ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => searchAllow && handleToggleAllowSearch()}
+                    disabled={searchSettingsSaving}
+                  >
+                    허용 안 함
+                  </button>
+                  <button
+                    style={{ ...styles.searchToggleBtn, ...(searchAllow ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => !searchAllow && handleToggleAllowSearch()}
+                    disabled={searchSettingsSaving}
+                  >
+                    허용
+                  </button>
+                </div>
+
+                <div style={styles.searchPasswordRow}>
+                  <LockIcon size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                  <input
+                    style={styles.searchPasswordInput}
+                    type="password"
+                    placeholder={searchHasPassword ? '비밀번호 변경 (4자 이상)' : '비밀번호 설정 (4자 이상)'}
+                    value={searchPasswordInput}
+                    onChange={e => setSearchPasswordInput(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && handleSaveSearchPassword()}
+                    disabled={searchSettingsSaving}
+                  />
+                  <button
+                    style={{ ...styles.searchPasswordSaveBtn, opacity: searchPasswordInput.trim().length >= 4 ? 1 : 0.4 }}
+                    onClick={handleSaveSearchPassword}
+                    disabled={searchPasswordInput.trim().length < 4 || searchSettingsSaving}
+                  >
+                    저장
+                  </button>
+                </div>
+                {searchHasPassword && <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요</p>}
+              </>
+            )}
+
+            {searchSettingsError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{searchSettingsError}</p>}
+
+            <button style={styles.dialogBtnCancel} onClick={() => setShowSearchSettings(false)}>닫기</button>
           </div>
         </div>
       )}
@@ -2495,6 +2616,14 @@ const styles = {
   memberManageList: { width: '100%', display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' },
 
   dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+
+  searchToggleRow: { display: 'flex', width: '100%', gap: 6 },
+  searchToggleBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  searchToggleBtnActive: { border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)', color: 'var(--color-primary)', fontWeight: 700 },
+  searchPasswordRow: { width: '100%', display: 'flex', alignItems: 'center', gap: 6 },
+  searchPasswordInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  searchPasswordSaveBtn: { flexShrink: 0, padding: '10px 14px', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  searchPasswordHint: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', margin: 0 },
 
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },

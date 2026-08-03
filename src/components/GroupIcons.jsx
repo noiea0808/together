@@ -68,6 +68,24 @@ export function LogOutIcon(props) {
   )
 }
 
+export function LockIcon(props) {
+  return (
+    <IconBase {...props}>
+      <rect x="4.5" y="10.5" width="15" height="10" rx="2" />
+      <path d="M7.5 10.5V7a4.5 4.5 0 0 1 9 0v3.5" />
+    </IconBase>
+  )
+}
+
+export function SearchIcon(props) {
+  return (
+    <IconBase {...props}>
+      <circle cx="11" cy="11" r="7" />
+      <line x1="21" y1="21" x2="16.65" y2="16.65" />
+    </IconBase>
+  )
+}
+
 export function CrownIcon(props) {
   return (
     <IconBase {...props} strokeWidth={props.strokeWidth ?? 1.6}>
