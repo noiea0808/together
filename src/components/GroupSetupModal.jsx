@@ -164,7 +164,7 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
 
         {tab === 'create' && (
           <>
-            <p style={styles.dialogDesc}>팀/친구 그룹 이름을 입력하세요 (4자 이상)</p>
+            <p style={styles.dialogDesc}>팀/친구 그룹 이름을 입력하세요{'\n'}(4자 이상)</p>
             <input
               style={styles.input}
               placeholder="예: 개발팀, 대학 친구들"
@@ -214,7 +214,9 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
               {!searching && searchResults.map(g => (
                 <button key={g.id} style={styles.searchResultRow} onClick={() => openPasswordPrompt(g)}>
                   <span style={styles.searchResultName}>{g.name}</span>
-                  <span style={styles.searchResultCount}>멤버 {g.member_count}명</span>
+                  <span style={styles.searchResultCount}>
+                    멤버 {g.member_count}명{g.owner_nickname ? ` · 방장 ${g.owner_nickname}` : ''}
+                  </span>
                 </button>
               ))}
             </div>

@@ -28,9 +28,13 @@ CREATE TABLE IF NOT EXISTS group_join_attempts (
 ALTER TABLE group_join_attempts ENABLE ROW LEVEL SECURITY;
 
 -- 3) 검색 — allow_search=true인 그룹만, 이름 부분일치, 내가 이미 속한 그룹은 제외.
--- 이름/멤버수만 반환하고 비밀번호 설정 여부조차 알려주지 않는다.
+-- 이름/멤버수/방장 닉네임만 반환하고 비밀번호 설정 여부조차 알려주지 않는다.
+-- 동명 그룹을 구분할 단서로 방장 닉네임을 보여준다 (완전 동일 이름을 막는 대신 택한 방식).
+-- 리턴 컬럼이 바뀌면 CREATE OR REPLACE로 덮어쓸 수 없어서 먼저 지운다.
+DROP FUNCTION IF EXISTS public.search_groups(TEXT);
+
 CREATE OR REPLACE FUNCTION public.search_groups(p_query TEXT)
-RETURNS TABLE(id UUID, name TEXT, member_count BIGINT)
+RETURNS TABLE(id UUID, name TEXT, member_count BIGINT, owner_nickname TEXT)
 LANGUAGE plpgsql
 SECURITY DEFINER
 STABLE
@@ -45,15 +49,16 @@ BEGIN
   END IF;
 
   RETURN QUERY
-  SELECT g.id, g.name, count(gm2.user_id) AS member_count
+  SELECT g.id, g.name, count(gm2.user_id) AS member_count, u.nickname AS owner_nickname
   FROM groups g
   JOIN group_search_settings s ON s.group_id = g.id AND s.allow_search = true
   LEFT JOIN group_members gm2 ON gm2.group_id = g.id
+  LEFT JOIN users u ON u.id = g.created_by
   WHERE g.name ILIKE '%' || q || '%'
     AND NOT EXISTS (
       SELECT 1 FROM group_members gm WHERE gm.group_id = g.id AND gm.user_id = me
     )
-  GROUP BY g.id, g.name
+  GROUP BY g.id, g.name, u.nickname
   ORDER BY g.name
   LIMIT 20;
 END;

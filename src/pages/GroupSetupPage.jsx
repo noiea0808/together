@@ -178,7 +178,7 @@ export default function GroupSetupPage() {
       <div style={styles.card}>
         {tab === 'create' && (
           <>
-            <p style={styles.desc}>팀/친구 그룹 이름을 입력하세요 (4자 이상)</p>
+            <p style={styles.desc}>팀/친구 그룹 이름을 입력하세요{'\n'}(4자 이상)</p>
             <input
               style={styles.input}
               placeholder="예: 개발팀, 대학 친구들"
@@ -244,7 +244,9 @@ export default function GroupSetupPage() {
               {!searching && searchResults.map(g => (
                 <button key={g.id} style={styles.searchResultRow} onClick={() => openPasswordPrompt(g)}>
                   <span style={styles.searchResultName}>{g.name}</span>
-                  <span style={styles.searchResultCount}>멤버 {g.member_count}명</span>
+                  <span style={styles.searchResultCount}>
+                    멤버 {g.member_count}명{g.owner_nickname ? ` · 방장 ${g.owner_nickname}` : ''}
+                  </span>
                 </button>
               ))}
             </div>
@@ -288,7 +290,7 @@ const styles = {
     padding: 'var(--spacing-lg)', boxShadow: 'var(--shadow-md)',
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)',
   },
-  desc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' },
+  desc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line' },
   input: {
     width: '100%', padding: '14px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
