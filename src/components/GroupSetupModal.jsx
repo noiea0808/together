@@ -6,10 +6,10 @@ import { UsersIcon, UserPlusIcon, SearchIcon, LockIcon } from './GroupIcons'
 import GroupInviteShare from './GroupInviteShare'
 
 const MIN_NAME_LENGTH = 4
-const MIN_SEARCH_LENGTH = 4
+const MIN_SEARCH_LENGTH = 3
 
 export default function GroupSetupModal({ userId, onClose, onDone }) {
-  const [tab, setTab] = useState('create') // 'create' | 'join' | 'search'
+  const [tab, setTab] = useState('search') // 'search' | 'create' | 'join'
   const [groupName, setGroupName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -148,17 +148,17 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
     <div style={styles.overlay} onClick={onClose}>
       <div style={styles.dialog} onClick={e => e.stopPropagation()}>
         <div style={styles.iconBadge}><UsersIcon size={26} /></div>
-        <div style={styles.dialogTitle}>그룹 만들기 / 참여하기</div>
+        <div style={styles.dialogTitle}>그룹 참여하기 / 만들기</div>
 
         <div style={styles.tabs}>
+          <button style={{ ...styles.tab, ...(tab === 'search' ? styles.tabActive : {}) }} onClick={() => switchTab('search')}>
+            <SearchIcon size={15} /> 검색
+          </button>
           <button style={{ ...styles.tab, ...(tab === 'create' ? styles.tabActive : {}) }} onClick={() => switchTab('create')}>
             <UsersIcon size={15} /> 만들기
           </button>
           <button style={{ ...styles.tab, ...(tab === 'join' ? styles.tabActive : {}) }} onClick={() => switchTab('join')}>
             <UserPlusIcon size={15} /> 초대코드
-          </button>
-          <button style={{ ...styles.tab, ...(tab === 'search' ? styles.tabActive : {}) }} onClick={() => switchTab('search')}>
-            <SearchIcon size={15} /> 검색
           </button>
         </div>
 
@@ -196,7 +196,7 @@ export default function GroupSetupModal({ userId, onClose, onDone }) {
 
         {tab === 'search' && (
           <>
-            <p style={styles.dialogDesc}>그룹 이름을 4자 이상 입력하세요</p>
+            <p style={styles.dialogDesc}>그룹 이름을 3자 이상 입력하세요</p>
             <input
               style={styles.input}
               placeholder="그룹 이름"

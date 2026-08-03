@@ -119,6 +119,13 @@ function addDays(date, n) {
 }
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
+// 드래그 도중 텍스트가 선택됐는지 — 마우스로 천천히/빠르게 텍스트를 드래그해도, 실제로 글자가
+// 선택돼 있으면 스와이프 제스처가 아니라 텍스트 선택 시도였다고 판단해 내비게이션을 건너뛴다.
+function isTextBeingSelected() {
+  const selection = window.getSelection?.()
+  return !!selection && selection.toString().length > 0
+}
+
 function sortPots(pots) {
   const byTime = (a, b) => a.meal_time.localeCompare(b.meal_time)
   return [
@@ -168,13 +175,17 @@ export default function TodayPage() {
   // 카드 전체가 탭 영역(편집 팝업 열기)이 된 뒤로는, 드래그가 클릭으로 이어져 편집 팝업이
   // 실수로 열리지 않도록 드래그 여부를 기록해뒀다가 onClick에서 건너뛴다.
   const cardWasDragged = useRef(false)
-  const handleCardSwipeStart = (e) => { e.stopPropagation(); swipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleCardSwipeStart = (e) => {
+    e.stopPropagation()
+    swipeStart.current = { x: e.clientX, y: e.clientY }
+  }
   const handleCardSwipeEnd = (e) => {
     if (!swipeStart.current) return
     e.stopPropagation()
     const dx = e.clientX - swipeStart.current.x
     const dy = e.clientY - swipeStart.current.y
     swipeStart.current = null
+    if (isTextBeingSelected()) return // 텍스트를 드래그로 선택한 경우 — 속도와 무관하게 스와이프로 취급하지 않는다
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
     cardWasDragged.current = true
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
@@ -195,12 +206,15 @@ export default function TodayPage() {
 
   // 메인 상태 카드를 제외한 나머지 화면 영역 스와이프 — 전후 날짜로 이동
   const pageSwipeStart = useRef(null)
-  const handlePageSwipeStart = (e) => { pageSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handlePageSwipeStart = (e) => {
+    pageSwipeStart.current = { x: e.clientX, y: e.clientY }
+  }
   const handlePageSwipeEnd = (e) => {
     if (!pageSwipeStart.current) return
     const dx = e.clientX - pageSwipeStart.current.x
     const dy = e.clientY - pageSwipeStart.current.y
     pageSwipeStart.current = null
+    if (isTextBeingSelected()) return // 텍스트를 드래그로 선택한 경우 — 속도와 무관하게 스와이프로 취급하지 않는다
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return
     goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
@@ -965,7 +979,7 @@ export default function TodayPage() {
               그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
             </p>
             <button style={styles.emptyBtn} onClick={() => setShowGroupSetup(true)}>
-              그룹 만들기 / 참여하기
+              그룹 참여하기 / 만들기
             </button>
           </div>
         )}
@@ -1007,7 +1021,7 @@ export default function TodayPage() {
         </div>
 
         <div style={styles.secondaryLinkRow}>
-          <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 참여하기 / 만들기</button>
           <span style={styles.secondaryLinkDivider}>·</span>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 밥팟 참여</button>
         </div>
@@ -1538,10 +1552,13 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
 
-  // 그룹 검색 허용 + 비밀번호 (방장 전용) — 켜려면 비밀번호가 먼저 설정돼 있어야 함
+  // 그룹 검색 허용 + 비밀번호 (방장 전용) — 켜려면 비밀번호가 먼저 설정돼 있어야 함.
+  // searchSelected는 "허용/허용 안 함" 중 화면에 선택 표시된 쪽 — 비밀번호가 아직 없는 상태에서
+  // "허용"을 누르면 곧바로 저장하지 않고 우선 선택만 표시하고 비밀번호 입력칸을 펼친다.
   const [showSearchSettings, setShowSearchSettings] = useState(false)
   const [searchSettingsLoading, setSearchSettingsLoading] = useState(false)
   const [searchAllow, setSearchAllow] = useState(false)
+  const [searchSelected, setSearchSelected] = useState(false)
   const [searchHasPassword, setSearchHasPassword] = useState(false)
   const [searchPasswordInput, setSearchPasswordInput] = useState('')
   const [searchSettingsSaving, setSearchSettingsSaving] = useState(false)
@@ -1552,18 +1569,12 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
     setSearchSettingsLoading(true)
     setSearchSettingsError(null)
     getGroupSearchSettings(group.id)
-      .then(s => { setSearchAllow(s.allow_search); setSearchHasPassword(s.has_password) })
+      .then(s => { setSearchAllow(s.allow_search); setSearchSelected(s.allow_search); setSearchHasPassword(s.has_password) })
       .catch(() => setSearchSettingsError('불러오지 못했어요.'))
       .finally(() => setSearchSettingsLoading(false))
   }, [showSearchSettings, group.id])
 
-  const handleToggleAllowSearch = async () => {
-    if (searchSettingsSaving) return
-    const next = !searchAllow
-    if (next && !searchHasPassword) {
-      setSearchSettingsError('먼저 비밀번호를 설정해주세요')
-      return
-    }
+  const persistAllowSearch = async (next) => {
     setSearchSettingsSaving(true)
     setSearchSettingsError(null)
     try {
@@ -1571,9 +1582,19 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       setSearchAllow(next)
     } catch (e) {
       setSearchSettingsError(e.message || '저장하지 못했어요.')
+      setSearchSelected(searchAllow) // 실패하면 선택 표시를 실제 저장된 상태로 되돌림
     } finally {
       setSearchSettingsSaving(false)
     }
+  }
+
+  const selectAllowSearch = (next) => {
+    if (searchSettingsSaving || searchSelected === next) return
+    setSearchSettingsError(null)
+    setSearchSelected(next)
+    // 켜는 경우인데 비밀번호가 아직 없으면, 저장은 비밀번호 입력 후로 미루고 선택 표시만 바꾼다.
+    if (next && !searchHasPassword) return
+    persistAllowSearch(next)
   }
 
   const handleSaveSearchPassword = async () => {
@@ -1584,6 +1605,10 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       await setGroupPassword(group.id, searchPasswordInput.trim())
       setSearchHasPassword(true)
       setSearchPasswordInput('')
+      if (searchSelected && !searchAllow) {
+        await setGroupAllowSearch(group.id, true)
+        setSearchAllow(true)
+      }
     } catch (e) {
       setSearchSettingsError(e.message || '저장하지 못했어요.')
     } finally {
@@ -2035,41 +2060,49 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               <>
                 <div style={styles.searchToggleRow}>
                   <button
-                    style={{ ...styles.searchToggleBtn, ...(!searchAllow ? styles.searchToggleBtnActive : {}) }}
-                    onClick={() => searchAllow && handleToggleAllowSearch()}
+                    style={{ ...styles.searchToggleBtn, ...(!searchSelected ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => selectAllowSearch(false)}
                     disabled={searchSettingsSaving}
                   >
                     허용 안 함
                   </button>
                   <button
-                    style={{ ...styles.searchToggleBtn, ...(searchAllow ? styles.searchToggleBtnActive : {}) }}
-                    onClick={() => !searchAllow && handleToggleAllowSearch()}
+                    style={{ ...styles.searchToggleBtn, ...(searchSelected ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => selectAllowSearch(true)}
                     disabled={searchSettingsSaving}
                   >
                     허용
                   </button>
                 </div>
 
-                <div style={styles.searchPasswordRow}>
-                  <LockIcon size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
-                  <input
-                    style={styles.searchPasswordInput}
-                    type="password"
-                    placeholder={searchHasPassword ? '비밀번호 변경 (4자 이상)' : '비밀번호 설정 (4자 이상)'}
-                    value={searchPasswordInput}
-                    onChange={e => setSearchPasswordInput(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && handleSaveSearchPassword()}
-                    disabled={searchSettingsSaving}
-                  />
-                  <button
-                    style={{ ...styles.searchPasswordSaveBtn, opacity: searchPasswordInput.trim().length >= 4 ? 1 : 0.4 }}
-                    onClick={handleSaveSearchPassword}
-                    disabled={searchPasswordInput.trim().length < 4 || searchSettingsSaving}
-                  >
-                    저장
-                  </button>
-                </div>
-                {searchHasPassword && <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요</p>}
+                {searchSelected && (
+                  <>
+                    <div style={styles.searchPasswordRow}>
+                      <LockIcon size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                      <input
+                        style={styles.searchPasswordInput}
+                        type="password"
+                        placeholder={searchHasPassword ? '비밀번호 변경 (4자 이상)' : '비밀번호 설정 (4자 이상)'}
+                        value={searchPasswordInput}
+                        onChange={e => setSearchPasswordInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSaveSearchPassword()}
+                        disabled={searchSettingsSaving}
+                      />
+                      <button
+                        style={{ ...styles.searchPasswordSaveBtn, opacity: searchPasswordInput.trim().length >= 4 ? 1 : 0.4 }}
+                        onClick={handleSaveSearchPassword}
+                        disabled={searchPasswordInput.trim().length < 4 || searchSettingsSaving}
+                      >
+                        저장
+                      </button>
+                    </div>
+                    {searchHasPassword ? (
+                      <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요</p>
+                    ) : (
+                      <p style={styles.searchPasswordHint}>비밀번호를 저장해야 검색 허용이 켜져요</p>
+                    )}
+                  </>
+                )}
               </>
             )}
 
@@ -2621,7 +2654,7 @@ const styles = {
   searchToggleBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
   searchToggleBtnActive: { border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)', color: 'var(--color-primary)', fontWeight: 700 },
   searchPasswordRow: { width: '100%', display: 'flex', alignItems: 'center', gap: 6 },
-  searchPasswordInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  searchPasswordInput: { flex: 1, minWidth: 0, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
   searchPasswordSaveBtn: { flexShrink: 0, padding: '10px 14px', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
   searchPasswordHint: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', margin: 0 },
 

@@ -8,12 +8,12 @@ import GroupInviteShare from '../components/GroupInviteShare'
 import { SearchIcon, LockIcon } from '../components/GroupIcons'
 
 const MIN_NAME_LENGTH = 4
-const MIN_SEARCH_LENGTH = 4
+const MIN_SEARCH_LENGTH = 3
 
 export default function GroupSetupPage() {
   const navigate = useNavigate()
   const { user } = useUser()
-  const [tab, setTab] = useState('create') // 'create' | 'join' | 'search'
+  const [tab, setTab] = useState('search') // 'search' | 'create' | 'join'
   const [groupName, setGroupName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -156,6 +156,12 @@ export default function GroupSetupPage() {
 
       <div style={styles.tabs}>
         <button
+          style={{ ...styles.tab, ...(tab === 'search' ? styles.tabActive : {}) }}
+          onClick={() => switchTab('search')}
+        >
+          <SearchIcon size={14} /> 검색
+        </button>
+        <button
           style={{ ...styles.tab, ...(tab === 'create' ? styles.tabActive : {}) }}
           onClick={() => switchTab('create')}
         >
@@ -166,12 +172,6 @@ export default function GroupSetupPage() {
           onClick={() => switchTab('join')}
         >
           초대 코드
-        </button>
-        <button
-          style={{ ...styles.tab, ...(tab === 'search' ? styles.tabActive : {}) }}
-          onClick={() => switchTab('search')}
-        >
-          <SearchIcon size={14} /> 검색
         </button>
       </div>
 
@@ -226,7 +226,7 @@ export default function GroupSetupPage() {
 
         {tab === 'search' && (
           <>
-            <p style={styles.desc}>그룹 이름을 4자 이상 입력하세요</p>
+            <p style={styles.desc}>그룹 이름을 3자 이상 입력하세요</p>
             <input
               style={styles.input}
               placeholder="그룹 이름"

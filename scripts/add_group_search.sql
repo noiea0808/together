@@ -1,4 +1,4 @@
--- 그룹 검색 기능: 이름 부분일치 검색(4자 이상) + 검색 허용 그룹은 비밀번호로만 참여
+-- 그룹 검색 기능: 이름 부분일치 검색(3자 이상) + 검색 허용 그룹은 비밀번호로만 참여
 -- Supabase SQL Editor에서 실행하세요. (멱등 — 여러 번 실행해도 안전)
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
@@ -40,7 +40,7 @@ DECLARE
   me UUID := public.app_current_user_id();
   q TEXT := trim(p_query);
 BEGIN
-  IF me IS NULL OR length(q) < 4 THEN
+  IF me IS NULL OR length(q) < 3 THEN
     RETURN;
   END IF;
 
@@ -78,11 +78,13 @@ GRANT EXECUTE ON FUNCTION public.get_group_search_settings(UUID) TO authenticate
 
 -- 5) 방장이 비밀번호를 설정/변경. 검색 허용을 끈 상태에서도 미리 설정해둘 수 있고,
 -- 다시 켤 때 새로 입력하지 않으면 기존 비밀번호가 그대로 유지된다.
+-- search_path에 extensions를 함께 잡는 이유: Supabase는 pgcrypto를 public이 아니라
+-- extensions 스키마에 설치하는 게 기본값이라, public만 잡으면 crypt/gen_salt를 못 찾는다.
 CREATE OR REPLACE FUNCTION public.set_group_password(p_group_id UUID, p_password TEXT)
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM groups WHERE id = p_group_id AND created_by = public.app_current_user_id()) THEN
@@ -135,7 +137,7 @@ CREATE OR REPLACE FUNCTION public.join_group_by_password(p_group_id UUID, p_pass
 RETURNS void
 LANGUAGE plpgsql
 SECURITY DEFINER
-SET search_path = public
+SET search_path = public, extensions
 AS $$
 DECLARE
   me UUID := public.app_current_user_id();
