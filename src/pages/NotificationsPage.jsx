@@ -34,6 +34,26 @@ const EVENT_META = {
 
 const DECLINE_REASON_PRESETS = ['선약이 있어요', '오늘은 혼자 먹을게요', '컨디션이 안 좋아요', '다음에 같이 해요']
 
+// event_type을 알림함 상단 분류 탭으로 묶는다. 여기 없는 타입(예: feedback_reply)은 '기타'로 빠진다.
+const CATEGORY_EVENT_TYPES = {
+  pot: ['join', 'leave', 'update', 'comment', 'invite', 'invite_new', 'invite_declined'],
+  friend: ['friend_request', 'friend_accepted'],
+  wish: ['wish_like', 'wish_comment', 'wish_mention'],
+}
+function getNotificationCategory(eventType) {
+  for (const [category, types] of Object.entries(CATEGORY_EVENT_TYPES)) {
+    if (types.includes(eventType)) return category
+  }
+  return 'etc'
+}
+const CATEGORY_TABS = [
+  { key: 'all', label: '전체' },
+  { key: 'pot', label: '밥팟' },
+  { key: 'friend', label: '친구' },
+  { key: 'wish', label: '위시' },
+  { key: 'etc', label: '기타' },
+]
+
 export default function NotificationsPage() {
   const navigate = useNavigate()
   const { user } = useUser()
@@ -45,6 +65,7 @@ export default function NotificationsPage() {
   const [conflict, setConflict] = useState(null) // { notification, otherPot }
   const [declineTarget, setDeclineTarget] = useState(null) // notification 대상
   const [declineReason, setDeclineReason] = useState('')
+  const [activeCategory, setActiveCategory] = useState('all')
 
   useEffect(() => {
     if (!user) return
@@ -133,6 +154,10 @@ export default function NotificationsPage() {
     await doAccept(conflict.notification)
   }
 
+  const filteredNotifications = activeCategory === 'all'
+    ? notifications
+    : notifications.filter(n => getNotificationCategory(n.event_type) === activeCategory)
+
   return (
     <div style={S.page}>
       <div style={S.header}>
@@ -140,6 +165,20 @@ export default function NotificationsPage() {
         <span style={S.headerTitle}>알림</span>
         <div style={{ width: 34 }} />
       </div>
+
+      {!loading && notifications.length > 0 && (
+        <div className="no-scrollbar" style={S.categoryTabRow}>
+          {CATEGORY_TABS.map(tab => (
+            <button
+              key={tab.key}
+              style={{ ...S.categoryTab, ...(activeCategory === tab.key ? S.categoryTabActive : {}) }}
+              onClick={() => setActiveCategory(tab.key)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div style={S.list}>
         {loading ? (
@@ -149,8 +188,13 @@ export default function NotificationsPage() {
             <div style={{ fontSize: 36, marginBottom: 8 }}>🔔</div>
             <p style={S.emptyText}>아직 받은 알림이 없어요.</p>
           </div>
+        ) : filteredNotifications.length === 0 ? (
+          <div style={S.emptyState}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🔔</div>
+            <p style={S.emptyText}>이 분류엔 알림이 없어요.</p>
+          </div>
         ) : (
-          notifications.map(n => {
+          filteredNotifications.map(n => {
             const meta = EVENT_META[n.event_type]
             const pot = n.meal_pots
             const inv = n.pot_invitations
@@ -284,6 +328,14 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0, lineHeight: 1,
   },
   headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+
+  categoryTabRow: { display: 'flex', gap: 6, padding: '10px 16px 0', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0 },
+  categoryTab: {
+    flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)',
+    background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)',
+    padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
+  },
+  categoryTabActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a10)', border: '1px solid var(--color-primary)' },
 
   list: { flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 40 },
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },

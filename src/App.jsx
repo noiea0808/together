@@ -30,6 +30,7 @@ import AdminApp from './pages/admin/AdminApp'
 import RiceBowlIcon from './components/RiceBowlIcon'
 import NotificationToast from './components/NotificationToast'
 import GroupInviteModal from './components/GroupInviteModal'
+import PushPermissionPrompt from './components/PushPermissionPrompt'
 import DailyTipModal from './components/DailyTipModal'
 import InAppBrowserGuard from './components/InAppBrowserGuard'
 import NativeDeepLinkHandler from './components/NativeDeepLinkHandler'
@@ -141,6 +142,7 @@ function ConsumerApp() {
           <HeaderConfigProvider>
             <NotificationToast />
             <GroupInviteModal />
+            <PushPermissionPrompt />
             <DailyTipModal />
             <ConsumerRoutes />
           </HeaderConfigProvider>

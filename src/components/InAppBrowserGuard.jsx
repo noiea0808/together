@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
-import { openInChromeAndroid } from '../lib/inAppBrowser'
+import { escapeInAppBrowserAndroid } from '../lib/inAppBrowser'
 
 // 카톡 등 인앱 브라우저 안에서는 안드로이드만 구글 로그인이 막힌다(403 disallowed_useragent).
 // iOS 인앱 브라우저는 구글 로그인이 정상 동작하는 것으로 확인돼 안내가 필요 없다.
@@ -11,15 +11,15 @@ export default function InAppBrowserGuard() {
   const [dismissed, setDismissed] = useState(false)
 
   useEffect(() => {
-    if (isInAppBrowser && isAndroid) openInChromeAndroid()
+    if (isInAppBrowser && isAndroid) escapeInAppBrowserAndroid()
   }, [isInAppBrowser, isAndroid])
 
   if (!isInAppBrowser || !isAndroid || dismissed) return null
 
   return (
     <div style={styles.banner}>
-      <span style={styles.text}>카톡 브라우저에서는 로그인이 안 돼요. Chrome으로 전환하고 있어요…</span>
-      <button style={styles.btn} onClick={openInChromeAndroid}>Chrome으로 열기</button>
+      <span style={styles.text}>카톡 브라우저에서는 로그인이 안 돼요. 앱 또는 Chrome으로 전환하고 있어요…</span>
+      <button style={styles.btn} onClick={escapeInAppBrowserAndroid}>밖에서 열기</button>
       <button style={styles.close} onClick={() => setDismissed(true)} aria-label="닫기">✕</button>
     </div>
   )

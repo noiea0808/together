@@ -2,6 +2,7 @@ import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
+import { takePendingRoute } from './pendingRoute'
 
 // 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
 // https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
@@ -75,16 +76,11 @@ export async function deleteAccount() {
 
 // OAuth 왕복 후 돌아올 경로. 그룹 초대 코드는 localStorage 대신 URL(/join/:code)에
 // 실어 나른다 — 카톡 인앱 ↔ 외부 브라우저 전환이나 OAuth 리다이렉트 과정에서 저장소가
-// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 기존 returnTo 방식 유지.
+// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 pendingRoute를 쓴다.
 function oauthReturnPath() {
   const invite = localStorage.getItem('pendingInviteCode')
   if (invite) return `/join/${invite}`
-  const returnTo = sessionStorage.getItem('returnTo')
-  if (returnTo) {
-    sessionStorage.removeItem('returnTo')
-    return returnTo
-  }
-  return '/today'
+  return takePendingRoute() ?? '/today'
 }
 
 // 네이티브 앱 안에서 WebView로 그대로 리다이렉트하면 구글이 403(disallowed_useragent)으로

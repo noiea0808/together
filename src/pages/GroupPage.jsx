@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getMyFriendRequests, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
@@ -117,17 +117,32 @@ export default function GroupPage() {
   const [realFriends, setRealFriends] = useState([]) // [{ requestId, id, nickname, avatar_url }] — 친구찾기로 맺어진 실제 친구
   const [confirmUnfriend, setConfirmUnfriend] = useState(false)
   const [unfriending, setUnfriending] = useState(false)
+  const [friendMenuOpen, setFriendMenuOpen] = useState(false)
 
-  // 친구가 아닌 그룹 멤버에게 수동으로 친구 요청 보내기
+  // 친구가 아닌 그룹 멤버에게 수동으로 친구 요청 보내기 — 로컬 state만으로는 다른 메뉴 갔다
+  // 오면(리마운트) 사라져서 '요청됨'이 도로 '친구하기'로 보이는 문제가 있었다.
+  // pending 요청은 서버 기준(getMyFriendRequests)으로 들고 있어야 새로고침/재방문에도 유지된다.
   const [sendingRequestId, setSendingRequestId] = useState(null)
-  const [sentRequestIds, setSentRequestIds] = useState(new Set())
+  const [pendingSentIds, setPendingSentIds] = useState(new Set()) // 내가 보낸 pending 요청 상대
+  const [pendingReceivedIds, setPendingReceivedIds] = useState(new Set()) // 상대가 나한테 보낸 pending 요청
+
+  const reloadFriendRequests = () =>
+    getMyFriendRequests()
+      .then(rows => {
+        setPendingSentIds(new Set(rows.filter(r => r.direction === 'sent').map(r => r.other_id)))
+        setPendingReceivedIds(new Set(rows.filter(r => r.direction === 'received').map(r => r.other_id)))
+      })
+      .catch(e => console.error(e))
+
   const handleSendFriendRequest = async (e, friendId) => {
     e.stopPropagation()
     if (sendingRequestId) return
     setSendingRequestId(friendId)
     try {
       await sendFriendRequest(user.id, friendId)
-      setSentRequestIds(prev => new Set(prev).add(friendId))
+      // 상대가 이미 나한테 pending 요청을 보내둔 상태였다면 이 호출로 바로 accepted가 되므로
+      // realFriends도 같이 새로고침해야 '친구' 표시(요청 버튼 사라짐)가 즉시 반영된다.
+      await Promise.all([reloadFriendRequests(), reloadRealFriends()])
     } catch (err) {
       console.error(err)
     } finally {
@@ -136,7 +151,7 @@ export default function GroupPage() {
   }
 
   const reloadRealFriends = () => getMyFriends().then(setRealFriends).catch(e => console.error(e))
-  useEffect(() => { reloadRealFriends() }, [user.id])
+  useEffect(() => { reloadRealFriends(); reloadFriendRequests() }, [user.id])
 
   const { friendIdsWithNewWish, markFriendsWishSeen, loaded: badgesLoaded } = useNavBadges()
   // 배지 데이터가 서버에서 도착한(loaded) 시점 값을 스냅샷으로 고정 — 이후 markFriendsWishSeen이
@@ -259,6 +274,7 @@ export default function GroupPage() {
     setFriendSheetTab('status')
     setOpenWishCommentsId(null)
     setNewWishCommentText('')
+    setFriendMenuOpen(false)
   }, [selectedFriendId])
 
   useEffect(() => {
@@ -519,11 +535,15 @@ export default function GroupPage() {
                   </div>
                   {!friend.requestId && (
                     <button
-                      style={{ ...styles.friendRequestBtn, opacity: sentRequestIds.has(friend.id) ? 0.6 : 1 }}
+                      style={{ ...styles.friendRequestBtn, ...(pendingSentIds.has(friend.id) ? styles.friendRequestBtnSent : {}) }}
                       onClick={e => handleSendFriendRequest(e, friend.id)}
-                      disabled={sendingRequestId === friend.id || sentRequestIds.has(friend.id)}
+                      disabled={sendingRequestId === friend.id || pendingSentIds.has(friend.id)}
                     >
-                      {sentRequestIds.has(friend.id) ? '요청됨' : sendingRequestId === friend.id ? '...' : '친구 요청'}
+                      {pendingSentIds.has(friend.id)
+                        ? '요청됨'
+                        : sendingRequestId === friend.id
+                        ? '...'
+                        : pendingReceivedIds.has(friend.id) ? '수락하기' : '친구하기'}
                     </button>
                   )}
                   {statusChips.length > 0 && (
@@ -559,6 +579,26 @@ export default function GroupPage() {
                   ))}
                 </div>
               </div>
+              {selectedFriend.requestId && (
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  <button style={styles.wishMoreBtn} onClick={() => setFriendMenuOpen(v => !v)} aria-label="더보기">
+                    <MoreHorizontalIcon size={18} />
+                  </button>
+                  {friendMenuOpen && (
+                    <>
+                      <div style={styles.menuBackdrop} onClick={() => setFriendMenuOpen(false)} />
+                      <div style={styles.wishMoreDropdown}>
+                        <button
+                          style={{ ...styles.wishMoreItem, color: 'var(--color-danger)' }}
+                          onClick={() => { setFriendMenuOpen(false); setConfirmUnfriend(true) }}
+                        >
+                          친구 해제
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
 
             <div style={styles.sheetDivider} />
@@ -777,9 +817,6 @@ export default function GroupPage() {
               </>
             )}
 
-            {selectedFriend.requestId && (
-              <button style={styles.unfriendBtn} onClick={() => setConfirmUnfriend(true)}>친구 끊기</button>
-            )}
             <button style={styles.sheetCloseBtn} onClick={() => setSelectedFriendId(null)}>닫기</button>
           </div>
         </div>
@@ -789,14 +826,14 @@ export default function GroupPage() {
         <div style={styles.overlay} onClick={() => !unfriending && setConfirmUnfriend(false)}>
           <div style={styles.dialog} onClick={e => e.stopPropagation()}>
             <div style={{ fontSize: 36 }}>👋</div>
-            <div style={styles.dialogTitle}>{selectedFriend.nickname}님과{'\n'}친구를 끊을까요?</div>
+            <div style={styles.dialogTitle}>{selectedFriend.nickname}님과{'\n'}친구를 해제할까요?</div>
             <div style={styles.dialogBtns}>
               <button
                 style={{ ...styles.dialogBtnPrimary, background: 'var(--color-danger)', boxShadow: '0 4px 14px rgba(244,67,54,0.32)' }}
                 onClick={handleUnfriend}
                 disabled={unfriending}
               >
-                {unfriending ? '처리 중...' : '끊기'}
+                {unfriending ? '처리 중...' : '해제'}
               </button>
               <button style={styles.dialogBtnCancel} onClick={() => setConfirmUnfriend(false)} disabled={unfriending}>취소</button>
             </div>
@@ -865,6 +902,10 @@ const styles = {
     background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)',
     borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
   },
+  // 이미 보낸 요청("요청됨")은 더 이상 누를 액션이 아니라 상태 표시라, 눈에 덜 띄는 회색 톤으로 구분한다.
+  friendRequestBtnSent: {
+    color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+  },
   // 너비를 고정해야 배지 개수가 달라도 모든 친구 행에서 같은 x 위치에서 시작한다(세로 줄맞춤).
   statusChipRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center', gap: 5, flexShrink: 0, width: 120 },
 
@@ -927,7 +968,6 @@ const styles = {
   statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
   sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
-  unfriendBtn: { marginTop: 10, padding: '10px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', cursor: 'pointer' },
 
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
   proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },

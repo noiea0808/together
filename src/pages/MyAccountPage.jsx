@@ -1,6 +1,7 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
+import { useEscKey } from '../lib/useEscKey'
 import {
   updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setAutoFriendGroupmates,
   getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
@@ -492,6 +493,16 @@ export default function MyAccountPage() {
     }
   }
 
+  // 이 페이지에서 직접 여는 팝업들의 ESC 닫기 — 자체 컴포넌트(피드백/아바타 크롭/설치 안내)는
+  // 각자 안에서 처리하므로 여기선 이 페이지가 직접 그리는 다이얼로그만 다룬다.
+  useEscKey(useCallback(() => {
+    if (editing) { setEditing(false); setNickname(user?.nickname ?? ''); return }
+    if (showWithdraw) { closeWithdraw(); return }
+    if (showLogoutConfirm) { setShowLogoutConfirm(false); return }
+    if (confirmDeleteWishId) { setConfirmDeleteWishId(null); return }
+    if (showAddWishModal || editingWishId) closeWishModal()
+  }, [editing, showWithdraw, showLogoutConfirm, confirmDeleteWishId, showAddWishModal, editingWishId, user?.nickname]))
+
   return (
     <div style={styles.page}>
       <div style={styles.tabs}>
@@ -539,6 +550,11 @@ export default function MyAccountPage() {
             </div>
             <ChevronRight />
           </div>
+
+          {/* 홈 화면 설치 — 닉네임 카드 바로 아래, 페이지 스크롤을 따라가는 일반 위치.
+              설치/바로가기가 이미 돼 있으면 컴포넌트 안에서 알아서 "설치됨" 배지로 바뀐다.
+              settingsGroup의 기본 gap 절반만큼 끌어올려 바로 위 카드와의 간격만 좁힌다. */}
+          <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
 
           {/* 계정 공개 */}
           <SettingsSection title="계정 공개">
@@ -590,13 +606,6 @@ export default function MyAccountPage() {
             />
           </SettingsSection>
         </div>
-
-        {/* 홈 화면 설치 — 화면 하단에 고정, 스크롤 위치와 무관하게 항상 노출 */}
-        {!isInstalled && (
-          <div style={styles.fixedInstallBar}>
-            <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" />
-          </div>
-        )}
 
         {showFeedbackModal && <FeedbackModal onClose={() => setShowFeedbackModal(false)} />}
 
@@ -968,17 +977,7 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  // 이 페이지는 내부 스크롤 컨테이너가 아니라 문서(페이지) 자체가 스크롤되는 구조라
-  // position:sticky가 걸리지 않는다 — 그래서 fixed로 고정하고, 아래 paddingBottom을
-  // 넉넉히 잡아 끝까지 스크롤하면 로그아웃/회원 탈퇴가 이 바 위로 완전히 올라오게 한다.
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(150px + var(--safe-area-inset-bottom))' },
-
-  fixedInstallBar: {
-    position: 'fixed', left: '50%', transform: 'translateX(-50%)', bottom: 'calc(72px + var(--safe-area-inset-bottom))',
-    width: '100%', maxWidth: 'var(--max-width)', boxSizing: 'border-box',
-    padding: '10px var(--spacing-md)', background: 'rgba(250,248,245,0.95)', backdropFilter: 'blur(8px)',
-    borderTop: '1px solid var(--color-border)', zIndex: 90,
-  },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--spacing-xl) + var(--safe-area-inset-bottom))' },
 
   // 프로필 카드와 3개 설정 섹션을 한 그룹으로 묶어, 페이지 내 다른 블록(설치 안내, 로그아웃)과는
   // 구분되는 넉넉한 간격을 준다.

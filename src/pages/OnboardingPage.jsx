@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { signUp, signIn, signInWithGoogle, signInWithKakao, requestPasswordReset } from '../lib/db'
+import { takePendingRoute } from '../lib/pendingRoute'
 import { useUser } from '../lib/UserContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import InstallAppPrompt from '../components/InstallAppPrompt'
@@ -145,9 +146,8 @@ function EmailForm({ hasPendingInvite, onBack, onForgot }) {
       localStorage.setItem('rememberedEmail', form.email.trim())
       login(user)
       // 밥팟 링크 등에서 넘어온 경우 원래 위치로 복귀
-      const returnTo = sessionStorage.getItem('returnTo')
+      const returnTo = takePendingRoute()
       if (returnTo) {
-        sessionStorage.removeItem('returnTo')
         navigate(returnTo)
       } else {
         // onboarded 여부는 App 라우팅 게이트가 판단해 /welcome 또는 /today 로 보냄
