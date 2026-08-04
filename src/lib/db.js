@@ -4,6 +4,14 @@ import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
 import { takePendingRoute } from './pendingRoute'
 
+// send-push 결과 로깅 — 실패 사유(FCM 에러 코드 등)가 담긴 pushResult.failures가 객체 배열이라
+// console.warn에 그냥 넘기면 네이티브 WebView 콘솔 브릿지(logcat)에서 "[object Object]"로만
+// 찍혀 원인을 못 본다. JSON으로 풀어서 실제 값이 보이게 한다.
+function logPushResult(label, pushError, pushResult) {
+  if (pushError) console.warn(`${label} send-push 실패:`, JSON.stringify(pushError))
+  else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
+}
+
 // 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
 // https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
 const PUBLIC_ORIGIN = 'https://www.eat-together.net'
@@ -514,8 +522,7 @@ async function notifyFriendRequest(requestId, toUserId, fromUserId, { title, bod
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('friend notification send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('friend notification send-push 일부 실패:', pushResult.failures)
+  logPushResult('friend notification', pushError, pushResult)
 }
 
 // 상대가 이미 나에게 보낸 pending 요청이 있으면 맞요청으로 보고 바로 수락 처리한다.
@@ -645,8 +652,7 @@ export async function inviteGroupFriend(groupId, fromUserId, toUserId) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('inviteGroupFriend send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('inviteGroupFriend send-push 일부 실패:', pushResult.failures)
+  logPushResult('inviteGroupFriend', pushError, pushResult)
 }
 
 // ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
@@ -941,8 +947,7 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
     const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
       body: { userIds, title, body, url },
     })
-    if (pushError) console.warn('notifyPotMembers send-push 실패:', pushError)
-    else if (pushResult?.failed > 0) console.warn('notifyPotMembers send-push 일부 실패:', pushResult.failures)
+    logPushResult('notifyPotMembers', pushError, pushResult)
   } catch (e) {
     console.warn('notifyPotMembers:', e)
   }
@@ -967,8 +972,7 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('invitePotFriend send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('invitePotFriend send-push 일부 실패:', pushResult.failures)
+  logPushResult('invitePotFriend', pushError, pushResult)
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -997,8 +1001,7 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('proposeMealTogether send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('proposeMealTogether send-push 일부 실패:', pushResult.failures)
+  logPushResult('proposeMealTogether', pushError, pushResult)
 
   return inv
 }
@@ -1086,8 +1089,7 @@ export async function declinePotInvitation(invitationId, userId, reason) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [inv.from_user_id], title, body, url },
   })
-  if (pushError) console.warn('declinePotInvitation send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('declinePotInvitation send-push 일부 실패:', pushResult.failures)
+  logPushResult('declinePotInvitation', pushError, pushResult)
 }
 
 // 제안 취소: 발신자가 아직 상대가 응답하지 않은 제안을 거둬들인다.
@@ -1816,8 +1818,7 @@ async function notifyWishPlaceOwner({ wishPlaceId, fromUserId, insertPayload, ti
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [ownerId], title, body, url },
   })
-  if (pushError) console.warn('wish place send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('wish place send-push 일부 실패:', pushResult.failures)
+  logPushResult('wish place', pushError, pushResult)
 }
 
 // 친구의 위시 항목에 하트를 남긴다. 소유자 본인이 아니면 알림/푸시도 함께 보낸다.
@@ -1902,8 +1903,7 @@ async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, ment
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [mentionedUserId], title, body, url },
   })
-  if (pushError) console.warn('wish mention send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('wish mention send-push 일부 실패:', pushResult.failures)
+  logPushResult('wish mention', pushError, pushResult)
 }
 
 export async function deleteWishPlaceComment(id) {
