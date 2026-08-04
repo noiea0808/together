@@ -2082,7 +2082,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                       <input
                         style={styles.searchPasswordInput}
                         type="password"
-                        placeholder={searchHasPassword ? '비밀번호 변경 (4자 이상)' : '비밀번호 설정 (4자 이상)'}
+                        placeholder={searchHasPassword ? '****' : '비밀번호 설정 (4자 이상)'}
                         value={searchPasswordInput}
                         onChange={e => setSearchPasswordInput(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleSaveSearchPassword()}
@@ -2097,7 +2097,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                       </button>
                     </div>
                     {searchHasPassword ? (
-                      <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요</p>
+                      <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요 · 바꾸려면 새로 입력하고 저장하세요</p>
                     ) : (
                       <p style={styles.searchPasswordHint}>비밀번호를 저장해야 검색 허용이 켜져요</p>
                     )}

@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import {
-  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled,
+  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setAutoFriendGroupmates,
   getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
@@ -102,6 +102,8 @@ export default function MyAccountPage() {
   const [pushError, setPushError] = useState(null)
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
   const [discoverableLoading, setDiscoverableLoading] = useState(false)
+  const [autoFriendGroupmates, setAutoFriendGroupmatesState] = useState(user?.auto_friend_groupmates ?? false)
+  const [autoFriendGroupmatesLoading, setAutoFriendGroupmatesLoading] = useState(false)
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
@@ -425,6 +427,21 @@ export default function MyAccountPage() {
     }
   }
 
+  const handleToggleAutoFriendGroupmates = async () => {
+    if (autoFriendGroupmatesLoading) return
+    setAutoFriendGroupmatesLoading(true)
+    try {
+      const next = !autoFriendGroupmates
+      await setAutoFriendGroupmates(next)
+      setAutoFriendGroupmatesState(next)
+      login({ ...user, auto_friend_groupmates: next })
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setAutoFriendGroupmatesLoading(false)
+    }
+  }
+
   const handleToggleLunchReminder = async () => {
     if (lunchReminderLoading) return
     setLunchReminderLoading(true)
@@ -529,6 +546,11 @@ export default function MyAccountPage() {
               title="친구 찾기 허용"
               description="다른 사용자가 이메일이나 닉네임으로 나를 찾을 수 있어요."
               right={<ToggleSwitch on={discoverable} onClick={handleToggleDiscoverable} disabled={discoverableLoading} label="친구 찾기 허용" />}
+            />
+            <SettingsRow
+              title="그룹 멤버 자동 친구 등록"
+              description="이 설정을 켠 사람과 같은 그룹이 되면 자동으로 친구가 돼요. 양쪽 다 켜져 있어야 적용돼요."
+              right={<ToggleSwitch on={autoFriendGroupmates} onClick={handleToggleAutoFriendGroupmates} disabled={autoFriendGroupmatesLoading} label="그룹 멤버 자동 친구 등록" />}
               last
             />
           </SettingsSection>

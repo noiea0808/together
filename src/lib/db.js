@@ -481,6 +481,13 @@ export async function setDiscoverable(userId, value) {
   if (error) throw error
 }
 
+// 켜는 순간 기존 그룹 멤버 중 마찬가지로 이 설정을 켠 사람들과 소급으로 친구가 맺어지므로
+// (양쪽 다 켜져 있어야 함) 단순 update가 아니라 RPC를 거친다. scripts/add_auto_friend_groupmates.sql
+export async function setAutoFriendGroupmates(enabled) {
+  const { error } = await supabase.rpc('set_auto_friend_groupmates', { p_enabled: enabled })
+  if (error) throw error
+}
+
 export async function setLunchReminderEnabled(userId, value) {
   const { error } = await supabase.from('users').update({ notify_lunch_reminder: value }).eq('id', userId)
   if (error) throw error

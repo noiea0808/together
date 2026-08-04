@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
@@ -57,7 +57,7 @@ export default function GroupPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [friendsModalTab, setFriendsModalTab] = useState('search')
-  usePageHeader({ title: '친구', action: { label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } } })
+  usePageHeader({ title: '그룹 멤버들', action: { label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } } })
 
   // 친구 요청 알림(/group?friend_requests=1)을 눌러 들어온 경우, 요청 탭이 열린 채로 바로 뜬다.
   useEffect(() => {
@@ -117,6 +117,23 @@ export default function GroupPage() {
   const [realFriends, setRealFriends] = useState([]) // [{ requestId, id, nickname, avatar_url }] — 친구찾기로 맺어진 실제 친구
   const [confirmUnfriend, setConfirmUnfriend] = useState(false)
   const [unfriending, setUnfriending] = useState(false)
+
+  // 친구가 아닌 그룹 멤버에게 수동으로 친구 요청 보내기
+  const [sendingRequestId, setSendingRequestId] = useState(null)
+  const [sentRequestIds, setSentRequestIds] = useState(new Set())
+  const handleSendFriendRequest = async (e, friendId) => {
+    e.stopPropagation()
+    if (sendingRequestId) return
+    setSendingRequestId(friendId)
+    try {
+      await sendFriendRequest(user.id, friendId)
+      setSentRequestIds(prev => new Set(prev).add(friendId))
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setSendingRequestId(null)
+    }
+  }
 
   const reloadRealFriends = () => getMyFriends().then(setRealFriends).catch(e => console.error(e))
   useEffect(() => { reloadRealFriends() }, [user.id])
@@ -450,7 +467,7 @@ export default function GroupPage() {
               <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <div style={{ fontWeight: 700 }}>아직 친구가 없어요</div>
+            <div style={{ fontWeight: 700 }}>아직 아무도 없어요</div>
             <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center' }}>
               그룹 멤버이거나 친구 찾기로 추가하면{'\n'}여기 표시됩니다.
             </p>
@@ -466,7 +483,7 @@ export default function GroupPage() {
               <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
               <path d="M16 3.13a4 4 0 0 1 0 7.75" />
             </svg>
-            <div style={{ fontWeight: 700 }}>이 그룹엔 친구가 없어요</div>
+            <div style={{ fontWeight: 700 }}>이 그룹엔 멤버가 없어요</div>
           </div>
         ) : (
           <div style={{ ...styles.friendList, opacity: statusLoading ? 0.5 : 1 }}>
@@ -500,6 +517,15 @@ export default function GroupPage() {
                       </div>
                     )}
                   </div>
+                  {!friend.requestId && (
+                    <button
+                      style={{ ...styles.friendRequestBtn, opacity: sentRequestIds.has(friend.id) ? 0.6 : 1 }}
+                      onClick={e => handleSendFriendRequest(e, friend.id)}
+                      disabled={sendingRequestId === friend.id || sentRequestIds.has(friend.id)}
+                    >
+                      {sentRequestIds.has(friend.id) ? '요청됨' : sendingRequestId === friend.id ? '...' : '친구 요청'}
+                    </button>
+                  )}
                   {statusChips.length > 0 && (
                     <div style={styles.statusChipRow}>
                       {statusChips.map(({ slot, opt }) => (
@@ -834,6 +860,11 @@ const styles = {
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  friendRequestBtn: {
+    flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)',
+    background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)',
+    borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
+  },
   // 너비를 고정해야 배지 개수가 달라도 모든 친구 행에서 같은 x 위치에서 시작한다(세로 줄맞춤).
   statusChipRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center', gap: 5, flexShrink: 0, width: 120 },
 
