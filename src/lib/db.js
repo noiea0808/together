@@ -173,7 +173,11 @@ export async function getSessionUser() {
     return newProfile
   }
 
-  if (error) return null
+  // PGRST116(행 없음) 외의 에러는 세션이 없다는 뜻이 아니라 조회 자체가 실패했다는 뜻이다.
+  // 여기서 null을 반환하면 호출부(UserContext)가 "로그아웃 상태"로 오인해 로그인 화면으로
+  // 튕겨내는데, 실제로는 supabase 세션이 멀쩡히 살아있는 채로 네트워크만 잠깐 끊긴 경우가
+  // 대부분이다. 진짜 로그인 안 된 상태와 구분할 수 있도록 던져서 호출부가 판단하게 한다.
+  if (error) throw error
   // 최근 로그인 시각 갱신 — 세션 로드를 막지 않도록 결과를 기다리지 않는다.
   supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
   return data

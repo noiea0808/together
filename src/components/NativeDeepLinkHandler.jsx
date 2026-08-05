@@ -6,6 +6,7 @@ import { Browser } from '@capacitor/browser'
 import { PushNotifications } from '@capacitor/push-notifications'
 import { handleNativeOAuthCallback } from '../lib/db'
 import { takePendingRoute } from '../lib/pendingRoute'
+import { supabase } from '../lib/supabase'
 
 const APP_LINK_HOSTS = ['www.eat-together.net', 'eat-together.net']
 
@@ -80,10 +81,20 @@ export default function NativeDeepLinkHandler() {
       else App.exitApp()
     }).then(handle => { backListenerHandle = handle })
 
+    // 앱이 백그라운드로 가면 JS 타이머가 멈춰서 supabase의 자동 토큰 갱신도 같이 멈춘다.
+    // 오래 백그라운드에 있다가 돌아오면 토큰이 만료된 채로 남아있어 마치 로그아웃된 것처럼
+    // 보이는 문제가 있었다 — 포그라운드/백그라운드 전환에 맞춰 직접 켜고 꺼준다.
+    let stateListenerHandle
+    App.addListener('appStateChange', ({ isActive }) => {
+      if (isActive) supabase.auth.startAutoRefresh()
+      else supabase.auth.stopAutoRefresh()
+    }).then(handle => { stateListenerHandle = handle })
+
     return () => {
       urlListenerHandle?.remove()
       pushActionHandle?.remove()
       backListenerHandle?.remove()
+      stateListenerHandle?.remove()
     }
   }, [navigate])
 
