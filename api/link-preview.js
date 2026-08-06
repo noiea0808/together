@@ -89,6 +89,9 @@ function extractMeta(html) {
 }
 
 export default async function handler(req, res) {
+  // Capacitor 앱의 WebView는 https://localhost에서 로드되는데, 이 API는 배포 도메인의
+  // 절대 URL(getPublicOrigin())로 호출된다. 자격증명 없는 공개 프록시라 오리진 제한 없이 허용.
+  res.setHeader('Access-Control-Allow-Origin', '*')
   const { url: target, error } = parseSafeUrl(req.query?.url)
   if (error) {
     res.status(400).json({ error })
