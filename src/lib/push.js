@@ -106,12 +106,12 @@ async function ensureFreshSubscription(userId) {
   }
 
   const { endpoint, keys } = subscription.toJSON()
-  const { error } = await supabase
-    .from('push_subscriptions')
-    .upsert(
-      { user_id: userId, endpoint, p256dh: keys.p256dh, auth: keys.auth },
-      { onConflict: 'endpoint' }
-    )
+  // 일반 upsert(RLS: 본인 행만 update)가 아니라 RPC를 쓴다 — 같은 브라우저를 이전에
+  // 다른 계정으로 로그인했을 때 이 endpoint가 그 계정 소유로 남아있을 수 있는데,
+  // 그 소유권을 지금 로그인한 사용자에게 넘겨받아야 하기 때문이다 (fix_push_subscriptions_reclaim.sql).
+  const { error } = await supabase.rpc('claim_push_subscription', {
+    p_endpoint: endpoint, p_p256dh: keys.p256dh, p_auth: keys.auth,
+  })
   if (error) throw error
 
   return subscription
