@@ -136,20 +136,20 @@ export async function handleNativeOAuthCallback(url) {
   if (error) throw error
 }
 
-export async function getSessionUser() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
-
+// auth_id로 users 프로필을 조회하고, 첫 로그인이면 최소 프로필을 자동 생성한다.
+// supabase.auth.* 호출을 하나도 하지 않는다 — onAuthStateChange 콜백 안에서도 안전하게
+// 부를 수 있어야 하기 때문(콜백 안에서 getSession() 등 auth 락이 필요한 호출을 하면
+// 락을 이미 쥔 채로 같은 락을 또 기다리게 되어 영영 멈춘다 — 아래 UserContext 사용부 참고).
+export async function fetchProfileForAuthUser(authUser) {
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('auth_id', session.user.id)
+    .eq('auth_id', authUser.id)
     .single()
 
   // 첫 로그인(구글/이메일): users 테이블에 프로필이 없으면 최소 프로필 자동 생성.
   // 닉네임·생년월일·약관동의는 onboarded=false 상태로 두고 /welcome 단계에서 채운다.
   if (error && error.code === 'PGRST116') {
-    const authUser = session.user
     // 익명(게스트) 세션이면 온보딩 게이트를 우회하도록 is_guest=true, onboarded=true 로 생성.
     // 닉네임·guest_pot_id 는 joinPotAsGuest 에서 다시 채운다.
     if (authUser.is_anonymous) {
@@ -181,6 +181,12 @@ export async function getSessionUser() {
   // 최근 로그인 시각 갱신 — 세션 로드를 막지 않도록 결과를 기다리지 않는다.
   supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
   return data
+}
+
+export async function getSessionUser() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  return fetchProfileForAuthUser(session.user)
 }
 
 // 약관 동의 기록. agreedTerms: [{ id, version }] — 동의 당시의 term.version을 같이 저장해두면
