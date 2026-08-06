@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { useEscKey } from '../lib/useEscKey'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 const VIEWPORT = 220 // 원형 편집 영역 지름(px)
@@ -19,6 +20,8 @@ export default function AvatarCropModal({ file, onCancel, onConfirm, uploading }
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const dragRef = useRef(null)
   const imgRef = useRef(null)
+
+  useEscKey(useCallback(() => { if (!uploading) onCancel() }, [uploading, onCancel]))
 
   useEffect(() => {
     const url = URL.createObjectURL(file)

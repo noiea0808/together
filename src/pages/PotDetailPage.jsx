@@ -3,6 +3,8 @@ import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, setPotMomentScope, getGroupMembers, invitePotFriend, getPublicOrigin } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
+import { setPendingRoute } from '../lib/pendingRoute'
+import { shareLink, copyToClipboard, canShare } from '../lib/share'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
@@ -56,7 +58,7 @@ function GuestGate({ potId, onJoined, navigate }) {
   }
 
   const handleLogin = () => {
-    sessionStorage.setItem('returnTo', `/pot/${potId}`)
+    setPendingRoute(`/pot/${potId}`)
     navigate('/onboarding')
   }
 
@@ -118,6 +120,7 @@ export default function PotDetailPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [conflict, setConflict] = useState(null)
   const [showShare, setShowShare] = useState(false)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [shareTab, setShareTab] = useState('friend')
   const [shareFriends, setShareFriends] = useState([])
   const [shareFriendsLoading, setShareFriendsLoading] = useState(false)
@@ -407,7 +410,32 @@ export default function PotDetailPage() {
   }
 
   const potLink = `${getPublicOrigin()}/pot/${pot?.id}`
-  const copyText = (text, type) => { navigator.clipboard?.writeText(text); setCopied(type); setTimeout(() => setCopied(null), 2000) }
+  // 복사 성공 여부를 확인하고 표시한다 — 예전엔 실패해도 "✓"가 떠서 빈 클립보드를 붙여넣게 됐다.
+  const copyText = async (text, type) => {
+    setCopyFailed(false)
+    if (await copyToClipboard(text)) {
+      setCopied(type)
+      setTimeout(() => setCopied(null), 2000)
+    } else {
+      setCopyFailed(true)
+    }
+  }
+
+  // OS 공유 시트 — 카톡 등으로 바로 보낼 수 있어 복사→앱전환→붙여넣기 과정을 없앤다.
+  const handleSharePot = async () => {
+    setCopyFailed(false)
+    const result = await shareLink({
+      title: `${pot?.title ?? '밥팟'} 초대`,
+      text: `"${pot?.title ?? '밥팟'}" 같이 먹어요!`,
+      url: potLink,
+    })
+    if (result === 'copied') {
+      setCopied('link')
+      setTimeout(() => setCopied(null), 2000)
+    } else if (result === 'failed') {
+      setCopyFailed(true)
+    }
+  }
 
   if (!user) return <GuestGate potId={id} onJoined={login} navigate={navigate} />
   if (loading) return <div style={S.loadingPage}><RiceBowlIcon size={72} /></div>
@@ -968,6 +996,11 @@ export default function PotDetailPage() {
 
             {shareTab === 'link' && (
               <div style={S.sharePanel}>
+                {canShare() && (
+                  <button style={{ ...PRIMARY_ACTION_BUTTON, marginBottom: 10 }} onClick={handleSharePot}>
+                    밥팟 링크 보내기
+                  </button>
+                )}
                 <div style={S.shareLabel}>밥팟 링크</div>
                 <div style={S.shareRow}>
                   <span style={S.shareText}>{potLink}</span>
@@ -977,6 +1010,8 @@ export default function PotDetailPage() {
                 </div>
               </div>
             )}
+
+            {copyFailed && <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 }}>복사하지 못했어요. 링크를 길게 눌러 직접 복사해주세요.</p>}
 
             <button style={S.dialogBtnCancel} onClick={() => setShowShare(false)}>닫기</button>
           </div>

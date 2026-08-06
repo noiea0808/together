@@ -3,17 +3,18 @@ import { createRoot } from 'react-dom/client'
 import './index.css'
 import './lib/installPrompt' // beforeinstallprompt를 React 렌더 전에 최대한 빨리 캡처
 import { Capacitor } from '@capacitor/core'
-import { isAndroidInAppBrowser, openInChromeAndroid } from './lib/inAppBrowser'
+import { isAndroidInAppBrowser, escapeInAppBrowserAndroid } from './lib/inAppBrowser'
 import App from './App.jsx'
 
-// 카톡 등 인앱 브라우저(Android)는 React 마운트를 기다리지 않고 여기서 가장 먼저 크롬으로
+// 카톡 등 인앱 브라우저(Android)는 React 마운트를 기다리지 않고 여기서 가장 먼저 밖으로
 // 넘긴다. InAppBrowserGuard의 useEffect까지 기다리면 그 사이 JoinPage 등이 navigate()로
-// URL을 먼저 바꿔버릴 수 있어(예: /join/:code → /onboarding), 크롬으로 넘어갈 때 초대
-// 코드가 담긴 원래 URL을 놓치는 레이스가 생긴다. 앱 진입 즉시, 아무 것도 실행되기 전에
-// 원본 URL 그대로 캡처해 넘겨서 이 레이스를 원천 차단한다.
+// URL을 먼저 바꿔버릴 수 있어(예: /join/:code → /onboarding), 넘어갈 때 초대 코드가 담긴
+// 원래 URL을 놓치는 레이스가 생긴다. 앱 진입 즉시, 아무 것도 실행되기 전에 원본 URL
+// 그대로 캡처해 넘겨서 이 레이스를 원천 차단한다.
+// 초대 링크면 네이티브 앱을 먼저 시도하고, 앱이 없을 때만 크롬으로 간다.
 // 커패시터 네이티브 앱은 이 우회가 필요 없다(원래 자체 UA가 카톡 패턴에 안 걸리긴 하지만,
 // 우연에 기대지 않고 명시적으로 막아 앱이 스스로를 크롬으로 튕겨내는 일을 방지한다).
-if (!Capacitor.isNativePlatform() && isAndroidInAppBrowser()) openInChromeAndroid()
+if (!Capacitor.isNativePlatform() && isAndroidInAppBrowser()) escapeInAppBrowserAndroid()
 
 // 서비스 워커 등록 (PWA 설치 지원)
 if ('serviceWorker' in navigator) {

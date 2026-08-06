@@ -2,6 +2,15 @@ import { Capacitor } from '@capacitor/core'
 import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
+import { takePendingRoute } from './pendingRoute'
+
+// send-push 결과 로깅 — 실패 사유(FCM 에러 코드 등)가 담긴 pushResult.failures가 객체 배열이라
+// console.warn에 그냥 넘기면 네이티브 WebView 콘솔 브릿지(logcat)에서 "[object Object]"로만
+// 찍혀 원인을 못 본다. JSON으로 풀어서 실제 값이 보이게 한다.
+function logPushResult(label, pushError, pushResult) {
+  if (pushError) console.warn(`${label} send-push 실패:`, JSON.stringify(pushError))
+  else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
+}
 
 // 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
 // https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
@@ -75,16 +84,11 @@ export async function deleteAccount() {
 
 // OAuth 왕복 후 돌아올 경로. 그룹 초대 코드는 localStorage 대신 URL(/join/:code)에
 // 실어 나른다 — 카톡 인앱 ↔ 외부 브라우저 전환이나 OAuth 리다이렉트 과정에서 저장소가
-// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 기존 returnTo 방식 유지.
+// 이어지지 않는 환경에서도 URL은 살아남기 때문. 밥팟 링크는 pendingRoute를 쓴다.
 function oauthReturnPath() {
   const invite = localStorage.getItem('pendingInviteCode')
   if (invite) return `/join/${invite}`
-  const returnTo = sessionStorage.getItem('returnTo')
-  if (returnTo) {
-    sessionStorage.removeItem('returnTo')
-    return returnTo
-  }
-  return '/today'
+  return takePendingRoute() ?? '/today'
 }
 
 // 네이티브 앱 안에서 WebView로 그대로 리다이렉트하면 구글이 403(disallowed_useragent)으로
@@ -132,20 +136,20 @@ export async function handleNativeOAuthCallback(url) {
   if (error) throw error
 }
 
-export async function getSessionUser() {
-  const { data: { session } } = await supabase.auth.getSession()
-  if (!session) return null
-
+// auth_id로 users 프로필을 조회하고, 첫 로그인이면 최소 프로필을 자동 생성한다.
+// supabase.auth.* 호출을 하나도 하지 않는다 — onAuthStateChange 콜백 안에서도 안전하게
+// 부를 수 있어야 하기 때문(콜백 안에서 getSession() 등 auth 락이 필요한 호출을 하면
+// 락을 이미 쥔 채로 같은 락을 또 기다리게 되어 영영 멈춘다 — 아래 UserContext 사용부 참고).
+export async function fetchProfileForAuthUser(authUser) {
   const { data, error } = await supabase
     .from('users')
     .select('*')
-    .eq('auth_id', session.user.id)
+    .eq('auth_id', authUser.id)
     .single()
 
   // 첫 로그인(구글/이메일): users 테이블에 프로필이 없으면 최소 프로필 자동 생성.
   // 닉네임·생년월일·약관동의는 onboarded=false 상태로 두고 /welcome 단계에서 채운다.
   if (error && error.code === 'PGRST116') {
-    const authUser = session.user
     // 익명(게스트) 세션이면 온보딩 게이트를 우회하도록 is_guest=true, onboarded=true 로 생성.
     // 닉네임·guest_pot_id 는 joinPotAsGuest 에서 다시 채운다.
     if (authUser.is_anonymous) {
@@ -169,10 +173,20 @@ export async function getSessionUser() {
     return newProfile
   }
 
-  if (error) return null
+  // PGRST116(행 없음) 외의 에러는 세션이 없다는 뜻이 아니라 조회 자체가 실패했다는 뜻이다.
+  // 여기서 null을 반환하면 호출부(UserContext)가 "로그아웃 상태"로 오인해 로그인 화면으로
+  // 튕겨내는데, 실제로는 supabase 세션이 멀쩡히 살아있는 채로 네트워크만 잠깐 끊긴 경우가
+  // 대부분이다. 진짜 로그인 안 된 상태와 구분할 수 있도록 던져서 호출부가 판단하게 한다.
+  if (error) throw error
   // 최근 로그인 시각 갱신 — 세션 로드를 막지 않도록 결과를 기다리지 않는다.
   supabase.from('users').update({ last_login_at: new Date().toISOString() }).eq('id', data.id).then(() => {})
   return data
+}
+
+export async function getSessionUser() {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session) return null
+  return fetchProfileForAuthUser(session.user)
 }
 
 // 약관 동의 기록. agreedTerms: [{ id, version }] — 동의 당시의 term.version을 같이 저장해두면
@@ -382,6 +396,37 @@ export async function updateGroupName(groupId, name) {
   if (error) throw error
 }
 
+// 그룹 이름 검색(4자 이상, 부분일치) — 검색 허용(allow_search)된 그룹만, 이름+멤버수만 반환.
+// scripts/add_group_search.sql의 SECURITY DEFINER 함수를 거친다 (비밀번호 해시는 노출되지 않음).
+export async function searchGroups(query) {
+  const { data, error } = await supabase.rpc('search_groups', { p_query: query })
+  if (error) throw error
+  return data
+}
+
+// 방장이 그룹 설정 시트에서 검색 허용 상태를 확인. 비밀번호 자체는 내려받지 않고 설정 여부만 확인.
+export async function getGroupSearchSettings(groupId) {
+  const { data, error } = await supabase.rpc('get_group_search_settings', { p_group_id: groupId })
+  if (error) throw error
+  return data?.[0] ?? { allow_search: false, has_password: false }
+}
+
+export async function setGroupPassword(groupId, password) {
+  const { error } = await supabase.rpc('set_group_password', { p_group_id: groupId, p_password: password })
+  if (error) throw error
+}
+
+export async function setGroupAllowSearch(groupId, allow) {
+  const { error } = await supabase.rpc('set_group_allow_search', { p_group_id: groupId, p_allow: allow })
+  if (error) throw error
+}
+
+// 검색으로 찾은 그룹에 비밀번호로 참여. 실패 시 RPC가 던지는 한국어 에러 메시지를 그대로 노출한다.
+export async function joinGroupByPassword(groupId, password) {
+  const { error } = await supabase.rpc('join_group_by_password', { p_group_id: groupId, p_password: password })
+  if (error) throw error
+}
+
 export async function leaveGroup(groupId, userId) {
   const { error } = await supabase
     .from('group_members')
@@ -450,6 +495,13 @@ export async function setDiscoverable(userId, value) {
   if (error) throw error
 }
 
+// 켜는 순간 기존 그룹 멤버 중 마찬가지로 이 설정을 켠 사람들과 소급으로 친구가 맺어지므로
+// (양쪽 다 켜져 있어야 함) 단순 update가 아니라 RPC를 거친다. scripts/add_auto_friend_groupmates.sql
+export async function setAutoFriendGroupmates(enabled) {
+  const { error } = await supabase.rpc('set_auto_friend_groupmates', { p_enabled: enabled })
+  if (error) throw error
+}
+
 export async function setLunchReminderEnabled(userId, value) {
   const { error } = await supabase.from('users').update({ notify_lunch_reminder: value }).eq('id', userId)
   if (error) throw error
@@ -480,8 +532,7 @@ async function notifyFriendRequest(requestId, toUserId, fromUserId, { title, bod
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('friend notification send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('friend notification send-push 일부 실패:', pushResult.failures)
+  logPushResult('friend notification', pushError, pushResult)
 }
 
 // 상대가 이미 나에게 보낸 pending 요청이 있으면 맞요청으로 보고 바로 수락 처리한다.
@@ -611,8 +662,7 @@ export async function inviteGroupFriend(groupId, fromUserId, toUserId) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('inviteGroupFriend send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('inviteGroupFriend send-push 일부 실패:', pushResult.failures)
+  logPushResult('inviteGroupFriend', pushError, pushResult)
 }
 
 // ── 슬롯 상태 (유저 기준 단일 레코드) ────────────────
@@ -907,8 +957,7 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
     const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
       body: { userIds, title, body, url },
     })
-    if (pushError) console.warn('notifyPotMembers send-push 실패:', pushError)
-    else if (pushResult?.failed > 0) console.warn('notifyPotMembers send-push 일부 실패:', pushResult.failures)
+    logPushResult('notifyPotMembers', pushError, pushResult)
   } catch (e) {
     console.warn('notifyPotMembers:', e)
   }
@@ -933,8 +982,7 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('invitePotFriend send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('invitePotFriend send-push 일부 실패:', pushResult.failures)
+  logPushResult('invitePotFriend', pushError, pushResult)
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -963,8 +1011,7 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [toUserId], title, body, url },
   })
-  if (pushError) console.warn('proposeMealTogether send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('proposeMealTogether send-push 일부 실패:', pushResult.failures)
+  logPushResult('proposeMealTogether', pushError, pushResult)
 
   return inv
 }
@@ -1052,8 +1099,7 @@ export async function declinePotInvitation(invitationId, userId, reason) {
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [inv.from_user_id], title, body, url },
   })
-  if (pushError) console.warn('declinePotInvitation send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('declinePotInvitation send-push 일부 실패:', pushResult.failures)
+  logPushResult('declinePotInvitation', pushError, pushResult)
 }
 
 // 제안 취소: 발신자가 아직 상대가 응답하지 않은 제안을 거둬들인다.
@@ -1782,8 +1828,7 @@ async function notifyWishPlaceOwner({ wishPlaceId, fromUserId, insertPayload, ti
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [ownerId], title, body, url },
   })
-  if (pushError) console.warn('wish place send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('wish place send-push 일부 실패:', pushResult.failures)
+  logPushResult('wish place', pushError, pushResult)
 }
 
 // 친구의 위시 항목에 하트를 남긴다. 소유자 본인이 아니면 알림/푸시도 함께 보낸다.
@@ -1868,8 +1913,7 @@ async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, ment
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
     body: { userIds: [mentionedUserId], title, body, url },
   })
-  if (pushError) console.warn('wish mention send-push 실패:', pushError)
-  else if (pushResult?.failed > 0) console.warn('wish mention send-push 일부 실패:', pushResult.failures)
+  logPushResult('wish mention', pushError, pushResult)
 }
 
 export async function deleteWishPlaceComment(id) {

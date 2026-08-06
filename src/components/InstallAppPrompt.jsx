@@ -1,7 +1,8 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
 import { openInChromeAndroid } from '../lib/inAppBrowser'
+import { useEscKey } from '../lib/useEscKey'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import RiceBowlIcon from './RiceBowlIcon'
 
@@ -69,6 +70,11 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
   const [showInAppGuide, setShowInAppGuide] = useState(false)
   const [linkCopied, setLinkCopied] = useState(false)
   const iconColor = variant === 'subtle' ? 'currentColor' : '#fff'
+
+  useEscKey(useCallback(() => {
+    if (showInAppGuide) { setShowInAppGuide(false); return }
+    if (showGuide) setShowGuide(false)
+  }, [showInAppGuide, showGuide]))
 
   const copyCurrentLink = () => {
     navigator.clipboard?.writeText(window.location.href)

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useUser } from '../lib/UserContext'
 import { getMyFeedback, submitFeedback } from '../lib/db'
 import { useScrollLock } from '../lib/useScrollLock'
+import { useEscKey } from '../lib/useEscKey'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
 function formatDate(iso) {
@@ -20,6 +21,7 @@ export default function FeedbackModal({ onClose }) {
   const [error, setError] = useState(null)
 
   useScrollLock(true)
+  useEscKey(onClose)
 
   useEffect(() => {
     getMyFeedback(user.id).then(setItems).catch(() => setItems([])).finally(() => setLoading(false))

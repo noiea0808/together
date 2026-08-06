@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend, getPublicOrigin } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
+import { shareLink, copyToClipboard, canShare } from '../lib/share'
 import { SLOT_STATUS_OPTIONS } from '../mock/data'
 import { isPotTimeExpired, getJoinedStatusLabel } from '../lib/potConstants'
 import PotCard from '../components/PotCard'
@@ -12,20 +13,52 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import RiceBowlIcon from '../components/RiceBowlIcon'
-import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon } from '../components/GroupIcons'
+import { UsersIcon, UserIcon, PencilIcon, SendIcon, LogOutIcon, CrownIcon, SlidersIcon, UndoIcon, ChevronDownIcon, BroadcastIcon, BroadcastOffIcon, MoreHorizontalIcon, SearchIcon, LockIcon } from '../components/GroupIcons'
 import SlotIcon from '../components/SlotIcon'
 import StatusIcon from '../components/StatusIcon'
 import PotIcon from '../components/PotIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
-// 상태값별 내 상태 카드 보조 문구
+// 받침 유무에 따라 은/는을 골라 단어에 붙인다 (한글 유니코드 완성형 범위에서 종성 코드로 판별).
+function withEunNeun(word) {
+  const last = word[word.length - 1]
+  const code = last.charCodeAt(0) - 0xAC00
+  if (code < 0 || code > 11171) return `${word}은` // 한글 완성형이 아니면(숫자 등) 기본값
+  return code % 28 === 0 ? `${word}는` : `${word}은`
+}
+
+// "오늘 오전간식"처럼 날짜+슬롯 앞부분이 길어지면, 브라우저가 아무 데서나 줄바꿈하기 전에
+// 미리 그 뒤에서 끊어준다 — '아침'/'점심' 같은 짧은 조합은 한 줄 그대로 둔다.
+function dayslotSep(dayLabel, slot) {
+  return (dayLabel.length + slot.length) > 4 ? '\n' : ' '
+}
+
+// 상태값별 내 상태 카드 보조 문구 — dayLabel은 조회 중인 날짜에 맞는 상대 표현('오늘'/'내일'/'모레'/'N일 뒤')
 const STATUS_SUBTEXT = {
-  open: (slot) => `오늘 ${slot} 같이 먹을 수 있어요`,
-  closed: (slot) => `오늘 ${slot}은 약속이 있어요`,
+  open: (slot, dayLabel) => `${dayLabel} ${slot}${dayslotSep(dayLabel, slot)}같이 먹을 수 있어요`,
+  closed: (slot, dayLabel) => `${dayLabel} ${withEunNeun(slot)}${dayslotSep(dayLabel, slot)}약속이 있어요`,
   skip: (slot) => `이번 ${slot}은 쉬어갈게요`,
 }
-const STATUS_SUBTEXT_EMPTY = (slot) => `오늘 ${slot}은 어떻게 할까요?`
+
+// 매번 같은 문장이면 지루하니 몇 가지 배리에이션을 두고, 날짜+슬롯 기준으로 고정 선택한다
+// (매 리렌더마다 바뀌면 화면이 깜빡이는 것처럼 보여서 랜덤이 아니라 해시로 고정값을 고른다).
+const STATUS_SUBTEXT_EMPTY_VARIANTS = [
+  (slot, dayLabel) => `${dayLabel} ${withEunNeun(slot)}${dayslotSep(dayLabel, slot)}누구랑 먹을거에요?`,
+  (slot, dayLabel) => `${dayLabel} ${slot}${dayslotSep(dayLabel, slot)}메뉴는 정했어요?`,
+  (slot, dayLabel) => `${dayLabel} ${slot}엔${dayslotSep(dayLabel, slot)}뭐 드실 거예요?`,
+  (slot, dayLabel) => `${dayLabel} ${slot},${dayslotSep(dayLabel, slot)}같이 먹을 사람 구해볼까요?`,
+  (slot, dayLabel) => `${dayLabel} ${withEunNeun(slot)}${dayslotSep(dayLabel, slot)}아직 안 정했죠?`,
+]
+function hashString(str) {
+  let h = 0
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) | 0
+  return Math.abs(h)
+}
+function statusSubtextEmpty(slot, dayLabel, dateStr) {
+  const variant = STATUS_SUBTEXT_EMPTY_VARIANTS[hashString(`${dateStr}-${slot}`) % STATUS_SUBTEXT_EMPTY_VARIANTS.length]
+  return variant(slot, dayLabel)
+}
 
 // 상태 선택 팝업의 버튼 부제 — 슬롯명은 팝업 타이틀에 이미 나오므로 빼고, 뜻만 짧게.
 // 메인 카드에 쓰는 STATUS_SUBTEXT(슬롯명 포함, 문장형)와는 용도가 달라 별도로 둔다.
@@ -119,6 +152,13 @@ function addDays(date, n) {
 }
 const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
 
+// 드래그 도중 텍스트가 선택됐는지 — 마우스로 천천히/빠르게 텍스트를 드래그해도, 실제로 글자가
+// 선택돼 있으면 스와이프 제스처가 아니라 텍스트 선택 시도였다고 판단해 내비게이션을 건너뛴다.
+function isTextBeingSelected() {
+  const selection = window.getSelection?.()
+  return !!selection && selection.toString().length > 0
+}
+
 function sortPots(pots) {
   const byTime = (a, b) => a.meal_time.localeCompare(b.meal_time)
   return [
@@ -168,13 +208,17 @@ export default function TodayPage() {
   // 카드 전체가 탭 영역(편집 팝업 열기)이 된 뒤로는, 드래그가 클릭으로 이어져 편집 팝업이
   // 실수로 열리지 않도록 드래그 여부를 기록해뒀다가 onClick에서 건너뛴다.
   const cardWasDragged = useRef(false)
-  const handleCardSwipeStart = (e) => { e.stopPropagation(); swipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handleCardSwipeStart = (e) => {
+    e.stopPropagation()
+    swipeStart.current = { x: e.clientX, y: e.clientY }
+  }
   const handleCardSwipeEnd = (e) => {
     if (!swipeStart.current) return
     e.stopPropagation()
     const dx = e.clientX - swipeStart.current.x
     const dy = e.clientY - swipeStart.current.y
     swipeStart.current = null
+    if (isTextBeingSelected()) return // 텍스트를 드래그로 선택한 경우 — 속도와 무관하게 스와이프로 취급하지 않는다
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
     cardWasDragged.current = true
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
@@ -195,12 +239,15 @@ export default function TodayPage() {
 
   // 메인 상태 카드를 제외한 나머지 화면 영역 스와이프 — 전후 날짜로 이동
   const pageSwipeStart = useRef(null)
-  const handlePageSwipeStart = (e) => { pageSwipeStart.current = { x: e.clientX, y: e.clientY } }
+  const handlePageSwipeStart = (e) => {
+    pageSwipeStart.current = { x: e.clientX, y: e.clientY }
+  }
   const handlePageSwipeEnd = (e) => {
     if (!pageSwipeStart.current) return
     const dx = e.clientX - pageSwipeStart.current.x
     const dy = e.clientY - pageSwipeStart.current.y
     pageSwipeStart.current = null
+    if (isTextBeingSelected()) return // 텍스트를 드래그로 선택한 경우 — 속도와 무관하게 스와이프로 취급하지 않는다
     if (Math.abs(dx) < 60 || Math.abs(dx) < Math.abs(dy)) return
     goToDate(d => addDays(d, dx < 0 ? 1 : -1))
   }
@@ -810,7 +857,7 @@ export default function TodayPage() {
                           style={styles.cardMenuItem}
                           onClick={() => { setShowCardMenu(false); setShowResetConfirm(true) }}
                         >
-                          <UndoIcon size={13} strokeWidth={2.2} /> 오늘 상태 초기화
+                          <UndoIcon size={13} strokeWidth={2.2} /> {getRelativeLabel(currentDate).label} 상태 초기화
                         </button>
                       </div>
                     </>
@@ -830,13 +877,13 @@ export default function TodayPage() {
                 {info.label ? (
                   <>
                     <span style={{ ...styles.mainStatusLabel, color: info.color }}>{info.label}</span>
-                    {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](slot)}</span>}
+                    {STATUS_SUBTEXT[info.key] && <span style={styles.mainStatusSub}>{STATUS_SUBTEXT[info.key](slot, getRelativeLabel(currentDate).label)}</span>}
                     {info.timeStr && <span style={styles.mainStatusMeta}>{info.timeStr}</span>}
                     {info.desc && <span style={styles.mainStatusDesc}>{info.desc}</span>}
                   </>
                 ) : (
                   <span style={styles.mainStatusEmpty}>
-                    {info.isPastDate ? '기록 없음' : STATUS_SUBTEXT_EMPTY(slot)}
+                    {info.isPastDate ? '기록 없음' : statusSubtextEmpty(slot, getRelativeLabel(currentDate).label, dateStr)}
                   </span>
                 )}
               </div>
@@ -929,7 +976,7 @@ export default function TodayPage() {
 
         {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 더보기(⋮) 메뉴로 묶어서 우측에 작게 */}
         <div style={styles.sectionTitleRow}>
-          <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : '오늘 열린 밥팟'}</div>
+          <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : `${getRelativeLabel(currentDate).label} 열린 밥팟`}</div>
           {viewMode === 'group' && !editingOrder && (
             <div style={{ position: 'relative' }}>
               <button style={styles.viewMenuBtn} aria-label="더보기" onClick={() => setShowViewMenu(v => !v)}>
@@ -965,7 +1012,7 @@ export default function TodayPage() {
               그룹을 만들거나 초대 코드로 참여하면<br />팀원 상태를 여기서 볼 수 있어요.
             </p>
             <button style={styles.emptyBtn} onClick={() => setShowGroupSetup(true)}>
-              그룹 만들기 / 참여하기
+              그룹 참여하기 / 만들기
             </button>
           </div>
         )}
@@ -1002,12 +1049,12 @@ export default function TodayPage() {
               )
             })
           })() : (
-            <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} />
+            <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} dayLabel={getRelativeLabel(currentDate).label} />
           )}
         </div>
 
         <div style={styles.secondaryLinkRow}>
-          <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 만들기 / 참여하기</button>
+          <button style={styles.secondaryLinkBtn} onClick={() => setShowGroupSetup(true)}>그룹 참여하기 / 만들기</button>
           <span style={styles.secondaryLinkDivider}>·</span>
           <button style={styles.secondaryLinkBtn} onClick={() => setShowJoinPot(true)}>초대 코드로 밥팟 참여</button>
         </div>
@@ -1522,10 +1569,12 @@ export default function TodayPage() {
 function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotData, isShared, onToggleShare, onShowToast, amIInAnyPot, allCollapsed, collapseKey, dateStr, onNavigate, onRefresh }) {
   const [showInvite, setShowInvite] = useState(false)
   const [copied, setCopied] = useState(null)
+  const [copyFailed, setCopyFailed] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [editingName, setEditingName] = useState(false)
   const [nameValue, setNameValue] = useState(group.name)
   const [confirmLeave, setConfirmLeave] = useState(false)
+  const [showGroupMenu, setShowGroupMenu] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   useEffect(() => { setCollapsed(allCollapsed) }, [collapseKey])
 
@@ -1537,6 +1586,70 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   // 멤버 관리
   const [showMemberManage, setShowMemberManage] = useState(false)
   const [confirmRemoveMember, setConfirmRemoveMember] = useState(null) // { id, nickname }
+
+  // 그룹 검색 허용 + 비밀번호 (방장 전용) — 켜려면 비밀번호가 먼저 설정돼 있어야 함.
+  // searchSelected는 "허용/허용 안 함" 중 화면에 선택 표시된 쪽 — 비밀번호가 아직 없는 상태에서
+  // "허용"을 누르면 곧바로 저장하지 않고 우선 선택만 표시하고 비밀번호 입력칸을 펼친다.
+  const [showSearchSettings, setShowSearchSettings] = useState(false)
+  const [searchSettingsLoading, setSearchSettingsLoading] = useState(false)
+  const [searchAllow, setSearchAllow] = useState(false)
+  const [searchSelected, setSearchSelected] = useState(false)
+  const [searchHasPassword, setSearchHasPassword] = useState(false)
+  const [searchPasswordInput, setSearchPasswordInput] = useState('')
+  const [searchSettingsSaving, setSearchSettingsSaving] = useState(false)
+  const [searchSettingsError, setSearchSettingsError] = useState(null)
+
+  useEffect(() => {
+    if (!showSearchSettings) return
+    setSearchSettingsLoading(true)
+    setSearchSettingsError(null)
+    getGroupSearchSettings(group.id)
+      .then(s => { setSearchAllow(s.allow_search); setSearchSelected(s.allow_search); setSearchHasPassword(s.has_password) })
+      .catch(() => setSearchSettingsError('불러오지 못했어요.'))
+      .finally(() => setSearchSettingsLoading(false))
+  }, [showSearchSettings, group.id])
+
+  const persistAllowSearch = async (next) => {
+    setSearchSettingsSaving(true)
+    setSearchSettingsError(null)
+    try {
+      await setGroupAllowSearch(group.id, next)
+      setSearchAllow(next)
+    } catch (e) {
+      setSearchSettingsError(e.message || '저장하지 못했어요.')
+      setSearchSelected(searchAllow) // 실패하면 선택 표시를 실제 저장된 상태로 되돌림
+    } finally {
+      setSearchSettingsSaving(false)
+    }
+  }
+
+  const selectAllowSearch = (next) => {
+    if (searchSettingsSaving || searchSelected === next) return
+    setSearchSettingsError(null)
+    setSearchSelected(next)
+    // 켜는 경우인데 비밀번호가 아직 없으면, 저장은 비밀번호 입력 후로 미루고 선택 표시만 바꾼다.
+    if (next && !searchHasPassword) return
+    persistAllowSearch(next)
+  }
+
+  const handleSaveSearchPassword = async () => {
+    if (searchSettingsSaving || searchPasswordInput.trim().length < 4) return
+    setSearchSettingsSaving(true)
+    setSearchSettingsError(null)
+    try {
+      await setGroupPassword(group.id, searchPasswordInput.trim())
+      setSearchHasPassword(true)
+      setSearchPasswordInput('')
+      if (searchSelected && !searchAllow) {
+        await setGroupAllowSearch(group.id, true)
+        setSearchAllow(true)
+      }
+    } catch (e) {
+      setSearchSettingsError(e.message || '저장하지 못했어요.')
+    } finally {
+      setSearchSettingsSaving(false)
+    }
+  }
 
   // 그룹 초대하기 — 친구 선택(내 다른 그룹 멤버) / 초대 코드 / 링크
   const [inviteTab, setInviteTab] = useState('friend')
@@ -1626,7 +1739,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   }
 
   // 설정 시트가 열려 있는 동안 배경 스크롤 잠금
-  useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showInvite || confirmRemoveMember || proposeTarget))
+  useScrollLock(!!(showSettings || editingName || editingNickname || showMemberManage || showSearchSettings || showInvite || confirmRemoveMember || proposeTarget))
 
   // 참여 중인 슬롯은 무조건 공유 상태라 끌 수 없다 — 시도하면 이유를 토스트로 알려주고 끝낸다.
   // (정상적으로 토글이 적용됐을 때의 안내 토스트는 상위 handleToggleShare가 띄운다)
@@ -1641,7 +1754,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
   const isMaster = group.created_by === myUserId
 
   const handleSaveName = async () => {
-    if (!nameValue.trim()) return
+    if (nameValue.trim().length < 4) return
     await updateGroupName(group.id, nameValue.trim())
     setEditingName(false)
     setShowSettings(false)
@@ -1716,10 +1829,33 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
   const hasActivity = members.some(m => getMemberData(m.id)?.status) || pots.length > 0
 
-  const copyText = (text, type) => {
-    navigator.clipboard?.writeText(text)
-    setCopied(type)
-    setTimeout(() => setCopied(null), 2000)
+  const inviteLink = `${getPublicOrigin()}/join/${group.invite_code}`
+
+  // 복사 성공 여부를 확인하고 표시한다 — 예전엔 실패해도 "✓"가 떠서 빈 클립보드를 붙여넣게 됐다.
+  const copyText = async (text, type) => {
+    setCopyFailed(false)
+    if (await copyToClipboard(text)) {
+      setCopied(type)
+      setTimeout(() => setCopied(null), 2000)
+    } else {
+      setCopyFailed(true)
+    }
+  }
+
+  // OS 공유 시트 — 카톡 등으로 바로 보낼 수 있어 복사→앱전환→붙여넣기 과정을 없앤다.
+  const handleShareInvite = async () => {
+    setCopyFailed(false)
+    const result = await shareLink({
+      title: `${group.name} 그룹 초대`,
+      text: `"${group.name}" 그룹에 초대할게요. 같이 먹자에서 오늘 뭐 먹을지 맞춰봐요!`,
+      url: inviteLink,
+    })
+    if (result === 'copied') {
+      setCopied('link')
+      setTimeout(() => setCopied(null), 2000)
+    } else if (result === 'failed') {
+      setCopyFailed(true)
+    }
   }
 
   // Status counts for filter tabs
@@ -1756,6 +1892,24 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
       <div style={styles.groupHeader}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
           <span style={{ ...styles.groupName, color: effectiveIsShared ? 'var(--color-text)' : '#8F877D' }}>{group.name}</span>
+          <div style={{ position: 'relative' }}>
+            <button style={styles.viewMenuBtn} aria-label="더보기" onClick={() => setShowGroupMenu(v => !v)}>
+              <MoreHorizontalIcon size={15} />
+            </button>
+            {showGroupMenu && (
+              <>
+                <div style={styles.cardMenuOverlay} onClick={() => setShowGroupMenu(false)} />
+                <div style={styles.cardMenuDropdown}>
+                  <button
+                    style={{ ...styles.cardMenuItem, color: 'var(--color-danger)' }}
+                    onClick={() => { setShowGroupMenu(false); setConfirmLeave(true) }}
+                  >
+                    그룹 나가기
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
           {/* 참여 중인 슬롯은 무조건 공유되므로(effectiveIsShared) 배지는 항상 공유 상태로 보이지만,
@@ -1800,7 +1954,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
       {/* 그룹 설정 바텀시트 */}
       {showSettings && (
-        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowInvite(false) }}>
+        <div style={styles.sheetOverlay} onClick={() => { setShowSettings(false); setEditingName(false); setEditingNickname(false); setShowMemberManage(false); setShowSearchSettings(false); setShowInvite(false) }}>
           <div style={styles.sheet} onClick={e => e.stopPropagation()}>
 
             {/* 타이틀 */}
@@ -1816,16 +1970,30 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             <div style={styles.sheetDivider} />
 
-            {/* 1. 그룹명 변경 (방장만) */}
+            {/* 방장 관리 — 방장에게만 보이는 항목들을 한데 모아 위쪽에 배치 */}
             {isMaster && (
-              <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
-                <span style={styles.sheetRowIcon}><PencilIcon size={17} /></span>
-                <span style={styles.sheetRowLabel}>그룹명 변경</span>
-                <span style={styles.sheetRowChevron}>›</span>
-              </button>
+              <>
+                <div style={styles.sheetSectionLabel}>방장 관리</div>
+                <button style={styles.sheetRow} onClick={() => setEditingName(true)}>
+                  <span style={{ ...styles.sheetRowIcon, ...styles.sheetRowIconMaster }}><PencilIcon size={17} /></span>
+                  <span style={styles.sheetRowLabel}>그룹명 변경</span>
+                  <span style={styles.sheetRowChevron}>›</span>
+                </button>
+                <button style={styles.sheetRow} onClick={() => setShowMemberManage(true)}>
+                  <span style={{ ...styles.sheetRowIcon, ...styles.sheetRowIconMaster }}><UsersIcon size={17} /></span>
+                  <span style={styles.sheetRowLabel}>멤버 관리</span>
+                  <span style={styles.sheetRowChevron}>›</span>
+                </button>
+                <button style={styles.sheetRow} onClick={() => setShowSearchSettings(true)}>
+                  <span style={{ ...styles.sheetRowIcon, ...styles.sheetRowIconMaster }}><SearchIcon size={17} /></span>
+                  <span style={styles.sheetRowLabel}>그룹 검색 허용</span>
+                  <span style={styles.sheetRowChevron}>›</span>
+                </button>
+                <div style={styles.sheetSectionLabel}>공통</div>
+              </>
             )}
 
-            {/* 2. 그룹내 닉네임 변경 */}
+            {/* 그룹내 닉네임 변경 */}
             <button style={styles.sheetRow} onClick={handleEditNicknameOpen}>
               <span style={styles.sheetRowIcon}><UserIcon size={17} /></span>
               <span style={styles.sheetRowLabel}>
@@ -1837,32 +2005,17 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               <span style={styles.sheetRowChevron}>›</span>
             </button>
 
-            {/* 3. 멤버 관리 (방장만) */}
-            {isMaster && (
-              <button style={styles.sheetRow} onClick={() => setShowMemberManage(true)}>
-                <span style={styles.sheetRowIcon}><UsersIcon size={17} /></span>
-                <span style={styles.sheetRowLabel}>멤버 관리</span>
-                <span style={styles.sheetRowChevron}>›</span>
-              </button>
-            )}
-
-            {/* 4. 기본 밥팟 추가 */}
+            {/* 기본 밥팟 추가 */}
             <button style={styles.sheetRow} onClick={() => { setShowSettings(false); onNavigate(`/group/${group.id}/settings`) }}>
               <span style={styles.sheetRowIcon}><RiceBowlIcon size={18} /></span>
               <span style={styles.sheetRowLabel}>기본 밥팟 추가</span>
             </button>
 
-            {/* 5. 그룹 초대하기 */}
+            {/* 그룹 초대하기 */}
             <button style={styles.sheetRow} onClick={() => { setShowInvite(true); setInviteTab('friend') }}>
               <span style={styles.sheetRowIcon}><SendIcon size={16} /></span>
               <span style={styles.sheetRowLabel}>그룹 초대하기</span>
               <span style={styles.sheetRowChevron}>›</span>
-            </button>
-
-            {/* 6. 그룹 나가기 */}
-            <button style={{ ...styles.sheetRow, color: 'var(--color-danger)' }} onClick={() => setConfirmLeave(true)}>
-              <span style={{ ...styles.sheetRowIcon, background: 'var(--color-danger-bg)', color: 'var(--color-danger)' }}><LogOutIcon size={17} /></span>
-              <span style={styles.sheetRowLabel}>그룹 나가기</span>
             </button>
 
             {/* 닫기 */}
@@ -1886,10 +2039,10 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
               maxLength={20}
               autoFocus
               onKeyDown={e => e.key === 'Enter' && handleSaveName()}
-              placeholder="새 그룹명"
+              placeholder="새 그룹명 (4자 이상)"
             />
             <div style={styles.dialogBtns}>
-              <button style={styles.dialogBtnPrimary} onClick={handleSaveName}>저장</button>
+              <button style={{ ...styles.dialogBtnPrimary, opacity: nameValue.trim().length >= 4 ? 1 : 0.4 }} onClick={handleSaveName} disabled={nameValue.trim().length < 4}>저장</button>
               <button style={styles.dialogBtnCancel} onClick={() => { setEditingName(false); setNameValue(group.name) }}>취소</button>
             </div>
           </div>
@@ -1959,6 +2112,73 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
         </div>
       )}
 
+      {/* 그룹 검색 허용 팝업 (방장 전용) */}
+      {showSearchSettings && (
+        <div style={styles.overlay} onClick={() => setShowSearchSettings(false)}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={styles.dialogIconBadge}><SearchIcon size={22} /></div>
+            <div style={styles.dialogTitle}>그룹 검색 허용</div>
+            <p style={styles.dialogDesc}>켜면 그룹 이름 검색으로 누구나 찾을 수 있어요.{'\n'}참여하려면 비밀번호를 입력해야 해요.</p>
+
+            {searchSettingsLoading ? (
+              <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' }}>불러오는 중...</p>
+            ) : (
+              <>
+                <div style={styles.searchToggleRow}>
+                  <button
+                    style={{ ...styles.searchToggleBtn, ...(!searchSelected ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => selectAllowSearch(false)}
+                    disabled={searchSettingsSaving}
+                  >
+                    허용 안 함
+                  </button>
+                  <button
+                    style={{ ...styles.searchToggleBtn, ...(searchSelected ? styles.searchToggleBtnActive : {}) }}
+                    onClick={() => selectAllowSearch(true)}
+                    disabled={searchSettingsSaving}
+                  >
+                    허용
+                  </button>
+                </div>
+
+                {searchSelected && (
+                  <>
+                    <div style={styles.searchPasswordRow}>
+                      <LockIcon size={16} style={{ color: 'var(--color-text-muted)', flexShrink: 0 }} />
+                      <input
+                        style={styles.searchPasswordInput}
+                        type="password"
+                        placeholder={searchHasPassword ? '****' : '비밀번호 설정 (4자 이상)'}
+                        value={searchPasswordInput}
+                        onChange={e => setSearchPasswordInput(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleSaveSearchPassword()}
+                        disabled={searchSettingsSaving}
+                      />
+                      <button
+                        style={{ ...styles.searchPasswordSaveBtn, opacity: searchPasswordInput.trim().length >= 4 ? 1 : 0.4 }}
+                        onClick={handleSaveSearchPassword}
+                        disabled={searchPasswordInput.trim().length < 4 || searchSettingsSaving}
+                      >
+                        저장
+                      </button>
+                    </div>
+                    {searchHasPassword ? (
+                      <p style={styles.searchPasswordHint}>비밀번호가 설정돼 있어요 · 바꾸려면 새로 입력하고 저장하세요</p>
+                    ) : (
+                      <p style={styles.searchPasswordHint}>비밀번호를 저장해야 검색 허용이 켜져요</p>
+                    )}
+                  </>
+                )}
+              </>
+            )}
+
+            {searchSettingsError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{searchSettingsError}</p>}
+
+            <button style={styles.dialogBtnCancel} onClick={() => setShowSearchSettings(false)}>닫기</button>
+          </div>
+        </div>
+      )}
+
       {/* 그룹 초대하기 팝업 — "같이 먹자고 하기"와 동일한 구성(친구 선택/초대 코드/링크) */}
       {showInvite && (
         <div style={styles.overlay} onClick={() => setShowInvite(false)}>
@@ -2010,15 +2230,22 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
             {inviteTab === 'link' && (
               <div style={styles.sharePanel}>
+                {canShare() && (
+                  <button style={{ ...PRIMARY_ACTION_BUTTON, marginBottom: 10 }} onClick={handleShareInvite}>
+                    초대 링크 보내기
+                  </button>
+                )}
                 <div style={styles.shareLabel}>초대 링크</div>
                 <div style={styles.shareRow}>
-                  <span style={styles.shareText}>{`${getPublicOrigin()}/join/${group.invite_code}`}</span>
-                  <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(`${getPublicOrigin()}/join/${group.invite_code}`, 'link')}>
+                  <span style={styles.shareText}>{inviteLink}</span>
+                  <button style={{ ...styles.shareCopyBtn, background: copied === 'link' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(inviteLink, 'link')}>
                     {copied === 'link' ? '✓' : '복사'}
                   </button>
                 </div>
               </div>
             )}
+
+            {copyFailed && <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', margin: 0 }}>복사하지 못했어요. 링크를 길게 눌러 직접 복사해주세요.</p>}
 
             <button style={styles.dialogBtnCancel} onClick={() => setShowInvite(false)}>닫기</button>
           </div>
@@ -2169,7 +2396,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 
 // 그룹별 보기 전용 — 팀명을 반복하지 않는 슬림한 타임 행 (밥팟별 보기의 독립 카드와 의도적으로 다른 형태)
 // 밥팟별 보기 — 슬롯 구분 없이 해당 날짜에 열린 전체 밥팟을 그룹/슬롯 순으로 나열
-function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
+function AllPotsView({ groups, potsMap, myUserId, onNavigate, dayLabel }) {
   const allPots = Object.entries(potsMap)
     .flatMap(([groupId, pots]) => pots.map(pot => ({ pot, groupName: groups.find(g => g.id === groupId)?.name ?? '' })))
     .sort((a, b) => {
@@ -2182,7 +2409,7 @@ function AllPotsView({ groups, potsMap, myUserId, onNavigate }) {
     return (
       <div style={styles.emptyGroup}>
         <RiceBowlIcon size={36} />
-        <div style={{ fontWeight: 700 }}>오늘 열린 밥팟이 없어요</div>
+        <div style={{ fontWeight: 700 }}>{dayLabel} 열린 밥팟이 없어요</div>
         <p style={{ color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', textAlign: 'center', lineHeight: 1.6 }}>
           그룹으로 보기에서 밥팟을 만들어보세요.
         </p>
@@ -2426,10 +2653,10 @@ const styles = {
   mainStatusIconImg: { width: 112, height: 112, flexShrink: 0 },
   mainStatusTextCol: { flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center', gap: 2, minWidth: 0, minHeight: 60 },
   mainStatusLabel: { fontSize: 'var(--font-size-lg)', fontWeight: 900, letterSpacing: '-0.3px' },
-  mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600 },
+  mainStatusSub: { fontSize: 'var(--font-size-xs)', color: '#5A5148', fontWeight: 600, whiteSpace: 'pre-line', lineHeight: 1.4 },
   mainStatusMeta: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
-  mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600 },
+  mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600, whiteSpace: 'pre-line', lineHeight: 1.4 },
   subSlotRow: { display: 'flex', alignItems: 'stretch', gap: 4 },
   subSlotBtn: { display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 0, height: 60, boxSizing: 'border-box', padding: 0, border: '1.5px solid', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
   subSlotIconZone: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
@@ -2478,12 +2705,16 @@ const styles = {
     borderRadius: 'var(--radius-full)', padding: '3px 11px',
   },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '8px 0 6px' },
+  sheetSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', padding: '10px 12px 4px' },
   sheetRow: { display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', background: 'var(--color-bg)', border: 'none', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', borderRadius: 'var(--radius-md)', width: '100%', textAlign: 'left' },
   sheetRowIcon: {
     width: 34, height: 34, borderRadius: 10, flexShrink: 0,
     background: 'var(--color-surface-2)', color: 'var(--color-text)',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
+  // 방장 전용 항목(그룹명 변경/멤버 관리/그룹 검색 허용) 아이콘 배지 — "그룹 나가기"의 danger 톤과
+  // 같은 방식으로, 소제목 없이도 한눈에 방장 전용 항목임을 구분할 수 있게 한다.
+  sheetRowIconMaster: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
   sheetRowLabel: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
   sheetRowChevron: { fontSize: 10, color: 'var(--color-text-muted)' },
   sheetClose: { width: '100%', padding: 12, marginTop: 10, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
@@ -2495,6 +2726,14 @@ const styles = {
   memberManageList: { width: '100%', display: 'flex', flexDirection: 'column', maxHeight: '50vh', overflowY: 'auto' },
 
   dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+
+  searchToggleRow: { display: 'flex', width: '100%', gap: 6 },
+  searchToggleBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  searchToggleBtnActive: { border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)', color: 'var(--color-primary)', fontWeight: 700 },
+  searchPasswordRow: { width: '100%', display: 'flex', alignItems: 'center', gap: 6 },
+  searchPasswordInput: { flex: 1, minWidth: 0, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
+  searchPasswordSaveBtn: { flexShrink: 0, padding: '10px 14px', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
+  searchPasswordHint: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', margin: 0 },
 
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },

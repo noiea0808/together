@@ -81,7 +81,7 @@ const TABS = [
   { path: '/today',    Icon: HomeIcon,     label: '오늘' },
   { path: '/schedule', Icon: CalendarIcon, label: '일정' },
   { path: '/moment',   Icon: MomentIcon,   label: '모먼트' },
-  { path: '/group',    Icon: PeopleIcon,   label: '친구' },
+  { path: '/group',    Icon: PeopleIcon,   label: '그룹 멤버들' },
   { path: '/account',  Icon: UserIcon,     label: '내 계정' },
 ]
 

@@ -13,7 +13,7 @@ const PAGES = [
   {
     shot: guideAsk,
     title: '점약있어요?',
-    body: '점심을 제안했다가 괜히 머쓱했던 순간들.\n\n그런 순간을 조금 더\n편하게 만들고 싶었어요.',
+    body: '서로의 점심 약속을 미리 알고,\n괜히 머쓱해지는 일이\n없었으면 해서 만들었어요.',
   },
   {
     shot: guideGroup,
