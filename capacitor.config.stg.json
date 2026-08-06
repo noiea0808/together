@@ -1,0 +1,11 @@
+{
+  "appId": "com.gachimeokja.app",
+  "appName": "STG",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "https"
+  },
+  "android": {
+    "path": "android-stg"
+  }
+}

@@ -12,17 +12,24 @@ function logPushResult(label, pushError, pushResult) {
   else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
 }
 
+// STG 빌드(`vite build --mode stg`, capacitor.config.stg.json)는 프로덕션 앱과 같은 기기에
+// 나란히 설치되는 별도 패키지(com.gachimeokja.app)라 백엔드/스킴을 프로덕션과 분리해야 한다.
+const IS_STG = import.meta.env.MODE === 'stg'
+
 // 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
 // https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
-const PUBLIC_ORIGIN = 'https://www.eat-together.net'
+const PUBLIC_ORIGIN = IS_STG
+  ? 'https://together-git-staging-noieas-projects.vercel.app'
+  : 'https://www.eat-together.net'
 export function getPublicOrigin() {
   return Capacitor.isNativePlatform() ? PUBLIC_ORIGIN : window.location.origin
 }
 
-// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml의 intent-filter와
-// 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로 돌아오면
-// AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
-const NATIVE_OAUTH_REDIRECT = 'gachimeokja://oauth-callback'
+// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml(STG는 android-stg/)의
+// intent-filter와 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로
+// 돌아오면 AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
+// STG는 프로덕션 앱과 스킴이 겹치면 로그인 복귀 시 OS가 앱 선택창을 띄우므로 별도 스킴을 쓴다.
+const NATIVE_OAUTH_REDIRECT = IS_STG ? 'gachimeokjastg://oauth-callback' : 'gachimeokja://oauth-callback'
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {

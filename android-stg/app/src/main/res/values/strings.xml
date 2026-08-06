@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">STG</string>
+    <string name="title_activity_main">STG</string>
+    <string name="package_name">com.gachimeokja.app</string>
+    <string name="custom_url_scheme">com.gachimeokja.app</string>
+</resources>
