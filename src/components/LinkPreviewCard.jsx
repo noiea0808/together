@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCache, setCache } from '../lib/cache'
+import { getPublicOrigin } from '../lib/db'
 
 const URL_RE = /https?:\/\/[^\s]+/i
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
@@ -26,7 +27,7 @@ function hostnameOf(url) {
 // 썸네일은 우리 이미지 프록시를 거쳐 불러온다. 네이버 등 일부 CDN이 Referer로
 // 핫링크를 차단해 <img>로 직접 부르면 배포 도메인에서 403이 나기 때문이다.
 function proxied(imageUrl) {
-  return `/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
+  return `${getPublicOrigin()}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
 }
 
 export default function LinkPreviewCard({ text }) {
@@ -58,7 +59,7 @@ export default function LinkPreviewCard({ text }) {
     if (!url || !visible) return
     const cached = getCache(`linkpreview:${url}`, ONE_DAY_MS)
     if (cached) { setPreview(cached.data); return }
-    fetch(`/api/link-preview?url=${encodeURIComponent(url)}`)
+    fetch(`${getPublicOrigin()}/api/link-preview?url=${encodeURIComponent(url)}`)
       .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
       .then(data => { setCache(`linkpreview:${url}`, data); setPreview(data) })
       .catch(() => {})
