@@ -3,8 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { useEscKey } from '../lib/useEscKey'
 import {
-  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setAutoFriendGroupmates,
-  getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
+  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setActivityNotifyEnabled, setAutoFriendGroupmates,
+  getWishPlaces, addWishPlace, updateWishPlace, updateWishPlacePreview, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
@@ -98,7 +98,12 @@ export default function MyAccountPage() {
   const [avatarError, setAvatarError] = useState(null)
   const [cropFile, setCropFile] = useState(null)
   const avatarInputRef = useRef(null)
-  const [pushEnabled, setPushEnabled] = useState(false)
+  // pushEnabled(활동 알림)와 lunchReminderEnabled(점심 상태 리마인드)는 서로 독립적인
+  // DB 컬럼(notify_activity / notify_lunch_reminder)이다. hasPushSubscription은 둘 중
+  // 하나라도 켜져 있으면 필요한 "이 기기가 푸시를 받을 수 있는 상태인지"를 나타내는
+  // 순수 인프라 플래그로, 어느 토글의 on/off 표시에도 직접 쓰이지 않는다.
+  const [pushEnabled, setPushEnabled] = useState(user?.notify_activity ?? true)
+  const [hasPushSubscription, setHasPushSubscription] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushError, setPushError] = useState(null)
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
@@ -141,7 +146,7 @@ export default function MyAccountPage() {
 
   useEffect(() => {
     if (!isPushSupported()) return
-    getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
+    getPushSubscription().then((sub) => setHasPushSubscription(!!sub)).catch(() => {})
   }, [])
 
 
@@ -263,6 +268,17 @@ export default function MyAccountPage() {
     }
   }
 
+  // LinkPreviewCard가 처음 가져오거나(등록 직후) 새로고침 버튼으로 다시 가져온 미리보기를
+  // DB에 저장해 다음부터는 다시 긁어오지 않고 바로 보여준다. data가 null이면(요청 자체 실패)
+  // 저장하지 않고 다음에 다시 시도할 수 있게 둔다.
+  const handleWishPreviewFetched = (placeId, data) => {
+    if (!data) return
+    updateWishPlacePreview(placeId, data).catch(e => console.error(e))
+    setWishPlaces(prev => prev.map(p => p.id === placeId
+      ? { ...p, preview_title: data.title ?? null, preview_description: data.description ?? null, preview_image: data.image ?? null, preview_site_name: data.siteName ?? null }
+      : p))
+  }
+
   const toggleNewWishGroup = (groupId) => {
     setNewWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
   }
@@ -307,7 +323,11 @@ export default function MyAccountPage() {
       await updateWishPlace(editingWishId, content, editingWishCategory)
       await setWishPlaceShares(editingWishId, editingWishGroupIds)
       const shares = editingWishGroupIds.map(group_id => ({ group_id }))
-      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content, category: editingWishCategory, wish_place_shares: shares } : p))
+      // 링크가 바뀌었을 수 있어 db.js의 updateWishPlace가 저장된 미리보기를 서버에서 비웠다 —
+      // 로컬 상태도 맞춰서 비워야 LinkPreviewCard가 새 링크로 다시 가져온다.
+      setWishPlaces(prev => prev.map(p => p.id === editingWishId
+        ? { ...p, content, category: editingWishCategory, wish_place_shares: shares, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null }
+        : p))
       cancelEditWish()
     } catch (e) {
       console.error(e)
@@ -349,13 +369,24 @@ export default function MyAccountPage() {
     setPushLoading(true)
     setPushError(null)
     try {
-      if (pushEnabled) {
-        await unsubscribeFromPush()
-        setPushEnabled(false)
+      const next = !pushEnabled
+      if (next) {
+        // 아직 이 기기가 구독 전이면(리마인드도 꺼져 있던 경우) 지금 만들어준다.
+        if (!hasPushSubscription) {
+          await subscribeToPush(user.id)
+          setHasPushSubscription(true)
+        }
+        await setActivityNotifyEnabled(user.id, true)
       } else {
-        await subscribeToPush(user.id)
-        setPushEnabled(true)
+        await setActivityNotifyEnabled(user.id, false)
+        // 리마인드가 켜져 있으면 그쪽에 구독이 계속 필요하니 지금은 끄지 않는다.
+        if (!lunchReminderEnabled) {
+          await unsubscribeFromPush()
+          setHasPushSubscription(false)
+        }
       }
+      setPushEnabled(next)
+      login({ ...user, notify_activity: next })
     } catch (e) {
       console.error(e)
       setPushError(e.message || '알림 설정에 실패했어요.')
@@ -449,13 +480,23 @@ export default function MyAccountPage() {
     setPushError(null)
     try {
       const next = !lunchReminderEnabled
-      // 리마인드는 활동 알림과 별개 항목이지만 발송에는 같은 브라우저 푸시 구독이 필요하므로,
-      // 아직 구독 전이면 켜는 시점에 대신 구독해준다.
-      if (next && !pushEnabled) {
-        await subscribeToPush(user.id)
-        setPushEnabled(true)
+      // 리마인드는 활동 알림과 완전히 독립된 항목이지만 발송에는 같은 푸시 구독이 필요하므로,
+      // 아직 구독 전이면 켜는 시점에 대신 구독해준다. (활동 알림 토글은 건드리지 않는다 —
+      // notify_activity 컬럼이 따로 있어서 여기서 구독만 만들어도 그쪽이 켜진 것으로 보이지 않는다.)
+      if (next) {
+        if (!hasPushSubscription) {
+          await subscribeToPush(user.id)
+          setHasPushSubscription(true)
+        }
+        await setLunchReminderEnabled(user.id, true)
+      } else {
+        await setLunchReminderEnabled(user.id, false)
+        // 활동 알림이 켜져 있으면 그쪽에 구독이 계속 필요하니 지금은 끄지 않는다.
+        if (!pushEnabled) {
+          await unsubscribeFromPush()
+          setHasPushSubscription(false)
+        }
       }
-      await setLunchReminderEnabled(user.id, next)
       setLunchReminderState(next)
       login({ ...user, notify_lunch_reminder: next })
     } catch (e) {
@@ -715,7 +756,14 @@ export default function MyAccountPage() {
                   </div>
                 </div>
                 {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
-                <LinkPreviewCard text={place.content} />
+                <LinkPreviewCard
+                  text={place.content}
+                  preview={place.preview_site_name != null
+                    ? { title: place.preview_title, description: place.preview_description, image: place.preview_image, siteName: place.preview_site_name }
+                    : null}
+                  onFetched={data => handleWishPreviewFetched(place.id, data)}
+                  editable
+                />
                 {(() => {
                   const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                   return text && <div style={styles.wishText}>{text}</div>

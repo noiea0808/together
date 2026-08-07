@@ -89,6 +89,9 @@ function extractMeta(html) {
 }
 
 export default async function handler(req, res) {
+  // Capacitor 앱의 WebView는 https://localhost에서 로드되는데, 이 API는 배포 도메인의
+  // 절대 URL(getPublicOrigin())로 호출된다. 자격증명 없는 공개 프록시라 오리진 제한 없이 허용.
+  res.setHeader('Access-Control-Allow-Origin', '*')
   const { url: target, error } = parseSafeUrl(req.query?.url)
   if (error) {
     res.status(400).json({ error })
@@ -104,7 +107,11 @@ export default async function handler(req, res) {
     const youtube = await fetchYoutubePreview(target, controller.signal).catch(() => null)
     if (youtube) {
       clearTimeout(timer)
-      res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800')
+      // 브라우저/CDN 캐시에 저장해두면, 응답 헤더(예: CORS 허용 헤더)를 나중에 바꿔도
+      // 이미 캐시된 URL은 304 재검증 때 옛 헤더를 계속 재사용해 절대 갱신되지 않는 문제가
+      // 있었다(Capacitor WebView에서 실제로 겪음). 클라이언트는 LinkPreviewCard.jsx가
+      // 자체적으로 24시간 캐시하므로 여기서는 아예 캐시하지 않는다.
+      res.setHeader('Cache-Control', 'no-store')
       res.status(200).json(youtube)
       return
     }
@@ -126,7 +133,7 @@ export default async function handler(req, res) {
 
     const contentType = response.headers.get('content-type') || ''
     if (!contentType.includes('text/html') || !response.body) {
-      res.setHeader('Cache-Control', 's-maxage=3600, stale-while-revalidate=86400')
+      res.setHeader('Cache-Control', 'no-store')
       res.status(200).json({ url: target.href, siteName: target.hostname })
       return
     }
@@ -153,7 +160,7 @@ export default async function handler(req, res) {
       try { image = new URL(image, response.url || fetchUrl.href).href } catch { image = null }
     }
 
-    res.setHeader('Cache-Control', 's-maxage=86400, stale-while-revalidate=604800')
+    res.setHeader('Cache-Control', 'no-store')
     res.status(200).json({
       url: target.href,
       title: meta.title || target.hostname,
@@ -163,6 +170,7 @@ export default async function handler(req, res) {
     })
   } catch {
     clearTimeout(timer)
+    res.setHeader('Cache-Control', 'no-store')
     res.status(200).json({ url: target.href, siteName: target.hostname })
   }
 }

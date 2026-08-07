@@ -9,5 +9,15 @@
         "0D:EF:75:B0:32:00:23:FD:B0:66:1C:69:86:E2:4F:40:BF:46:B3:75:8B:15:06:BB:B1:33:60:7E:B0:A8:A4:60"
       ]
     }
+  },
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.gachimeokja.app",
+      "sha256_cert_fingerprints": [
+        "9D:7B:52:B8:9A:2F:03:74:E7:4E:C2:DC:83:6E:24:06:83:6A:88:42:15:34:67:37:33:37:2B:35:79:92:1D:0D"
+      ]
+    }
   }
 ]

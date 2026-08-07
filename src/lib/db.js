@@ -3,6 +3,9 @@ import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
 import { takePendingRoute } from './pendingRoute'
+import { getPublicOrigin, IS_STG } from './platform'
+
+export { getPublicOrigin } from './platform'
 
 // send-push 결과 로깅 — 실패 사유(FCM 에러 코드 등)가 담긴 pushResult.failures가 객체 배열이라
 // console.warn에 그냥 넘기면 네이티브 WebView 콘솔 브릿지(logcat)에서 "[object Object]"로만
@@ -12,17 +15,11 @@ function logPushResult(label, pushError, pushResult) {
   else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
 }
 
-// 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
-// https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
-const PUBLIC_ORIGIN = 'https://www.eat-together.net'
-export function getPublicOrigin() {
-  return Capacitor.isNativePlatform() ? PUBLIC_ORIGIN : window.location.origin
-}
-
-// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml의 intent-filter와
-// 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로 돌아오면
-// AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
-const NATIVE_OAUTH_REDIRECT = 'gachimeokja://oauth-callback'
+// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml(STG는 android-stg/)의
+// intent-filter와 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로
+// 돌아오면 AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
+// STG는 프로덕션 앱과 스킴이 겹치면 로그인 복귀 시 OS가 앱 선택창을 띄우므로 별도 스킴을 쓴다.
+const NATIVE_OAUTH_REDIRECT = IS_STG ? 'gachimeokjastg://oauth-callback' : 'gachimeokja://oauth-callback'
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {
@@ -184,7 +181,13 @@ export async function fetchProfileForAuthUser(authUser) {
 }
 
 export async function getSessionUser() {
-  const { data: { session } } = await supabase.auth.getSession()
+  // getSession()은 저장된 세션이 만료돼 리프레시가 필요할 때 네트워크 요청을 한다.
+  // 이 리프레시가 네트워크 문제로 실패하면(진짜 로그아웃이 아니라) error와 함께
+  // session: null을 반환하는데, 여기서 error를 버리고 null만 보면 "로그인 안 된 상태"와
+  // "세션은 멀쩡한데 확인을 못한 상태"를 구분할 수 없다. 호출부(UserContext)가 판단할 수
+  // 있도록 error가 있으면 그대로 던진다.
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) throw error
   if (!session) return null
   return fetchProfileForAuthUser(session.user)
 }
@@ -504,6 +507,13 @@ export async function setAutoFriendGroupmates(enabled) {
 
 export async function setLunchReminderEnabled(userId, value) {
   const { error } = await supabase.from('users').update({ notify_lunch_reminder: value }).eq('id', userId)
+  if (error) throw error
+}
+
+// "활동 알림"(좋아요/댓글/초대 등, send-push 경유) on/off — notify_lunch_reminder와 독립된
+// 컬럼이라 서로 영향을 주지 않는다. 실제 발송 여부 필터링은 send-push Edge Function이 한다.
+export async function setActivityNotifyEnabled(userId, value) {
+  const { error } = await supabase.from('users').update({ notify_activity: value }).eq('id', userId)
   if (error) throw error
 }
 
@@ -975,7 +985,7 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
   const url = `/pot/${potId}`
 
   const { error } = await supabase.from('notifications').insert({
-    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite',
+    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite', invite_status: 'pending',
   })
   if (error) throw error
 
@@ -983,6 +993,26 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
     body: { userIds: [toUserId], title, body, url },
   })
   logPushResult('invitePotFriend', pushError, pushResult)
+}
+
+// 알림함에서 밥팟 초대(invitePotFriend)를 수락 — 실제 참여는 joinPot과 완전히 같은 경로를
+// 타서, 밥팟 상세 화면에서 직접 참여했을 때와 알림함 상태가 어긋나지 않는다.
+export async function acceptPotFriendInvite(notificationId, potId, userId) {
+  await joinPot(potId, userId)
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('id', notificationId)
+  if (error) throw error
+}
+
+// 알림함에서 밥팟 초대를 거절 — pot_members는 건드리지 않는다(원래도 참여 안 한 상태이므로).
+export async function declinePotFriendInvite(notificationId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'declined' })
+    .eq('id', notificationId)
+  if (error) throw error
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -1187,6 +1217,14 @@ export async function joinPot(potId, userId) {
     .upsert({ pot_id: potId, user_id: userId })
   if (error) throw error
 
+  // 알림함의 밥팟 초대(invite)를 거치지 않고 상세 화면에서 바로 참여한 경우에도, 그
+  // 초대 알림이 대기 상태로 남아있지 않도록 여기서 같이 정리한다 — 실패해도 참여 자체는
+  // 이미 끝났으니 조용히 넘어간다(알림함 표시만 살짝 안 맞을 뿐 기능엔 영향 없음).
+  supabase.from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('pot_id', potId).eq('user_id', userId).eq('event_type', 'invite').eq('invite_status', 'pending')
+    .then(({ error: syncError }) => { if (syncError) console.warn('invite 알림 동기화 실패:', syncError) })
+
   const { data: joined } = await supabase.from('users').select('nickname').eq('id', userId).single()
   await notifyPotMembers(potId, userId, {
     title: '같이 먹자',
@@ -1197,6 +1235,14 @@ export async function joinPot(potId, userId) {
 
 // 게스트로 밥팟 참여: 익명 세션 발급 → 게스트 프로필 생성 → 참여. 게스트 프로필 반환.
 export async function joinPotAsGuest(potId, nickname) {
+  // 화면이 일시적으로 로그아웃 상태로 오인해(네트워크 문제 등) 게스트 참여 게이트가 떠도,
+  // 실제로는 로그인 세션이 살아있을 수 있다. signInAnonymously는 같은 storage key에 익명
+  // 세션을 덮어써서 진짜 계정 세션을 되돌릴 수 없이 날려버리므로, 발급 전에 한 번 더 확인한다.
+  const { data: { session: existingSession } } = await supabase.auth.getSession()
+  if (existingSession && !existingSession.user.is_anonymous) {
+    throw new Error('ALREADY_LOGGED_IN')
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
   if (authError) throw authError
   const authId = authData.user.id
@@ -1263,6 +1309,41 @@ export async function leavePot(potId, userId) {
     .from('pot_members')
     .delete()
     .match({ pot_id: potId, user_id: userId })
+  if (error) throw error
+}
+
+// 방장/기본팟 관리자가 다른 멤버를 강제로 내보낸다. leavePot(자진 탈퇴)과 달리 나가는 이유가
+// 본인의 선택이 아니므로 당사자에게도 알림이 가야 하는데, notifyPotMembers는 "나간 사람 본인"을
+// 항상 제외하도록 설계돼 있어(자진 탈퇴 시 본인에게 "나갔다"는 알림이 뜰 필요가 없어서) 그대로
+// 재사용하면 정작 쫓겨난 사람만 알림을 못 받는 문제가 있었다. 여기서는 당사자에게 별도 알림을 더 보낸다.
+export async function kickPotMember(potId, targetUserId) {
+  const { data: target } = await supabase.from('users').select('nickname').eq('id', targetUserId).single()
+
+  // 다른 멤버들에게: 기존 leavePot과 동일한 "나갔어요" 알림 (targetUserId 제외)
+  await notifyPotMembers(potId, targetUserId, {
+    title: '같이 먹자',
+    body: `${target?.nickname ?? '누군가'}님이 밥팟에서 나갔어요.`,
+    eventType: 'leave',
+  })
+
+  // 쫓겨난 당사자에게: 별도 문구로 직접 알림 + 푸시
+  const { data: pot } = await supabase.from('meal_pots').select('title').eq('id', potId).single()
+  const title = '밥팟에서 나가게 됐어요'
+  const body = `[${pot?.title ?? '밥팟'}]에서 방장에 의해 내보내졌어요.`
+  const { error: insertError } = await supabase.from('notifications').insert({
+    user_id: targetUserId, pot_id: potId, title, body, event_type: 'kicked',
+  })
+  if (insertError) console.error('kickPotMember 알림 insert 실패:', insertError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [targetUserId], title, body },
+  })
+  logPushResult('kickPotMember', pushError, pushResult)
+
+  const { error } = await supabase
+    .from('pot_members')
+    .delete()
+    .match({ pot_id: potId, user_id: targetUserId })
   if (error) throw error
 }
 
@@ -1776,9 +1857,28 @@ export async function addWishPlace(userId, content, category = 'like') {
 }
 
 export async function updateWishPlace(id, content, category) {
+  // 내용이 바뀌면 링크도 바뀌었을 수 있어 저장해둔 미리보기를 비운다 — 다음에 볼 때
+  // LinkPreviewCard가 새 링크로 한 번 다시 가져와 updateWishPlacePreview로 채워 넣는다.
   const { error } = await supabase
     .from('wish_places')
-    .update({ content, category })
+    .update({ content, category, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// 위시 항목의 링크 미리보기를 등록/조회 시점에 한 번 가져와 저장해둔다. 이후에는 매번
+// 다시 긁어오지 않고 저장된 값을 그대로 보여준다(느리게 뜨는 문제 방지). data가 null이면
+// (fetchLinkPreview 자체가 실패한 경우) 아무것도 저장하지 않아 다음에 다시 시도할 수 있다.
+export async function updateWishPlacePreview(id, data) {
+  if (!data) return
+  const { error } = await supabase
+    .from('wish_places')
+    .update({
+      preview_title: data.title ?? null,
+      preview_description: data.description ?? null,
+      preview_image: data.image ?? null,
+      preview_site_name: data.siteName ?? null,
+    })
     .eq('id', id)
   if (error) throw error
 }
