@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- AndroidManifest.xml의 com.google.firebase.messaging.default_notification_color가
+         상태바 알림 아이콘(흰색 실루엣, ic_stat_notify)을 이 색으로 틴트한다. 웹 CSS의
+         color-primary 브랜드 오렌지와 동일한 값(#FF6B35). -->
+    <color name="notification_icon_color">#FF6B35</color>
+</resources>

@@ -1,5 +1,6 @@
 import { Jimp } from 'jimp'
-import { writeFile } from 'fs/promises'
+import { writeFile, mkdir } from 'fs/promises'
+import { existsSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 
@@ -88,6 +89,23 @@ async function generate() {
 
   await badge.write(join(publicDir, 'badge-monochrome.png'))
   console.log('✓ badge-monochrome.png 생성됨')
+
+  // 같은 흰색 실루엣을 Capacitor 네이티브 앱(FCM)의 상태바 알림 아이콘으로도 쓴다.
+  // AndroidManifest.xml의 com.google.firebase.messaging.default_notification_icon이
+  // 이 리소스(@drawable/ic_stat_notify)를 가리킨다 — 지정 안 하면 FCM이 컬러 런처 아이콘을
+  // 그대로 상태바에 욱여넣어 뭉개진 회색 사각형처럼 보인다.
+  const notifyIconSizes = { mdpi: 24, hdpi: 36, xhdpi: 48, xxhdpi: 72, xxxhdpi: 96 }
+  for (const androidRoot of ['android', 'android-stg']) {
+    const resDir = join(__dirname, '..', androidRoot, 'app/src/main/res')
+    if (!existsSync(resDir)) continue
+    for (const [density, px] of Object.entries(notifyIconSizes)) {
+      const dir = join(resDir, `drawable-${density}`)
+      await mkdir(dir, { recursive: true })
+      const resized = badge.clone().resize({ w: px, h: px })
+      await resized.write(join(dir, 'ic_stat_notify.png'))
+    }
+    console.log(`✓ ${androidRoot}: ic_stat_notify.png (알림 아이콘) 생성됨`)
+  }
 
   // 스테이징에선 아이콘 배경색뿐 아니라 홈 화면에 뜨는 이름도 (STG)를 붙여서,
   // 아이콘 색만으로 구분이 안 갈 때(작은 위젯, 흑백 모드 등)도 확실히 구분되게 한다.

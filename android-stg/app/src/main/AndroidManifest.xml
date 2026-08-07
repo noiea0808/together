@@ -55,6 +55,11 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- FCM 상태바 알림 아이콘 — 지정 안 하면 컬러 런처 아이콘을 그대로 써서 상태바에서
+             뭉개진 회색 사각형처럼 보인다. scripts/generate-icons.mjs가 흰색 실루엣으로 생성. -->
+        <meta-data android:name="com.google.firebase.messaging.default_notification_icon" android:resource="@drawable/ic_stat_notify" />
+        <meta-data android:name="com.google.firebase.messaging.default_notification_color" android:resource="@color/notification_icon_color" />
     </application>
 
     <!-- Permissions -->
