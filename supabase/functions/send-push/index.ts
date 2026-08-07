@@ -48,7 +48,21 @@ Deno.serve(async (req) => {
 
   const admin = createClient(url, serviceKey)
   try {
-    const result = await sendPushToUsers(admin, userIds, { title, body, url: targetUrl })
+    // "활동 알림"을 꺼둔 사용자는 제외한다. 인앱 알림함 기록(notifications 테이블)은 이
+    // 함수를 호출하기 전에 이미 별도로 남겨지므로 여기서 걸러도 알림함에서는 그대로 보인다.
+    // notify_lunch_reminder는 별도 함수(lunch-reminder)가 독립적으로 필터링하므로 여기선
+    // 관여하지 않는다 — 두 알림 종류가 서로 영향을 주지 않게 하는 지점이 바로 여기다.
+    const { data: optedUsers, error: usersErr } = await admin
+      .from('users')
+      .select('id')
+      .in('id', userIds)
+      .eq('notify_activity', true)
+    if (usersErr) return json({ error: usersErr.message }, 500)
+
+    const targetIds = (optedUsers ?? []).map((u) => u.id)
+    if (targetIds.length === 0) return json({ sent: 0, failed: 0, failures: [] })
+
+    const result = await sendPushToUsers(admin, targetIds, { title, body, url: targetUrl })
     return json(result)
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500)

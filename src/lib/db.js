@@ -504,6 +504,13 @@ export async function setLunchReminderEnabled(userId, value) {
   if (error) throw error
 }
 
+// "활동 알림"(좋아요/댓글/초대 등, send-push 경유) on/off — notify_lunch_reminder와 독립된
+// 컬럼이라 서로 영향을 주지 않는다. 실제 발송 여부 필터링은 send-push Edge Function이 한다.
+export async function setActivityNotifyEnabled(userId, value) {
+  const { error } = await supabase.from('users').update({ notify_activity: value }).eq('id', userId)
+  if (error) throw error
+}
+
 // 친구 목록/요청은 users 테이블 RLS(같은 밥팟 참여자만 조회 가능)를 우회해야 해서
 // SECURITY DEFINER RPC를 거친다 — 친구가 반드시 같은 밥팟에 있으리란 보장이 없기 때문.
 export async function getMyFriends() {
