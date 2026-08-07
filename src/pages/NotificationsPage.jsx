@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyNotifications, markAllNotificationsRead, getMyPotsForSlotAllGroups, leavePotWithCleanup, acceptPotInvitation, declinePotInvitation } from '../lib/db'
+import { getMyNotifications, markAllNotificationsRead, getMyPotsForSlotAllGroups, leavePotWithCleanup, acceptPotInvitation, declinePotInvitation, acceptPotFriendInvite, declinePotFriendInvite } from '../lib/db'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
@@ -61,7 +61,9 @@ export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [newIds, setNewIds] = useState(new Set())
   const [actingId, setActingId] = useState(null)
-  const [localOverrides, setLocalOverrides] = useState({}) // invitationId -> { status, pot_id, decline_reason }
+  // "제안"(invite_new)은 pot_invitations.id로, "밥팟 초대"(invite)는 notifications.id로 키를
+  // 잡는다 — 서로 다른 UUID 네임스페이스라 한 맵에 같이 둬도 충돌하지 않는다.
+  const [localOverrides, setLocalOverrides] = useState({}) // id -> { status, pot_id?, decline_reason? }
   const [conflict, setConflict] = useState(null) // { notification, otherPot }
   const [declineTarget, setDeclineTarget] = useState(null) // notification 대상
   const [declineReason, setDeclineReason] = useState('')
@@ -142,6 +144,37 @@ export default function NotificationsPage() {
     }
   }
 
+  // 이미 있는 밥팟에 초대(invitePotFriend, event_type='invite') — "제안"(invite_new)과 달리
+  // 별도 테이블 없이 notifications.invite_status만 본다. 수락은 joinPot과 완전히 같은 경로라
+  // 밥팟 상세 화면에서 직접 참여해도 이 상태가 알아서 같이 맞춰진다(db.js의 joinPot 참고).
+  const handleAcceptPotFriendInvite = async (e, n) => {
+    e.stopPropagation()
+    if (actingId) return
+    setActingId(n.id)
+    try {
+      await acceptPotFriendInvite(n.id, n.pot_id, user.id)
+      setLocalOverrides(prev => ({ ...prev, [n.id]: { status: 'accepted' } }))
+    } catch (e2) {
+      console.error(e2)
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  const handleDeclinePotFriendInvite = async (e, n) => {
+    e.stopPropagation()
+    if (actingId) return
+    setActingId(n.id)
+    try {
+      await declinePotFriendInvite(n.id)
+      setLocalOverrides(prev => ({ ...prev, [n.id]: { status: 'declined' } }))
+    } catch (e2) {
+      console.error(e2)
+    } finally {
+      setActingId(null)
+    }
+  }
+
   const handleConflictLeaveAndAccept = async () => {
     if (!conflict) return
     const { notification, otherPot } = conflict
@@ -200,16 +233,26 @@ export default function NotificationsPage() {
             const inv = n.pot_invitations
             const invStatus = inv ? (localOverrides[inv.id]?.status ?? inv.status) : null
             const invDeclineReason = inv ? (localOverrides[inv.id]?.decline_reason ?? inv.decline_reason) : null
+            // 이미 있는 밥팟에 초대(invite) — 별도 테이블 없이 notifications.invite_status만 본다.
+            // event_type: 'invite'는 그룹 초대(inviteGroupFriend, pot_id 없음)와 겹쳐 쓰이니
+            // pot_id가 있는 경우로 좁힌다.
+            const isPlainInvite = n.event_type === 'invite' && n.pot_id != null
+            const plainInviteStatus = isPlainInvite ? (localOverrides[n.id]?.status ?? n.invite_status) : null
             const dateLabel = formatDate(pot?.date || inv?.date)
             const metaLine = [pot?.groups?.name || inv?.groups?.name, dateLabel, pot?.title || inv?.title].filter(Boolean).join(' · ')
             const isNew = newIds.has(n.id)
-            const isPending = n.event_type === 'invite_new' && invStatus === 'pending'
-            const isBusy = actingId === inv?.id
+            const isPending = (n.event_type === 'invite_new' && invStatus === 'pending')
+              || (isPlainInvite && plainInviteStatus === 'pending')
+            const isBusy = actingId === (inv?.id ?? n.id)
             const handleItemClick = () => {
               if (isPending) return
               if (invStatus === 'accepted') {
                 const potId = localOverrides[inv.id]?.pot_id ?? inv.pot_id
                 if (potId) navigate(`/pot/${potId}`)
+                return
+              }
+              if (isPlainInvite && plainInviteStatus === 'accepted') {
+                if (n.pot_id) navigate(`/pot/${n.pot_id}`)
                 return
               }
               if (n.url) navigate(n.url)
@@ -237,10 +280,18 @@ export default function NotificationsPage() {
                   {n.body && <div style={S.itemText}>{n.body}</div>}
                   {isPending && (
                     <div style={S.inviteBtnRow}>
-                      <button style={S.inviteAcceptBtn} onClick={e => handleAccept(e, n)} disabled={isBusy}>
+                      <button
+                        style={S.inviteAcceptBtn}
+                        onClick={e => isPlainInvite ? handleAcceptPotFriendInvite(e, n) : handleAccept(e, n)}
+                        disabled={isBusy}
+                      >
                         {isBusy ? '처리 중...' : '수락'}
                       </button>
-                      <button style={S.inviteDeclineBtn} onClick={e => openDecline(e, n)} disabled={isBusy}>거절</button>
+                      <button
+                        style={S.inviteDeclineBtn}
+                        onClick={e => isPlainInvite ? handleDeclinePotFriendInvite(e, n) : openDecline(e, n)}
+                        disabled={isBusy}
+                      >거절</button>
                     </div>
                   )}
                   {n.event_type === 'invite_new' && invStatus === 'accepted' && (
@@ -253,6 +304,12 @@ export default function NotificationsPage() {
                   )}
                   {n.event_type === 'invite_new' && invStatus === 'cancelled' && (
                     <div style={S.inviteStatusDeclined}>상대가 제안을 취소했어요</div>
+                  )}
+                  {isPlainInvite && plainInviteStatus === 'accepted' && (
+                    <div style={S.inviteStatusDone}>✓ 참여했어요 · 밥팟으로 이동</div>
+                  )}
+                  {isPlainInvite && plainInviteStatus === 'declined' && (
+                    <div style={S.inviteStatusDeclined}>거절한 초대예요</div>
                   )}
                 </div>
               </div>

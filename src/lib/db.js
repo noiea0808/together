@@ -979,7 +979,7 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
   const url = `/pot/${potId}`
 
   const { error } = await supabase.from('notifications').insert({
-    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite',
+    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite', invite_status: 'pending',
   })
   if (error) throw error
 
@@ -987,6 +987,26 @@ export async function invitePotFriend(potId, fromUserId, toUserId) {
     body: { userIds: [toUserId], title, body, url },
   })
   logPushResult('invitePotFriend', pushError, pushResult)
+}
+
+// 알림함에서 밥팟 초대(invitePotFriend)를 수락 — 실제 참여는 joinPot과 완전히 같은 경로를
+// 타서, 밥팟 상세 화면에서 직접 참여했을 때와 알림함 상태가 어긋나지 않는다.
+export async function acceptPotFriendInvite(notificationId, potId, userId) {
+  await joinPot(potId, userId)
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('id', notificationId)
+  if (error) throw error
+}
+
+// 알림함에서 밥팟 초대를 거절 — pot_members는 건드리지 않는다(원래도 참여 안 한 상태이므로).
+export async function declinePotFriendInvite(notificationId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'declined' })
+    .eq('id', notificationId)
+  if (error) throw error
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -1190,6 +1210,14 @@ export async function joinPot(potId, userId) {
     .from('pot_members')
     .upsert({ pot_id: potId, user_id: userId })
   if (error) throw error
+
+  // 알림함의 밥팟 초대(invite)를 거치지 않고 상세 화면에서 바로 참여한 경우에도, 그
+  // 초대 알림이 대기 상태로 남아있지 않도록 여기서 같이 정리한다 — 실패해도 참여 자체는
+  // 이미 끝났으니 조용히 넘어간다(알림함 표시만 살짝 안 맞을 뿐 기능엔 영향 없음).
+  supabase.from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('pot_id', potId).eq('user_id', userId).eq('event_type', 'invite').eq('invite_status', 'pending')
+    .then(({ error: syncError }) => { if (syncError) console.warn('invite 알림 동기화 실패:', syncError) })
 
   const { data: joined } = await supabase.from('users').select('nickname').eq('id', userId).single()
   await notifyPotMembers(potId, userId, {
