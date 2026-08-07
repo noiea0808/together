@@ -1,38 +1,25 @@
 import { useEffect, useRef, useState } from 'react'
 import { getCache, setCache } from '../lib/cache'
-import { getPublicOrigin } from '../lib/db'
+import { extractFirstUrl, textWithoutUrl, proxiedImageUrl, fetchLinkPreview } from '../lib/linkPreview'
+import { UndoIcon } from './GroupIcons'
 
-const URL_RE = /https?:\/\/[^\s]+/i
+export { extractFirstUrl, textWithoutUrl }
+
 const ONE_DAY_MS = 24 * 60 * 60 * 1000
-
-export function extractFirstUrl(text) {
-  const match = text?.match(URL_RE)
-  if (!match) return null
-  return match[0].replace(/[)\]}>.,!?"']+$/, '')
-}
-
-// 링크가 섞인 텍스트를 카드로 미리보기 할 때, 원문에서 그 주소 부분만 잘라내고
-// 나머지 메모만 카드 뒤에 이어서 보여주기 위한 헬퍼.
-export function textWithoutUrl(content, url) {
-  if (!url) return content
-  const idx = content.indexOf(url)
-  if (idx === -1) return content
-  return (content.slice(0, idx) + content.slice(idx + url.length)).trim()
-}
 
 function hostnameOf(url) {
   try { return new URL(url).hostname } catch { return url }
 }
 
-// 썸네일은 우리 이미지 프록시를 거쳐 불러온다. 네이버 등 일부 CDN이 Referer로
-// 핫링크를 차단해 <img>로 직접 부르면 배포 도메인에서 403이 나기 때문이다.
-function proxied(imageUrl) {
-  return `${getPublicOrigin()}/api/image-proxy?url=${encodeURIComponent(imageUrl)}`
-}
-
-export default function LinkPreviewCard({ text }) {
+// preview: undefined면 기존처럼 컴포넌트가 알아서 가져와 세션 캐시에만 남기는 "독립 모드"
+// (밥팟 메모 등). null/객체로 명시해서 넘기면 "제어 모드" — 부모(DB)가 들고 있는 값을 그대로
+// 보여주고, 처음 한 번 없을 때만 가져온 뒤 onFetched로 결과를 돌려줘 영구 저장하게 한다.
+// editable이 true면(본인 소유일 때만) 새로고침 버튼을 보여준다.
+export default function LinkPreviewCard({ text, preview: storedPreview, onFetched, editable = false }) {
   const url = extractFirstUrl(text)
-  const [preview, setPreview] = useState(null)
+  const controlled = storedPreview !== undefined
+  const [preview, setPreview] = useState(controlled ? storedPreview : null)
+  const [refreshing, setRefreshing] = useState(false)
   const [imgFailed, setImgFailed] = useState(false)
   // og:image는 실제 콘텐츠 사진일 수도, 사이트 로고/아이콘일 수도 있어 API 응답만으론 구분이 안 된다.
   // 그래서 일단 컴팩트(아이콘형)로 시작해서, 실제로 로드된 이미지가 크고 정사각형이 아니면(=사진일 가능성)
@@ -40,6 +27,9 @@ export default function LinkPreviewCard({ text }) {
   const [isIconStyle, setIsIconStyle] = useState(true)
   const rootRef = useRef(null)
   const [visible, setVisible] = useState(false)
+
+  // 제어 모드에서는 부모가 들고 있는 값(예: 새로고침 후 갱신된 값)이 바뀌면 그대로 반영한다.
+  useEffect(() => { if (controlled) setPreview(storedPreview) }, [controlled, storedPreview])
 
   // 리스트에 카드가 여러 개 렌더링될 때(위시 리스트, 밥팟 코멘트 등) 화면에 보이기 전까지
   // /api/link-preview 호출을 미룬다 — 마운트되자마자 전부 요청하면 스크롤 안 한 카드까지 낭비.
@@ -55,15 +45,21 @@ export default function LinkPreviewCard({ text }) {
     return () => observer.disconnect()
   }, [url])
 
+  // 독립 모드: 세션 캐시 우선, 없으면 가져와서 캐시만 해둔다(영구 저장 없음).
   useEffect(() => {
-    if (!url || !visible) return
+    if (!url || controlled || !visible) return
     const cached = getCache(`linkpreview:${url}`, ONE_DAY_MS)
     if (cached) { setPreview(cached.data); return }
-    fetch(`${getPublicOrigin()}/api/link-preview?url=${encodeURIComponent(url)}`)
-      .then(res => { if (!res.ok) throw new Error('fail'); return res.json() })
-      .then(data => { setCache(`linkpreview:${url}`, data); setPreview(data) })
-      .catch(() => {})
-  }, [url, visible])
+    fetchLinkPreview(url).then(data => { if (data) { setCache(`linkpreview:${url}`, data); setPreview(data) } })
+  }, [url, visible, controlled])
+
+  // 제어 모드: 저장된 미리보기가 아직 없을 때(등록 직후 등) 딱 한 번 가져와서 부모에게 돌려준다.
+  // 부모가 DB에 저장해두면 다음부터는 storedPreview로 바로 채워져 이 effect가 다시 돌지 않는다.
+  useEffect(() => {
+    if (!url || !controlled || storedPreview || !visible) return
+    fetchLinkPreview(url).then(data => { if (data) setPreview(data); onFetched?.(data) })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [url, controlled, visible])
 
   useEffect(() => { setImgFailed(false); setIsIconStyle(true) }, [preview?.image])
 
@@ -73,6 +69,17 @@ export default function LinkPreviewCard({ text }) {
     const nearSquare = Math.abs(w - h) / Math.max(w, h) < 0.15
     const looksLikePhoto = !nearSquare && w > 200 && h > 200
     setIsIconStyle(!looksLikePhoto)
+  }
+
+  const handleRefresh = async (e) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (refreshing) return
+    setRefreshing(true)
+    const data = await fetchLinkPreview(url)
+    if (data) setPreview(data)
+    onFetched?.(data)
+    setRefreshing(false)
   }
 
   // preview 메타데이터를 못 가져와도(failed) 최소한 url/호스트명은 보여준다 —
@@ -91,7 +98,7 @@ export default function LinkPreviewCard({ text }) {
       {preview?.image && !imgFailed
         ? (
           <img
-            src={proxied(preview.image)}
+            src={proxiedImageUrl(preview.image)}
             alt=""
             style={isIconStyle ? styles.thumbCompact : styles.thumb}
             loading="lazy"
@@ -105,6 +112,17 @@ export default function LinkPreviewCard({ text }) {
         <div style={isIconStyle ? styles.titleCompact : styles.title}>{preview?.title || url}</div>
         <div style={isIconStyle ? styles.hostCompact : styles.host}>{preview?.siteName || hostnameOf(url)}</div>
       </div>
+      {editable && controlled && (
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={refreshing}
+          aria-label="미리보기 새로고침"
+          style={styles.refreshBtn}
+        >
+          <UndoIcon size={13} style={refreshing ? styles.refreshSpinning : undefined} />
+        </button>
+      )}
     </a>
   )
 }
@@ -151,4 +169,9 @@ const styles = {
     fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', opacity: 0.8,
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
+  refreshBtn: {
+    flexShrink: 0, width: 22, height: 22, display: 'flex', alignItems: 'center', justifyContent: 'center',
+    background: 'transparent', border: 'none', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0,
+  },
+  refreshSpinning: { animation: 'fabSpin 0.8s linear infinite' },
 }

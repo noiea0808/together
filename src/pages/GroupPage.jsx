@@ -632,7 +632,12 @@ export default function GroupPage() {
                             {WISH_CATEGORY_OPTIONS.find(o => o.key === place.category)?.label ?? '좋아하는 곳'}
                           </span>
                         </div>
-                        <LinkPreviewCard text={place.content} />
+                        <LinkPreviewCard
+                          text={place.content}
+                          preview={place.preview_site_name != null
+                            ? { title: place.preview_title, description: place.preview_description, image: place.preview_image, siteName: place.preview_site_name }
+                            : null}
+                        />
                         {(() => {
                           const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                           return text && <div style={styles.friendWishText}>{text}</div>

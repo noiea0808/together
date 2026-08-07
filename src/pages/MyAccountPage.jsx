@@ -4,7 +4,7 @@ import { useUser } from '../lib/UserContext'
 import { useEscKey } from '../lib/useEscKey'
 import {
   updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setAutoFriendGroupmates,
-  getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
+  getWishPlaces, addWishPlace, updateWishPlace, updateWishPlacePreview, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
 } from '../lib/db'
@@ -263,6 +263,17 @@ export default function MyAccountPage() {
     }
   }
 
+  // LinkPreviewCard가 처음 가져오거나(등록 직후) 새로고침 버튼으로 다시 가져온 미리보기를
+  // DB에 저장해 다음부터는 다시 긁어오지 않고 바로 보여준다. data가 null이면(요청 자체 실패)
+  // 저장하지 않고 다음에 다시 시도할 수 있게 둔다.
+  const handleWishPreviewFetched = (placeId, data) => {
+    if (!data) return
+    updateWishPlacePreview(placeId, data).catch(e => console.error(e))
+    setWishPlaces(prev => prev.map(p => p.id === placeId
+      ? { ...p, preview_title: data.title ?? null, preview_description: data.description ?? null, preview_image: data.image ?? null, preview_site_name: data.siteName ?? null }
+      : p))
+  }
+
   const toggleNewWishGroup = (groupId) => {
     setNewWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
   }
@@ -307,7 +318,11 @@ export default function MyAccountPage() {
       await updateWishPlace(editingWishId, content, editingWishCategory)
       await setWishPlaceShares(editingWishId, editingWishGroupIds)
       const shares = editingWishGroupIds.map(group_id => ({ group_id }))
-      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content, category: editingWishCategory, wish_place_shares: shares } : p))
+      // 링크가 바뀌었을 수 있어 db.js의 updateWishPlace가 저장된 미리보기를 서버에서 비웠다 —
+      // 로컬 상태도 맞춰서 비워야 LinkPreviewCard가 새 링크로 다시 가져온다.
+      setWishPlaces(prev => prev.map(p => p.id === editingWishId
+        ? { ...p, content, category: editingWishCategory, wish_place_shares: shares, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null }
+        : p))
       cancelEditWish()
     } catch (e) {
       console.error(e)
@@ -715,7 +730,14 @@ export default function MyAccountPage() {
                   </div>
                 </div>
                 {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
-                <LinkPreviewCard text={place.content} />
+                <LinkPreviewCard
+                  text={place.content}
+                  preview={place.preview_site_name != null
+                    ? { title: place.preview_title, description: place.preview_description, image: place.preview_image, siteName: place.preview_site_name }
+                    : null}
+                  onFetched={data => handleWishPreviewFetched(place.id, data)}
+                  editable
+                />
                 {(() => {
                   const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                   return text && <div style={styles.wishText}>{text}</div>

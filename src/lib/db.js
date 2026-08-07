@@ -3,6 +3,9 @@ import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
 import { takePendingRoute } from './pendingRoute'
+import { getPublicOrigin, IS_STG } from './platform'
+
+export { getPublicOrigin } from './platform'
 
 // send-push 결과 로깅 — 실패 사유(FCM 에러 코드 등)가 담긴 pushResult.failures가 객체 배열이라
 // console.warn에 그냥 넘기면 네이티브 WebView 콘솔 브릿지(logcat)에서 "[object Object]"로만
@@ -10,19 +13,6 @@ import { takePendingRoute } from './pendingRoute'
 function logPushResult(label, pushError, pushResult) {
   if (pushError) console.warn(`${label} send-push 실패:`, JSON.stringify(pushError))
   else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
-}
-
-// STG 빌드(`vite build --mode stg`, capacitor.config.stg.json)는 프로덕션 앱과 같은 기기에
-// 나란히 설치되는 별도 패키지(com.gachimeokja.app)라 백엔드/스킴을 프로덕션과 분리해야 한다.
-const IS_STG = import.meta.env.MODE === 'stg'
-
-// 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
-// https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
-const PUBLIC_ORIGIN = IS_STG
-  ? 'https://together-git-staging-noieas-projects.vercel.app'
-  : 'https://www.eat-together.net'
-export function getPublicOrigin() {
-  return Capacitor.isNativePlatform() ? PUBLIC_ORIGIN : window.location.origin
 }
 
 // OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml(STG는 android-stg/)의
@@ -1783,9 +1773,28 @@ export async function addWishPlace(userId, content, category = 'like') {
 }
 
 export async function updateWishPlace(id, content, category) {
+  // 내용이 바뀌면 링크도 바뀌었을 수 있어 저장해둔 미리보기를 비운다 — 다음에 볼 때
+  // LinkPreviewCard가 새 링크로 한 번 다시 가져와 updateWishPlacePreview로 채워 넣는다.
   const { error } = await supabase
     .from('wish_places')
-    .update({ content, category })
+    .update({ content, category, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// 위시 항목의 링크 미리보기를 등록/조회 시점에 한 번 가져와 저장해둔다. 이후에는 매번
+// 다시 긁어오지 않고 저장된 값을 그대로 보여준다(느리게 뜨는 문제 방지). data가 null이면
+// (fetchLinkPreview 자체가 실패한 경우) 아무것도 저장하지 않아 다음에 다시 시도할 수 있다.
+export async function updateWishPlacePreview(id, data) {
+  if (!data) return
+  const { error } = await supabase
+    .from('wish_places')
+    .update({
+      preview_title: data.title ?? null,
+      preview_description: data.description ?? null,
+      preview_image: data.image ?? null,
+      preview_site_name: data.siteName ?? null,
+    })
     .eq('id', id)
   if (error) throw error
 }
