@@ -510,6 +510,27 @@ export async function setLunchReminderEnabled(userId, value) {
   if (error) throw error
 }
 
+// 메인 화면에 표시할 슬롯 — 끈 슬롯은 오늘부터(과거 날짜는 영향 없음) 서브탭에서 숨겨진다.
+export async function updateActiveSlots(userId, slots) {
+  const { error } = await supabase.from('users').update({ active_slots: slots }).eq('id', userId)
+  if (error) throw error
+}
+
+// 슬롯 끄기는 순수 디스플레이 설정이라 데이터를 지울 필요가 없다 — 대신 특정 날짜에 그 슬롯을
+// 실제로 쓰고 있으면(직접 입력한 상태 또는 밥팟 참여) 그 날짜만 예외적으로 탭에 보여준다.
+// potsMap은 그룹 밥팟만 모으므로, 그룹 없는 친구 밥팟(add_friend_pot.sql) 참여까지 잡으려면
+// 그룹 무관하게 "내 팟"을 직접 조회해야 한다 — pot_members_select_sharedpot RLS가 본인 행은
+// 이미 허용하므로(add_guest_support.sql) 별도 RPC 없이 바로 가능하다.
+export async function getMyPotSlotsForDate(userId, date) {
+  const { data, error } = await supabase
+    .from('pot_members')
+    .select('meal_pots!inner(slot, date)')
+    .eq('user_id', userId)
+    .eq('meal_pots.date', date)
+  if (error) throw error
+  return [...new Set(data.map(r => r.meal_pots.slot))]
+}
+
 // "활동 알림"(좋아요/댓글/초대 등, send-push 경유) on/off — notify_lunch_reminder와 독립된
 // 컬럼이라 서로 영향을 주지 않는다. 실제 발송 여부 필터링은 send-push Edge Function이 한다.
 export async function setActivityNotifyEnabled(userId, value) {

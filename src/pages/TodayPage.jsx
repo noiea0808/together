@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getFriendsStatuses, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, getMyPotSlotsForDate, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getFriendsStatuses, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { shareLink, copyToClipboard, canShare } from '../lib/share'
@@ -222,9 +222,10 @@ export default function TodayPage() {
     if (Math.abs(dx) < 10 && Math.abs(dy) < 10) return
     cardWasDragged.current = true
     if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy)) return
-    const idx = SLOT_ORDER.indexOf(selectedSlot)
-    if (dx < 0 && idx < SLOT_ORDER.length - 1) goToSlot(SLOT_ORDER[idx + 1])
-    else if (dx > 0 && idx > 0) goToSlot(SLOT_ORDER[idx - 1])
+    const idx = visibleSlots.indexOf(selectedSlot)
+    if (idx === -1) return // 보정 useEffect가 아직 selectedSlot을 옮기기 전인 찰나 — 스와이프는 건너뛴다
+    if (dx < 0 && idx < visibleSlots.length - 1) goToSlot(visibleSlots[idx + 1])
+    else if (dx > 0 && idx > 0) goToSlot(visibleSlots[idx - 1])
   }
 
   // 날짜 전환 시 페이지 전체가 밀려나는 방향 — next(내일 방향)/prev(어제 방향)
@@ -307,6 +308,27 @@ export default function TodayPage() {
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
+
+  // 사용 슬롯 설정(MyAccountPage)은 순수 디스플레이 선호라, 꺼둔 슬롯이라도 이 날짜에 실제로
+  // 뭔가 잡혀 있으면(직접 입력한 상태 또는 밥팟 참여) 예외적으로 탭에 보여준다 — 그래야 끄기
+  // 자체가 기존 일정/참여를 숨겨서 접근 불가능하게 만들지 않는다.
+  const [myPotSlotsToday, setMyPotSlotsToday] = useState([])
+  useEffect(() => {
+    if (!user) return
+    getMyPotSlotsForDate(user.id, dateStr).then(setMyPotSlotsToday).catch(() => setMyPotSlotsToday([]))
+  }, [user, dateStr])
+
+  const activeSlots = user?.active_slots ?? SLOT_ORDER
+  const isPastView = currentDate < TODAY
+  const usedSlotsToday = new Set([...Object.keys(mySlots), ...myPotSlotsToday])
+  const visibleSlots = isPastView ? SLOT_ORDER : SLOT_ORDER.filter(s => activeSlots.includes(s) || usedSlotsToday.has(s))
+
+  // 방금 끈 슬롯이 현재 선택돼 있으면(설정을 바꾸고 돌아온 경우 등) 화면에 남지 않도록 보정
+  useEffect(() => {
+    if (!isPastView && visibleSlots.length > 0 && !visibleSlots.includes(selectedSlot)) {
+      setSelectedSlot(visibleSlots[0])
+    }
+  }, [isPastView, visibleSlots.join(','), selectedSlot])
 
   useEffect(() => {
     if (!user || ungroupedFriends.length === 0) { setFriendStatuses([]); return }
@@ -941,9 +963,10 @@ export default function TodayPage() {
           </div>
         </div>
 
-        {/* 슬롯 네비게이션 — 6개 슬롯을 화면 폭 안에 한 번에 표시. 아이콘 존은 중립색, 하단 라벨 띠가 상태색을 담당 */}
+        {/* 슬롯 네비게이션 — 사용 설정된 슬롯만 화면 폭 안에 한 번에 표시(지난 날짜는 6개 전부).
+            아이콘 존은 중립색, 하단 라벨 띠가 상태색을 담당 */}
         <div style={styles.subSlotRow}>
-          {SLOT_ORDER.map(slot => {
+          {visibleSlots.map(slot => {
             const info = getSlotInfo(slot)
             const isSelected = selectedSlot === slot
             return (

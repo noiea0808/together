@@ -7,7 +7,10 @@ import {
   getWishPlaces, addWishPlace, updateWishPlace, updateWishPlacePreview, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
+  updateActiveSlots,
 } from '../lib/db'
+import { SLOT_KEYS } from '../lib/potConstants'
+import SlotIcon from '../components/SlotIcon'
 import FeedbackModal from '../components/FeedbackModal'
 import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -80,6 +83,33 @@ function SettingsRow({ title, description, right, onClick, last }) {
   )
 }
 
+// 사용 슬롯 설정 카드 하나 — 누르면 앞(사용중)/뒤(미사용)로 뒤집히며 토글된다.
+function SlotToggleCard({ slot, active, busy, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-pressed={active}
+      aria-label={`${slot} ${active ? '사용중' : '미사용'}`}
+      style={{ ...styles.slotCardOuter, opacity: busy ? 0.6 : 1 }}
+    >
+      <div style={{ ...styles.slotCardInner, transform: active ? 'rotateY(0deg)' : 'rotateY(180deg)' }}>
+        <div style={{ ...styles.slotCardFace, ...styles.slotCardFront }}>
+          <SlotIcon slot={slot} size={20} />
+          <span style={styles.slotCardLabel}>{slot}</span>
+          <span style={styles.slotCardBadgeOn}>사용중</span>
+        </div>
+        <div style={{ ...styles.slotCardFace, ...styles.slotCardBack }}>
+          <SlotIcon slot={slot} size={20} muted />
+          <span style={{ ...styles.slotCardLabel, color: 'var(--color-text-muted)' }}>{slot}</span>
+          <span style={styles.slotCardBadgeOff}>미사용</span>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 export default function MyAccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -112,6 +142,11 @@ export default function MyAccountPage() {
   const [autoFriendGroupmatesLoading, setAutoFriendGroupmatesLoading] = useState(false)
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
+  // 메인 화면에 표시할 슬롯 — 순수 디스플레이 선호. 꺼도 그 슬롯에 실제 잡힌 일정이 있는
+  // 날짜는 TodayPage가 예외적으로 계속 보여주므로, 여기서는 데이터 정리 없이 즉시 토글한다.
+  const [activeSlots, setActiveSlotsState] = useState(user?.active_slots ?? SLOT_KEYS)
+  const [slotBusy, setSlotBusy] = useState(null) // 확인 중인 슬롯 (중복 클릭 방지)
+  const [slotError, setSlotError] = useState(null)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
@@ -507,6 +542,30 @@ export default function MyAccountPage() {
     }
   }
 
+  // 슬롯 켜기/끄기 — 순수 디스플레이 선호라 데이터 정리 없이 즉시 반영한다.
+  // 꺼도 실제 잡힌 일정이 있는 날짜는 TodayPage가 예외로 계속 보여준다.
+  const handleSlotToggle = async (slot) => {
+    if (slotBusy) return
+    const turningOn = !activeSlots.includes(slot)
+    if (!turningOn && activeSlots.length <= 1) {
+      setSlotError('최소 1개 슬롯은 사용 중이어야 해요.')
+      return
+    }
+    setSlotBusy(slot)
+    setSlotError(null)
+    try {
+      const next = turningOn ? [...activeSlots, slot] : activeSlots.filter(s => s !== slot)
+      await updateActiveSlots(user.id, next)
+      setActiveSlotsState(next)
+      login({ ...user, active_slots: next })
+    } catch (e) {
+      console.error(e)
+      setSlotError('설정을 저장하지 못했어요.')
+    } finally {
+      setSlotBusy(null)
+    }
+  }
+
   const handleLogout = async () => {
     await logout()
     navigate('/onboarding')
@@ -596,6 +655,25 @@ export default function MyAccountPage() {
               설치/바로가기가 이미 돼 있으면 컴포넌트 안에서 알아서 "설치됨" 배지로 바뀐다.
               settingsGroup의 기본 gap 절반만큼 끌어올려 바로 위 카드와의 간격만 좁힌다. */}
           <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
+
+          {/* 사용 슬롯 설정 — 메인 화면 서브탭에 보여줄 슬롯을 고른다. 카드를 뒤집어 사용/미사용을
+              표시하며, 오늘 이후로만 적용되고 지난 날짜 기록은 그대로 보인다. */}
+          <div style={styles.settingsSection}>
+            <h2 style={styles.settingsSectionTitle}>사용 슬롯 설정</h2>
+            <p style={styles.slotSectionDesc}>자주 쓰지 않는 슬롯은 꺼서 메인 화면을 단순하게 정리할 수 있어요. 오늘부터 적용되고, 지난 날짜 기록에는 영향을 주지 않아요.</p>
+            <div style={styles.slotGrid}>
+              {SLOT_KEYS.map(slot => (
+                <SlotToggleCard
+                  key={slot}
+                  slot={slot}
+                  active={activeSlots.includes(slot)}
+                  busy={slotBusy === slot}
+                  onClick={() => handleSlotToggle(slot)}
+                />
+              ))}
+            </div>
+            {slotError && <p style={styles.avatarErrorMsg}>{slotError}</p>}
+          </div>
 
           {/* 계정 공개 */}
           <SettingsSection title="계정 공개">
@@ -1070,6 +1148,20 @@ const styles = {
   settingsRowDesc: { fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', lineHeight: 1.5 },
   settingsNotice: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '18px 20px', margin: 0 },
 
+  slotSectionDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5, margin: '-4px 4px 0' },
+  // 메인 화면 슬롯 서브탭(subSlotRow)과 같은 방식 — 6개를 한 행에 꽉 채워 배열한다.
+  slotGrid: { display: 'flex', alignItems: 'stretch', gap: 4 },
+  // perspective는 카드 하나하나가 아니라 바깥(버튼)에 걸어야 뒤집힐 때 입체감이 생긴다.
+  slotCardOuter: { flex: '1 1 0', minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', perspective: 700, height: 72, fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent' },
+  slotCardInner: { position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transition: 'transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1)' },
+  // 뒷면은 애초에 180deg 돌려둔 채로 배치 — inner 전체가 뒤집히면 자연스럽게 정면을 보게 된다.
+  slotCardFace: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '0 2px', boxSizing: 'border-box', borderRadius: 12, overflow: 'hidden', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' },
+  slotCardFront: { background: 'var(--color-surface)', border: '1.5px solid var(--color-primary)' },
+  slotCardBack: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', transform: 'rotateY(180deg)' },
+  slotCardLabel: { fontSize: 9.5, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.15 },
+  slotCardBadgeOn: { fontSize: 8.5, fontWeight: 700, color: 'var(--color-primary)' },
+  slotCardBadgeOff: { fontSize: 8.5, fontWeight: 600, color: 'var(--color-text-muted)' },
+
   toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
   toggleThumb: { display: 'block', width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s' },
 
@@ -1080,9 +1172,11 @@ const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, textAlign: 'center' },
   dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
   withdrawWrap: { display: 'flex', justifyContent: 'center', marginTop: 14 },
