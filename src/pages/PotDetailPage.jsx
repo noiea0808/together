@@ -52,7 +52,11 @@ function GuestGate({ potId, onJoined, navigate }) {
       onJoined(profile)
     } catch (e) {
       console.error(e)
-      setError('참여에 실패했어요. 잠시 후 다시 시도해주세요.')
+      if (e.message === 'ALREADY_LOGGED_IN') {
+        setError('이미 로그인된 계정이 있어요. 새로고침한 뒤 다시 시도해주세요.')
+      } else {
+        setError('참여에 실패했어요. 잠시 후 다시 시도해주세요.')
+      }
       setLoading(false)
     }
   }

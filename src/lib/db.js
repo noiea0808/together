@@ -181,7 +181,13 @@ export async function fetchProfileForAuthUser(authUser) {
 }
 
 export async function getSessionUser() {
-  const { data: { session } } = await supabase.auth.getSession()
+  // getSession()은 저장된 세션이 만료돼 리프레시가 필요할 때 네트워크 요청을 한다.
+  // 이 리프레시가 네트워크 문제로 실패하면(진짜 로그아웃이 아니라) error와 함께
+  // session: null을 반환하는데, 여기서 error를 버리고 null만 보면 "로그인 안 된 상태"와
+  // "세션은 멀쩡한데 확인을 못한 상태"를 구분할 수 없다. 호출부(UserContext)가 판단할 수
+  // 있도록 error가 있으면 그대로 던진다.
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) throw error
   if (!session) return null
   return fetchProfileForAuthUser(session.user)
 }
@@ -1229,6 +1235,14 @@ export async function joinPot(potId, userId) {
 
 // 게스트로 밥팟 참여: 익명 세션 발급 → 게스트 프로필 생성 → 참여. 게스트 프로필 반환.
 export async function joinPotAsGuest(potId, nickname) {
+  // 화면이 일시적으로 로그아웃 상태로 오인해(네트워크 문제 등) 게스트 참여 게이트가 떠도,
+  // 실제로는 로그인 세션이 살아있을 수 있다. signInAnonymously는 같은 storage key에 익명
+  // 세션을 덮어써서 진짜 계정 세션을 되돌릴 수 없이 날려버리므로, 발급 전에 한 번 더 확인한다.
+  const { data: { session: existingSession } } = await supabase.auth.getSession()
+  if (existingSession && !existingSession.user.is_anonymous) {
+    throw new Error('ALREADY_LOGGED_IN')
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
   if (authError) throw authError
   const authId = authData.user.id
