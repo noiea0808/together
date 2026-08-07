@@ -9,7 +9,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS } from '../lib/potConstants'
+import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS, MIN_POT_PEOPLE, MAX_POT_PEOPLE } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { MegaphoneIcon, MoreHorizontalIcon } from '../components/GroupIcons'
 import LinkPreviewCard from '../components/LinkPreviewCard'
@@ -492,7 +492,11 @@ export default function PotDetailPage() {
             </div>
             {/* Icon + title */}
             <div style={S.heroHeader}>
-              <div style={S.heroIcon}>{pot.icon ? <PotIcon icon={pot.icon} size={56} /> : <RiceBowlIcon size={56} />}</div>
+              <div style={S.heroIcon}>
+                {pot.icon
+                  ? <PotIcon icon={pot.icon} size={56} />
+                  : pot.is_default ? <RiceBowlIcon size={56} /> : <span style={{ fontSize: 32 }}>🎉</span>}
+              </div>
               <div style={{ flex: 1, minWidth: 0 }}>
                 <div style={S.heroTitle}>{pot.title}</div>
                 <div style={S.heroSlot}>{pot.slot}</div>
@@ -638,9 +642,9 @@ export default function PotDetailPage() {
               <div style={{ ...S.editSection, ...S.editSectionRow }}>
                 <div style={S.editSectionLabel}>👥 몇 명까지?</div>
                 <div style={S.editStepper}>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, MIN_POT_PEOPLE, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
                   <span style={S.editStepperNum}>{draft.max_people}명</span>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(MAX_POT_PEOPLE, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
                 </div>
               </div>
 
@@ -786,9 +790,9 @@ export default function PotDetailPage() {
 
               {draftScope === 'max_people' && (
                 <div style={S.editStepper}>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, 2, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.max(participants.length, MIN_POT_PEOPLE, draft.max_people - 1))} aria-label="인원 줄이기">−</button>
                   <span style={S.editStepperNum}>{draft.max_people}명</span>
-                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(10, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
+                  <button style={S.editStepperBtn} onClick={() => setD('max_people', Math.min(MAX_POT_PEOPLE, draft.max_people + 1))} aria-label="인원 늘리기">+</button>
                 </div>
               )}
 

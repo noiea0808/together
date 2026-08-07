@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getActiveTerms, completeOnboarding } from '../lib/db'
+import { completeOnboarding } from '../lib/db'
+import { useRequiredTerms } from '../lib/useRequiredTerms'
 import { parseBirthId } from '../lib/birthId'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
@@ -16,8 +17,10 @@ export default function ProfileSetupPage() {
   const [birthFront, setBirthFront] = useState('')
   const [birthGenderDigit, setBirthGenderDigit] = useState('')
   const [lifestyle, setLifestyle] = useState('')
-  const [terms, setTerms] = useState([])
-  const [agreed, setAgreed] = useState({}) // { [termId]: true }
+  const {
+    terms, agreed, loadingTerms, loadError, retryLoad,
+    allChecked, requiredAllChecked, toggleAll, toggle, agree, agreedList,
+  } = useRequiredTerms()
   const [viewTerm, setViewTerm] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -29,19 +32,7 @@ export default function ProfileSetupPage() {
     if (user?.nickname && user.nickname !== user.email?.split('@')[0]) {
       setNickname(user.nickname)
     }
-    getActiveTerms().then(setTerms).catch(() => setTerms([]))
   }, [user])
-
-  const requiredTerms = terms.filter(t => t.is_required)
-  const allChecked = terms.length > 0 && terms.every(t => agreed[t.id])
-  const requiredAllChecked = requiredTerms.every(t => agreed[t.id])
-
-  const toggleAll = () => {
-    if (allChecked) setAgreed({})
-    else setAgreed(Object.fromEntries(terms.map(t => [t.id, true])))
-  }
-
-  const toggle = (id) => setAgreed(a => ({ ...a, [id]: !a[id] }))
 
   const birthTouched = birthFront.length > 0 || birthGenderDigit.length > 0
   const birthComplete = birthFront.length === 6 && birthGenderDigit.length === 1
@@ -54,11 +45,10 @@ export default function ProfileSetupPage() {
     if (!canSubmit) return
     setLoading(true); setError(null)
     try {
-      const agreedTerms = terms.filter(t => agreed[t.id]).map(t => ({ id: t.id, version: t.version }))
       const profile = await completeOnboarding(
         user.id,
         { nickname, birthdate: parsedBirth?.birthdate ?? null, gender: parsedBirth?.gender ?? null, lifestyle },
-        agreedTerms,
+        agreedList(),
       )
       login(profile)
       if (pendingCode) {
@@ -151,7 +141,14 @@ export default function ProfileSetupPage() {
         </div>
 
         {/* 약관 동의 */}
-        {terms.length > 0 && (
+        {loadingTerms ? (
+          <p style={styles.hint}>약관 불러오는 중...</p>
+        ) : loadError ? (
+          <div style={styles.terms}>
+            <span style={styles.birthErrorText}>약관을 불러오지 못했어요.</span>
+            <button type="button" style={styles.viewBtn} onClick={retryLoad}>다시 시도</button>
+          </div>
+        ) : terms.length > 0 && (
           <div style={styles.terms}>
             <button type="button" style={styles.agreeAll} onClick={toggleAll} disabled={loading}>
               <span style={{ ...styles.checkbox, ...(allChecked ? styles.checkboxOn : {}) }}>
@@ -202,7 +199,7 @@ export default function ProfileSetupPage() {
             <div style={styles.modalBody}>{viewTerm.content || '내용이 등록되지 않았습니다.'}</div>
             <button
               style={styles.modalAgree}
-              onClick={() => { setAgreed(a => ({ ...a, [viewTerm.id]: true })); setViewTerm(null) }}
+              onClick={() => { agree(viewTerm.id); setViewTerm(null) }}
             >
               동의하고 닫기
             </button>

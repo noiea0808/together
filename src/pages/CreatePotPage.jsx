@@ -7,14 +7,14 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS, MIN_POT_PEOPLE, MAX_POT_PEOPLE } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import PotIcon from '../components/PotIcon'
 import AutoTextarea from '../components/AutoTextarea'
 import PotIconPicker from '../components/PotIconPicker'
 
-const MIN_PEOPLE = 2
-const MAX_PEOPLE = 8
+const MIN_PEOPLE = MIN_POT_PEOPLE
+const MAX_PEOPLE = MAX_POT_PEOPLE
 const DEFAULT_PEOPLE = 6
 
 // 슬롯별 유머러스한 기본 제목 프리셋 — 그룹에서 밥팟을 열 때 빈칸 대신 미리 채워두고, 아이콘과 함께 자유롭게 수정할 수 있다.
@@ -192,8 +192,9 @@ export default function CreatePotPage() {
   const doCreate = async () => {
     setLoading(true)
     setError(null)
+    let pot
     try {
-      const pot = await createPot({
+      pot = await createPot({
         groupId,
         date: initialDate,
         slot: form.slot,
@@ -208,14 +209,26 @@ export default function CreatePotPage() {
         createdBy: user.id,
         icon: form.icon,
       })
+    } catch (e) {
+      setError('밥팟 생성에 실패했어요.')
+      console.error(e)
+      setLoading(false)
+      return
+    }
+
+    // 이 시점부터는 밥팟이 이미 DB에 만들어졌다 — 이후 단계(참여/공유 설정)가 실패해도
+    // "생성 실패"로 오안내하면 사용자가 다시 눌러 똑같은 밥팟이 하나 더 생길 수 있다.
+    // 대신 이미 만들어진 밥팟으로 그대로 보내 거기서 참여를 이어가게 한다.
+    try {
       await joinPot(pot.id, user.id)
       await setGroupShareSetting(user.id, groupId, initialDate, true).catch(() => {})
       invalidateCache(`board:${user.id}:`, { prefix: true })
       const today = toDateStr(new Date())
       navigate(initialDate === today ? '/today' : `/today?date=${initialDate}`)
     } catch (e) {
-      setError('밥팟 생성에 실패했어요.')
       console.error(e)
+      invalidateCache(`board:${user.id}:`, { prefix: true })
+      navigate(`/pot/${pot.id}`)
     } finally {
       setLoading(false)
     }
