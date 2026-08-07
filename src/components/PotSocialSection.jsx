@@ -42,6 +42,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const [comments, setComments] = useState([])
   const [commentCount, setCommentCount] = useState(0)
   const [commentText, setCommentText] = useState('')
+  const [commentInputFocused, setCommentInputFocused] = useState(false)
   const [postingComment, setPostingComment] = useState(false)
   const [photos, setPhotos] = useState([])
   const [photoCount, setPhotoCount] = useState(0)
@@ -340,11 +341,13 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
         {canPost && (
           <div style={{ ...S.commentInputRow, ...(compact ? S.commentInputRowCompact : {}) }}>
             <input
-              style={S.commentInput}
+              style={{ ...S.commentInput, ...(commentInputFocused ? S.commentInputFocused : {}) }}
               placeholder="한마디 남기기"
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+              onFocus={() => setCommentInputFocused(true)}
+              onBlur={() => setCommentInputFocused(false)}
               maxLength={200}
             />
             <button
@@ -459,6 +462,7 @@ const S = {
   commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
   commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
   commentInputRowCompact: { marginTop: 10, paddingTop: 10 },
-  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
+  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)', transition: 'border-color 0.15s, box-shadow 0.15s' },
+  commentInputFocused: { borderColor: 'var(--color-primary)', boxShadow: '0 0 0 3px var(--color-primary-a20)' },
   commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
 }

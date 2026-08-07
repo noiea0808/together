@@ -1033,13 +1033,14 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
 
 // 특정 유저 한 명에게만 초대 알림 발송. 대상이 아직 팟 멤버가 아니어도 되며,
 // 발신자 본인이 이 팟의 멤버이기만 하면 notifications_insert_sharedpot RLS를 통과한다.
-export async function invitePotFriend(potId, fromUserId, toUserId) {
+export async function invitePotFriend(potId, fromUserId, toUserId, menu) {
   const [{ data: pot }, { data: from }] = await Promise.all([
     supabase.from('meal_pots').select('title, slot').eq('id', potId).single(),
     supabase.from('users').select('nickname').eq('id', fromUserId).single(),
   ])
   const title = '같이 먹자고 초대했어요'
-  const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.`
+  const trimmedMenu = menu?.trim()
+  const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = `/pot/${potId}`
 
   const { error } = await supabase.from('notifications').insert({
@@ -1088,7 +1089,8 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
 
   const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
   const title = '같이 먹자는 제안이 왔어요'
-  const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.`
+  const trimmedMenu = menu?.trim()
+  const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = '/notifications'
 
   const { error: notifError } = await supabase.from('notifications').insert({

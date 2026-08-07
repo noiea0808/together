@@ -1799,7 +1799,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
     try {
       const existing = await getMyPotsForSlot(myUserId, group.id, dateStr, slot)
       if (existing.length > 0) {
-        await invitePotFriend(existing[0].pot_id, myUserId, proposeTarget.id)
+        await invitePotFriend(existing[0].pot_id, myUserId, proposeTarget.id, proposeMenu.trim() || null)
         setSentInviteIds(prev => new Set(prev).add(proposeTarget.id))
       } else {
         await proposeMealTogether({
