@@ -43,16 +43,15 @@ async function generate() {
   // 뭉개진 회색 사각형처럼 보인다.
   //
   // 실제 밥공기 사진(rice-bowl.png)의 실루엣을 그대로 단색화하면 그릇+밥이 뭉쳐서
-  // 작은 크기에선 그냥 동그라미로 보인다. 그래서 사진에서 뽑아내는 대신, 그릇 테두리
-  // 틈과 김 모락모락 표시가 살아있는 단순한 그림을 직접 픽셀로 그린다.
+  // 작은 크기에선 그냥 동그라미로 보인다. 그래서 사진에서 뽑아내는 대신, 그릇 윤곽과
+  // 김 모락모락 표시가 살아있는 단순한 그림을 직접 픽셀로 그린다.
   //
-  // 그릇과 밥 사이에 틈(안 채운 픽셀 band)을 두면 96px에서는 테두리 선처럼 보이지만,
-  // 실제 상태바 표시 크기인 24dp까지 줄어들면 그 틈이 두 개의 분리된 도형(눈사람/UFO)처럼
-  // 보여버려 밥공기로 안 읽힌다. 그래서 밥과 그릇을 틈 없이 하나로 이어 붙인 실루엣으로 그린다.
+  // 타원 두 개(그릇+밥)를 겹쳐 만들던 이전 방식은 96px에서는 그럴듯했지만, 실제 상태바
+  // 표시 크기인 24dp까지 줄어들면 렌즈/UFO처럼 보여 밥공기로 안 읽혔다. 위아래가 곧은
+  // 사다리꼴 컵 모양은 작은 크기에서도 "그릇"으로 또렷하게 유지된다.
   const badgeSize = 96
   const badge = new Jimp({ width: badgeSize, height: badgeSize, color: 0x00000000 })
   const WHITE = 0xffffffff
-  const cx = badgeSize / 2
 
   const fillIf = (predicate) => {
     for (let y = 0; y < badgeSize; y++) {
@@ -62,26 +61,65 @@ async function generate() {
     }
   }
 
-  // 그릇 몸통 — 넓고 얕은 타원 아랫부분만 남겨 사발(컵) 모양을 만든다
-  const bowlCx = cx, bowlCy = 56, bowlRx = 34, bowlRy = 22
-  fillIf((x, y) => y >= bowlCy && ((x - bowlCx) ** 2) / bowlRx ** 2 + ((y - bowlCy) ** 2) / bowlRy ** 2 <= 1)
+  // 곡선(2차 베지어)이 섞인 경로를 짧은 선분들로 잘게 쪼개 다각형 점 목록으로 만든다
+  const flattenPath = (cmds, segments = 16) => {
+    const pts = [cmds[0].p]
+    let current = cmds[0].p
+    for (let i = 1; i < cmds.length; i++) {
+      const cmd = cmds[i]
+      if (cmd.type === 'L') {
+        pts.push(cmd.p)
+      } else {
+        const [x0, y0] = current
+        const [qx, qy] = cmd.c
+        const [x2, y2] = cmd.p
+        for (let s = 1; s <= segments; s++) {
+          const t = s / segments
+          const x = (1 - t) ** 2 * x0 + 2 * (1 - t) * t * qx + t ** 2 * x2
+          const y = (1 - t) ** 2 * y0 + 2 * (1 - t) * t * qy + t ** 2 * y2
+          pts.push([x, y])
+        }
+      }
+      current = cmd.p
+    }
+    return pts
+  }
+
+  const pointInPolygon = (x, y, poly) => {
+    let inside = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const [xi, yi] = poly[i]
+      const [xj, yj] = poly[j]
+      const intersect = yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi
+      if (intersect) inside = !inside
+    }
+    return inside
+  }
+
+  // 그릇 — 위가 넓고 아래로 갈수록 좁아지는 사다리꼴, 바닥 모서리만 둥글게
+  const bowlPolygon = flattenPath([
+    { p: [14, 34] },
+    { type: 'L', p: [82, 34] },
+    { type: 'Q', c: [80, 50], p: [76, 64] },
+    { type: 'Q', c: [73, 78], p: [58, 78] },
+    { type: 'L', p: [38, 78] },
+    { type: 'Q', c: [23, 78], p: [20, 64] },
+    { type: 'Q', c: [16, 50], p: [14, 34] },
+  ])
+  fillIf((x, y) => pointInPolygon(x, y, bowlPolygon))
 
   // 받침대
-  fillIf((x, y) => y >= 80 && y < 86 && Math.abs(x - cx) <= 9)
+  fillIf((x, y) => y >= 80 && y < 87 && x >= 38 && x < 58)
 
-  // 밥 — 그릇 위에 봉긋 쌓인 언덕. 그릇 라인(bowlCy)에서 바로 이어 붙여 틈 없는 하나의
-  // 실루엣으로 합친다 — 폭이 그릇보다 좁아 자연스러운 잘록한 허리(테두리 느낌)만 남는다
-  const riceCx = cx, riceCy = bowlCy, riceRx = 26, riceRy = 16
-  fillIf((x, y) => y <= riceCy && ((x - riceCx) ** 2) / riceRx ** 2 + ((y - riceCy) ** 2) / riceRy ** 2 <= 1)
-
-  // 김 — 밥 위에 짧고 굵게, 서로 더 가깝게 모아서 작은 크기에서도 "귀"처럼 안 보이고
-  // 하나의 김 뭉치로 읽히게 한다
-  const steamStroke = (x0, y0, x1, y1, thickness) => {
-    const steps = 20
+  // 김 — 세 가닥 모두 같은 방향(왼쪽)으로 살짝 휘어 바람에 날리는 느낌으로 통일한다.
+  // 방향이 제각각이면 작은 크기에서 더듬이처럼 보여 산만해진다.
+  const cubicStroke = (p0, c1, c2, p3, thickness) => {
+    const steps = 24
     for (let i = 0; i <= steps; i++) {
       const t = i / steps
-      const px = x0 + (x1 - x0) * t
-      const py = y0 + (y1 - y0) * t
+      const mt = 1 - t
+      const px = mt ** 3 * p0[0] + 3 * mt ** 2 * t * c1[0] + 3 * mt * t ** 2 * c2[0] + t ** 3 * p3[0]
+      const py = mt ** 3 * p0[1] + 3 * mt ** 2 * t * c1[1] + 3 * mt * t ** 2 * c2[1] + t ** 3 * p3[1]
       for (let ox = -thickness / 2; ox <= thickness / 2; ox++) {
         for (let oy = -thickness / 2; oy <= thickness / 2; oy++) {
           const xx = Math.round(px + ox), yy = Math.round(py + oy)
@@ -90,8 +128,9 @@ async function generate() {
       }
     }
   }
-  steamStroke(cx - 4, 29, cx - 5, 20, 5)
-  steamStroke(cx + 4, 29, cx + 5, 20, 5)
+  cubicStroke([31, 27], [31, 27], [26, 19], [30, 9], 6)
+  cubicStroke([49, 29], [49, 29], [44, 19], [48, 8], 6)
+  cubicStroke([67, 27], [67, 27], [62, 19], [66, 9], 6)
 
   await badge.write(join(publicDir, 'badge-monochrome.png'))
   console.log('✓ badge-monochrome.png 생성됨')
