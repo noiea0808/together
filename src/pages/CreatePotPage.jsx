@@ -337,16 +337,18 @@ export default function CreatePotPage() {
             ))}
           </div>
         </div>
+      </div>
 
+      {/* ── Footer (고정 CTA 영역) ── */}
+      <div style={S.footer}>
         <button
-          style={{ ...S.submitBtn, ...S.submitBtnInline, opacity: loading ? 0.4 : 1 }}
+          style={{ ...S.submitBtn, opacity: loading ? 0.4 : 1 }}
           onClick={handleCreate}
           disabled={loading}
         >
           {loading ? '생성 중...' : <>밥팟 열기 <RiceBowlIcon size={18} /></>}
         </button>
-
-        {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: '10px 16px 0' }}>{error}</p>}
+        {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0, textAlign: 'center' }}>{error}</p>}
       </div>
 
       {/* 개별 수정 팝업 — 아이콘·이름 / 시간 / 최대 인원 / 메뉴 / 메모 */}
@@ -486,7 +488,11 @@ export default function CreatePotPage() {
 }
 
 const S = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column' },
+  // TabLayout으로 감싸이지 않는 최상위 라우트라 #root의 min-height:100dvh(플로어일 뿐,
+  // 상한이 없음)에 기대면 콘텐츠가 길어질 때 이 div까지 같이 늘어나 footer가 뷰포트
+  // 하단이 아니라 "늘어난 페이지의 끝"에 걸린다. height를 뷰포트로 못박고 overflow:hidden을
+  // 줘야 body의 overflowY:auto만 내부 스크롤되고 header/footer가 실제로 고정된다.
+  page: { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   header: {
     padding: '10px 16px', paddingTop: 'calc(10px + var(--safe-area-inset-top))', display: 'flex', alignItems: 'center', gap: 10,
     position: 'sticky', top: 0, background: 'rgba(250,248,245,0.95)', zIndex: 10,
@@ -574,7 +580,7 @@ const S = {
   },
 
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
-  submitBtnInline: { margin: '20px 16px 0', width: 'calc(100% - 32px)' },
+  footer: { flexShrink: 0, padding: '10px 16px calc(10px + var(--safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },

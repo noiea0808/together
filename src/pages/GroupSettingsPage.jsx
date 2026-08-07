@@ -457,7 +457,11 @@ export default function GroupSettingsPage() {
 }
 
 const S = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column' },
+  // TabLayout으로 감싸이지 않는 최상위 라우트라 #root의 min-height:100dvh(플로어일 뿐,
+  // 상한이 없음)에 기대면 콘텐츠가 길어질 때 이 div까지 같이 늘어나 footer가 뷰포트
+  // 하단이 아니라 "늘어난 페이지의 끝"에 걸린다. height를 뷰포트로 못박고 overflow:hidden을
+  // 줘야 body의 overflowY:auto만 내부 스크롤되고 header/footer가 실제로 고정된다.
+  page: { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
 
   header: {

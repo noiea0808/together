@@ -456,9 +456,7 @@ export default function PotDetailPage() {
           <div style={S.headerSub}>{pot.is_default ? pot.slot : `${pot.date} · ${pot.slot}`}</div>
         </div>
         {draft && draftScope === 'all'
-          ? <button style={{ ...S.headerTextBtn, color: 'var(--color-primary)', fontWeight: 800 }} onClick={saveDraft} disabled={actionLoading}>
-              {actionLoading ? '...' : '완료'}
-            </button>
+          ? <div style={{ width: 60 }} />
           : pot.is_default
             ? <button style={S.headerEditPill} onClick={() => navigate(`/group/${pot.group_id}/settings?${pot.config_id ? `config=${pot.config_id}` : `slot=${pot.slot}`}`)}>반복 설정</button>
             : canEdit
@@ -860,13 +858,15 @@ export default function PotDetailPage() {
         </div>
 
         <PotSocialSection potId={pot.id} currentUserId={user?.id} canPost={isJoined} momentScope={pot.moment_scope} onChange={invalidateBoard} />
+      </div>
 
-        {/* Action buttons — 초대(같이 먹자고 하기)는 이 밥팟을 키우는 액션이라 한 행에서
-            더 넓은 쪽을 차지하고, 나가기/삭제처럼 이 밥팟을 떠나는 유형의 액션은 왼쪽 좁은 칸에
-            둔다(방장은 나가기+삭제를 '더보기'로 묶어서 같은 자리에). 종료된 밥팟은 참여할 수도
-            초대할 수도 없지만, 이미 참여했던 사람이 나가거나(방장이면 삭제도) 정리할 수는
-            있어야 해서 나가기/더보기만 남기고 초대 버튼만 뺀다. */}
-        {isPotExpired && !isJoined ? (
+      {/* ── Footer (고정 CTA 영역) — 수정 중엔 저장, 그 외엔 참여/공유 액션 ── */}
+      <div style={S.footer}>
+        {draft && draftScope === 'all' ? (
+          <button style={{ ...S.submitBtn, opacity: actionLoading ? 0.6 : 1 }} onClick={saveDraft} disabled={actionLoading}>
+            {actionLoading ? '저장 중...' : '완료'}
+          </button>
+        ) : isPotExpired && !isJoined ? (
           <div style={S.expiredCard}>종료된 밥팟이에요</div>
         ) : isJoined ? (
           user?.is_guest ? (
@@ -1120,7 +1120,11 @@ export default function PotDetailPage() {
 }
 
 const S = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column' },
+  // TabLayout으로 감싸이지 않는 최상위 라우트라 #root의 min-height:100dvh(플로어일 뿐,
+  // 상한이 없음)에 기대면 콘텐츠가 길어질 때 이 div까지 같이 늘어나 footer가 뷰포트
+  // 하단이 아니라 "늘어난 페이지의 끝"에 걸린다. height를 뷰포트로 못박고 overflow:hidden을
+  // 줘야 body의 overflowY:auto만 내부 스크롤되고 header/footer가 실제로 고정된다.
+  page: { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
 
   header: {
@@ -1139,7 +1143,9 @@ const S = {
   headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
   headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' },
 
-  body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto', paddingBottom: 80 },
+  body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' },
+  footer: { flexShrink: 0, padding: '10px 16px calc(10px + var(--safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },
+  submitBtn: { ...PRIMARY_ACTION_BUTTON },
 
   /* Hero card (view mode) */
   heroCard: { background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
