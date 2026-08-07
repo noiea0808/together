@@ -87,11 +87,13 @@ export async function sendPushToUsers(
   }
 
   // FCM 시크릿이 없으면 sendFcmToUsers가 즉시 빈 결과를 돌려주므로 웹 푸시만 있어도 그대로 동작한다.
-  const fcmResult = await sendFcmToUsers(admin, userIds, payload).catch((e) => ({
-    sent: 0,
-    failed: 1,
-    failures: [{ target: 'fcm', message: e instanceof Error ? e.message : String(e) }],
-  }))
+  // 여기서 잡히는 건 토큰별 실패(sendFcmToUsers 내부에서 이미 로그됨)가 아니라 OAuth2 토큰
+  // 발급 실패 등 발송 자체를 막는 예외라 별도로 로그를 남긴다.
+  const fcmResult = await sendFcmToUsers(admin, userIds, payload).catch((e) => {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('[fcm] 발송 자체 실패:', message)
+    return { sent: 0, failed: 1, failures: [{ target: 'fcm', message }] }
+  })
 
   return {
     sent: results.filter((r) => r.status === 'fulfilled').length + fcmResult.sent,

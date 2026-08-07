@@ -21,9 +21,15 @@ try {
   serviceAccount = JSON.parse(raw)
 } catch (e) {
   fcmInitError = e instanceof Error ? e.message : String(e)
+  // 이 경우 네이티브 발송은 의도적으로 조용히 건너뛰지만(위 주석 참고), 실제로 시크릿이
+  // 설정돼 있어야 하는 환경에서 실수로 빠졌을 때 아무 데도 안 남으면 디버깅이 불가능해진다.
+  // Edge Function 로그(Supabase Dashboard > Functions > Logs)에는 남긴다.
+  console.error('[fcm] 초기화 실패, 네이티브 푸시는 건너뜁니다:', fcmInitError)
 }
 
-// send-push처럼 FCM 없이는 아예 요청을 못 받아야 하는 엔드포인트에서만 참조한다.
+// 지금은 어떤 엔드포인트도 호출하지 않는다(FCM 미설정 시에도 웹 푸시는 그대로 동작해야
+// 하므로 send-push가 이 값으로 요청 자체를 막지 않는다 — VAPID와의 의도적 차이).
+// 초기화 실패는 위에서 이미 console.error로 Edge Function 로그에 남긴다.
 export function getFcmInitError(): string | null {
   return fcmInitError
 }
@@ -144,6 +150,11 @@ export async function sendFcmToUsers(
   })
   if (staleTokens.length > 0) {
     await admin.from('fcm_tokens').delete().in('token', staleTokens)
+  }
+  // 클라이언트(db.js의 logPushResult)는 이 결과를 콘솔에만 남기고 아무도 안 보는 경우가
+  // 많다 — 실패가 있으면 서버(Edge Function) 로그에도 남겨서 나중에 조회할 수 있게 한다.
+  if (failures.length > 0) {
+    console.warn('[fcm] 발송 실패:', JSON.stringify(failures))
   }
 
   return {
