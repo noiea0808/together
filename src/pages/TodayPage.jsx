@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getFriendsStatuses, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { shareLink, copyToClipboard, canShare } from '../lib/share'
@@ -264,6 +264,17 @@ export default function TodayPage() {
   const [potsMap, setPotsMap] = useState({})         // groupId -> pots[]
   const [loading, setLoading] = useState(true)
 
+  // 친구 보기 — 그룹 유무와 무관하게 유저 단위로 한 번만 불러오고(친구 목록), 상태는 날짜별로 불러온다.
+  const [friends, setFriends] = useState([])
+  const [friendStatuses, setFriendStatuses] = useState([])
+  useEffect(() => {
+    if (!user) return
+    getMyFriends().then(setFriends).catch(() => {})
+  }, [user])
+  // 이미 나와 그룹을 공유하는 친구는 "그룹 보기"에 나오므로 "친구 보기"에는 그룹 없는 친구만 남긴다.
+  const groupedUserIds = new Set(Object.values(membersMap).flat().map(m => m.id))
+  const ungroupedFriends = friends.filter(f => !groupedUserIds.has(f.id))
+
   // 내 슬롯 상태: { slot -> { status, time, menu } }
   const [mySlots, setMySlots] = useState({})
   // 날짜 전체 초기화 확인 팝업
@@ -296,6 +307,11 @@ export default function TodayPage() {
 
   const dateStr = toDateStr(currentDate)
   const isToday = currentDate.getTime() === TODAY.getTime()
+
+  useEffect(() => {
+    if (!user || ungroupedFriends.length === 0) { setFriendStatuses([]); return }
+    getFriendsStatuses(dateStr).then(setFriendStatuses).catch(() => {})
+  }, [user, dateStr, ungroupedFriends.length])
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
   useScrollLock(!!(editingSlot || showResetConfirm || createConflict || showJoinPot || showGroupSetup || leavePotConfirm))
@@ -960,8 +976,8 @@ export default function TodayPage() {
 
       {/* 그룹별 보기 영역 전체 — 흰색 풀블리드 블록으로 상단 '내 상태' 영역과 경계를 분리 */}
       <div style={styles.lowerSection}>
-        {/* 그룹별/밥팟별 보기 전환 — 하나의 세그먼트 컨트롤 */}
-        {groups.length > 0 && (
+        {/* 그룹별/밥팟별 보기 전환 — 하나의 세그먼트 컨트롤. 그룹이 없어도 그룹 없는 친구가 있으면 노출 */}
+        {(groups.length > 0 || ungroupedFriends.length > 0) && (
           <div style={styles.viewModeTabs}>
             <button
               style={{ ...styles.viewModeTab, ...(viewMode === 'pot' ? styles.viewModeTabActive : {}) }}
@@ -971,12 +987,18 @@ export default function TodayPage() {
               style={{ ...styles.viewModeTab, ...(viewMode === 'group' ? styles.viewModeTabActive : {}) }}
               onClick={() => { setViewMode('group'); localStorage.setItem('lastViewMode', 'group') }}
             >그룹 보기</button>
+            {ungroupedFriends.length > 0 && (
+              <button
+                style={{ ...styles.viewModeTab, ...(viewMode === 'friend' ? styles.viewModeTabActive : {}) }}
+                onClick={() => { setViewMode('friend'); localStorage.setItem('lastViewMode', 'friend') }}
+              >친구 보기</button>
+            )}
           </div>
         )}
 
         {/* 오늘 열린 밥팟 — 목록이 메인 콘텐츠, 보조 컨트롤은 더보기(⋮) 메뉴로 묶어서 우측에 작게 */}
         <div style={styles.sectionTitleRow}>
-          <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : `${getRelativeLabel(currentDate).label} 열린 밥팟`}</div>
+          <div style={styles.sectionTitle}>{viewMode === 'group' ? `${selectedSlot} 현황` : viewMode === 'friend' ? `${selectedSlot} 친구 현황` : `${getRelativeLabel(currentDate).label} 열린 밥팟`}</div>
           {viewMode === 'group' && !editingOrder && (
             <div style={{ position: 'relative' }}>
               <button style={styles.viewMenuBtn} aria-label="더보기" onClick={() => setShowViewMenu(v => !v)}>
@@ -1004,7 +1026,7 @@ export default function TodayPage() {
           )}
         </div>
 
-        {groups.length === 0 && (
+        {groups.length === 0 && viewMode !== 'friend' && (
           <div style={styles.emptyGroup}>
             <UsersIcon size={36} strokeWidth={1.6} style={{ color: 'var(--color-text-muted)' }} />
             <div style={{ fontWeight: 700 }}>아직 그룹이 없어요</div>
@@ -1048,7 +1070,9 @@ export default function TodayPage() {
                 />
               )
             })
-          })() : (
+          })() : viewMode === 'friend' ? (
+            <FriendSlotCard friends={ungroupedFriends} statuses={friendStatuses} slot={selectedSlot} myUserId={user.id} dateStr={dateStr} />
+          ) : (
             <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} dayLabel={getRelativeLabel(currentDate).label} />
           )}
         </div>
@@ -2388,6 +2412,151 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
           {pots.map(pot => (
             <MealPodCard key={pot.id} pot={pot} myUserId={myUserId} onNavigate={onNavigate} />
           ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// 친구 보기 — 나와 그룹을 공유하지 않는 친구의 오늘 상태를 나열하고, "같이 먹자" 제안도 보낼 수 있다.
+// 제안을 수락하면 그룹에 속하지 않은(group_id NULL) 2인 밥팟이 새로 생긴다(둘만의 약속이라 그룹 팟과 구분).
+// 그룹 카드와 달리 설정/초대/기존 팟에 초대하기 같은 그룹 전용 기능은 없다(그룹이 없으니 붙일 곳이 없음).
+function FriendSlotCard({ friends, statuses, slot, myUserId, dateStr }) {
+  const [proposeTarget, setProposeTarget] = useState(null) // { id, nickname }
+  const [proposeMenu, setProposeMenu] = useState('')
+  const [proposeSending, setProposeSending] = useState(false)
+  const [proposeError, setProposeError] = useState(null)
+  const [pendingProposals, setPendingProposals] = useState([]) // pot_invitations(그룹 없는 것만, 이 슬롯)
+  const isPastDate = dateStr < toDateStr(new Date())
+
+  const reloadPendingProposals = () =>
+    getMyPendingInvitationsForDate(myUserId, dateStr)
+      .then(list => setPendingProposals(list.filter(inv => !inv.group_id && inv.slot === slot)))
+      .catch(() => {})
+
+  useEffect(() => { reloadPendingProposals() }, [myUserId, dateStr, slot])
+
+  const openPropose = (friend) => {
+    setProposeTarget(friend)
+    setProposeMenu('')
+    setProposeError(null)
+  }
+  const closePropose = () => setProposeTarget(null)
+
+  const handleCancelProposal = async (e, invitationId) => {
+    e.stopPropagation()
+    try {
+      await cancelPotInvitation(invitationId, myUserId)
+      await reloadPendingProposals()
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
+  const sendPropose = async () => {
+    if (!proposeTarget || proposeSending) return
+    setProposeSending(true)
+    setProposeError(null)
+    try {
+      await proposeMealTogether({
+        groupId: null, fromUserId: myUserId, toUserId: proposeTarget.id,
+        date: dateStr, slot, meal_time: null, menu: proposeMenu.trim() || null,
+      })
+      await reloadPendingProposals()
+      setProposeTarget(null)
+    } catch (e) {
+      console.error(e)
+      setProposeError('제안을 보내지 못했어요.')
+    } finally {
+      setProposeSending(false)
+    }
+  }
+
+  useScrollLock(!!proposeTarget)
+
+  const getFriendData = (friendId) => statuses.find(s => s.user_id === friendId && s.slot === slot) ?? null
+
+  return (
+    <div style={styles.groupCard}>
+      <div style={styles.groupHeader}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+          <span style={styles.groupName}>친구</span>
+        </div>
+      </div>
+      <div style={styles.memberSection}>
+        {friends.map(friend => {
+          const data = getFriendData(friend.id)
+          const opt = data?.status ? SLOT_STATUS_OPTIONS.find(o => o.key === data.status) : null
+          const timeStr = data?.meal_time
+            ? `${data.meal_time.slice(0, 5)}${data.end_time ? `~${data.end_time.slice(0, 5)}` : ''}`
+            : ''
+          const pendingInv = pendingProposals.find(inv => inv.to_user_id === friend.id)
+          return (
+            <div key={friend.id} style={{
+              display: 'flex', alignItems: 'center', gap: 9,
+              padding: '7px 0',
+              borderBottom: `1px solid #F5F0EB`,
+            }}>
+              {friend.avatar_url ? (
+                <img src={friend.avatar_url} alt="" style={{ width: 40, height: 40, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, border: '2px solid var(--color-border)', boxSizing: 'border-box' }} />
+              ) : (
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%',
+                  background: 'var(--color-text-muted)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
+                  border: '2px solid var(--color-border)', boxSizing: 'border-box',
+                }}>{friend.nickname[0]}</div>
+              )}
+              <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
+                {friend.nickname}
+              </span>
+              <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                {timeStr}
+              </span>
+              {opt ? (
+                <span style={{ fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: opt.color, background: opt.bg, border: `1px solid ${opt.border}`, borderRadius: 'var(--radius-full)', padding: '3px 9px', flexShrink: 0 }}>
+                  {opt.label}
+                </span>
+              ) : (
+                <span style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0 }}>미설정</span>
+              )}
+              {/* 참여중/참여완료는 same_pot_as_me일 때만 나오는 상태라 이미 이 친구와 같이 있는 팟 — 다시 제안할 필요 없음 */}
+              {!isPastDate && data?.status !== '참여중' && data?.status !== '참여완료' && (
+                pendingInv ? (
+                  <button style={styles.memberCancelBtn} onClick={e => handleCancelProposal(e, pendingInv.id)}>
+                    제안함 ✓ · 취소
+                  </button>
+                ) : (
+                  <button style={styles.memberProposeBtn} onClick={() => openPropose(friend)}>같이 먹자</button>
+                )
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      {proposeTarget && (
+        <div style={styles.overlay} onClick={closePropose}>
+          <div style={styles.dialog} onClick={e => e.stopPropagation()}>
+            <div style={{ fontSize: 36 }}>🍚</div>
+            <div style={styles.dialogTitle}>{proposeTarget.nickname}님에게{'\n'}{slot} 같이 먹자고 제안할까요?</div>
+            <input
+              style={styles.proposeMenuInput}
+              placeholder="메뉴나 한마디 (선택)"
+              value={proposeMenu}
+              onChange={e => setProposeMenu(e.target.value)}
+              maxLength={40}
+              autoFocus
+            />
+            {proposeError && <p style={{ fontSize: 12, color: 'var(--color-danger)', margin: 0 }}>{proposeError}</p>}
+            <div style={styles.dialogBtns}>
+              <button style={{ ...styles.memberProposeSendBtn, opacity: proposeSending ? 0.6 : 1 }} onClick={sendPropose} disabled={proposeSending}>
+                {proposeSending ? '보내는 중...' : '제안 보내기'}
+              </button>
+              <button style={styles.dialogBtnCancel} onClick={closePropose}>취소</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

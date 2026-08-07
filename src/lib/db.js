@@ -525,6 +525,43 @@ export async function getMyFriends() {
   return data.map(r => ({ requestId: r.request_id, id: r.id, nickname: r.nickname, avatar_url: r.avatar_url }))
 }
 
+// 그룹 없는 친구 상태(오늘 화면 "친구 보기")용 파생 — deriveGroupStatuses의 groupId 비교 대신
+// RPC가 미리 계산해 내려준 same_pot_as_me로 "같이 먹자" 제안으로 같이 있게 된 팟인지 판별한다.
+// 같은 팟이면 참여중/참여완료(실제 공유 상태)로, 다른 팟이면 closed(약속있음, 정보 비노출)로 표시.
+function deriveFriendStatuses(statusRows, potRows, date) {
+  const map = {}
+  statusRows.forEach(s => { map[`${s.user_id}:${s.slot}`] = { ...s } })
+  potRows.forEach(p => {
+    const key = `${p.user_id}:${p.slot}`
+    if (p.same_pot_as_me) {
+      map[key] = {
+        user_id: p.user_id, slot: p.slot,
+        status: isPotTimeExpired(date, p.end_time) ? '참여완료' : '참여중',
+        meal_time: p.meal_time, end_time: p.end_time,
+        is_hidden: map[key]?.is_hidden ?? false,
+      }
+    } else {
+      map[key] = {
+        user_id: p.user_id, slot: p.slot, status: 'closed', meal_time: p.meal_time, end_time: null,
+        is_hidden: map[key]?.is_hidden ?? false,
+      }
+    }
+  })
+  return Object.values(map).filter(s => !s.is_hidden)
+}
+
+// 친구의 daily_status/밥팟 참여도 같은 밥팟 참여자 한정 RLS를 우회해야 해서 SECURITY DEFINER RPC를 거친다.
+// (scripts/add_friend_status.sql) 메뉴·그룹·팟 정보는 RPC가 처음부터 내려주지 않는다.
+export async function getFriendsStatuses(date) {
+  const [statusRes, potRes] = await Promise.all([
+    supabase.rpc('get_friends_daily_status', { p_date: date }),
+    supabase.rpc('get_friends_pot_participation', { p_date: date }),
+  ])
+  if (statusRes.error) throw statusRes.error
+  if (potRes.error) throw potRes.error
+  return deriveFriendStatuses(statusRes.data ?? [], potRes.data ?? [], date)
+}
+
 // direction: 'sent' | 'received'
 export async function getMyFriendRequests() {
   const { data, error } = await supabase.rpc('get_my_friend_requests')
