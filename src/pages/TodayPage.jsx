@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, getMyPotSlotsForDate, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getFriendsStatuses, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
+import { getMyGroups, getTodayBoard, getGroupStatuses, getGroupPots, upsertStatus, deleteStatus, updateGroupName, leaveGroup, getMyStatuses, getGroupShareSettings, setGroupShareSettingBulk, leavePot, leavePotWithCleanup, deletePot, updatePotCreator, getGroupDefaultPotConfigs, ensureDefaultPots, updateGroupNickname, getPotByInviteCode, updateGroupOrder, getMyPotsForSlot, getMyPotSlotsForDate, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getFriendsStatuses, getFriendShareSettings, setFriendShareSettingBulk, inviteGroupFriend, getPublicOrigin, getGroupSearchSettings, setGroupPassword, setGroupAllowSearch } from '../lib/db'
 import { supabase } from '../lib/supabase'
 import { getCache, setCache, invalidateCache } from '../lib/cache'
 import { shareLink, copyToClipboard, canShare } from '../lib/share'
@@ -265,9 +265,11 @@ export default function TodayPage() {
   const [potsMap, setPotsMap] = useState({})         // groupId -> pots[]
   const [loading, setLoading] = useState(true)
 
-  // 친구 보기 — 그룹 유무와 무관하게 유저 단위로 한 번만 불러오고(친구 목록), 상태는 날짜별로 불러온다.
+  // 친구 보기 — 그룹 유무와 무관하게 유저 단위로 한 번만 불러오고(친구 목록), 상태/공유설정은 날짜별로 불러온다.
   const [friends, setFriends] = useState([])
   const [friendStatuses, setFriendStatuses] = useState([])
+  // 그룹처럼 그룹 전체가 아니라 친구 개별로 공유 on/off — { [friendId]: boolean }
+  const [friendShareSettingsMap, setFriendShareSettingsMap] = useState({})
   useEffect(() => {
     if (!user) return
     getMyFriends().then(setFriends).catch(() => {})
@@ -331,8 +333,13 @@ export default function TodayPage() {
   }, [isPastView, visibleSlots.join(','), selectedSlot])
 
   useEffect(() => {
-    if (!user || ungroupedFriends.length === 0) { setFriendStatuses([]); return }
+    if (!user || ungroupedFriends.length === 0) { setFriendStatuses([]); setFriendShareSettingsMap({}); return }
     getFriendsStatuses(dateStr).then(setFriendStatuses).catch(() => {})
+    getFriendShareSettings(user.id, dateStr).then(rows => {
+      const map = {}
+      rows.forEach(r => { map[r.friend_id] = r.is_shared })
+      setFriendShareSettingsMap(map)
+    }).catch(() => {})
   }, [user, dateStr, ungroupedFriends.length])
 
   // 팝업 열려 있는 동안 배경 스크롤 잠금
@@ -770,6 +777,17 @@ export default function TodayPage() {
     try { await setGroupShareSettingBulk(user.id, groupId, dateStr, isShared) } catch {}
   }
 
+  const applyFriendShare = (friendId, isShared) => {
+    setFriendShareSettingsMap(prev => ({ ...prev, [friendId]: isShared }))
+  }
+
+  // 그룹과 달리 친구는 개별 단위로 켜고 끈다 — 같은 방식으로 항상 전후 60일씩 적용
+  const handleToggleFriendShare = async (friendId, isShared) => {
+    applyFriendShare(friendId, isShared)
+    showToast(isShared ? '이 친구에게 내 상태를 공유해요' : '이 친구에게 내 상태 공유를 멈춰요')
+    try { await setFriendShareSettingBulk(user.id, friendId, dateStr, isShared) } catch {}
+  }
+
   // 슬롯별 현재 상태 요약 — 메인 표시창 / 서브 표시창 공용
   const getSlotInfo = (slot) => {
     const data = mySlots[slot]
@@ -906,10 +924,11 @@ export default function TodayPage() {
             <div style={styles.mainStatusBody}>
               <div style={{ ...styles.mainStatusIconWrap, opacity: info.isPastDate ? 0.6 : 1 }}>
                 {/* 기본은 슬롯 아이콘, open/skip/closed처럼 사용자가 직접 고른 상태일 때만 상태 아이콘으로 바꾼다.
-                    참여중/참여완료(밥팟 참여)는 직접 고른 상태가 아니라 슬롯 그대로 유지하고, 완료된 건만 톤을 낮춘다. */}
+                    참여중/참여완료(밥팟 참여)는 직접 고른 상태가 아니라 슬롯 그대로 유지한다.
+                    이 메인 카드는 흐림 효과(muted)를 쓰지 않는다 — 슬롯 탭과 달리 항상 또렷하게 보여준다. */}
                 {info.key === 'open' || info.key === 'skip' || info.key === 'closed'
                   ? <StatusIcon statusKey={info.key} size={112} style={styles.mainStatusIconImg} />
-                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} muted={info.key === '참여완료'} />}
+                  : <SlotIcon slot={slot} size={112} style={styles.mainStatusIconImg} />}
               </div>
               <div style={styles.mainStatusTextCol}>
                 {info.label ? (
@@ -964,7 +983,8 @@ export default function TodayPage() {
         </div>
 
         {/* 슬롯 네비게이션 — 사용 설정된 슬롯만 화면 폭 안에 한 번에 표시(지난 날짜는 6개 전부).
-            아이콘 존은 중립색, 하단 라벨 띠가 상태색을 담당 */}
+            아이콘 존은 중립색, 하단 라벨 띠가 상태색을 담당. 고를 게 하나뿐이면 선택 UI 자체가 의미 없어 숨긴다. */}
+        {visibleSlots.length > 1 && (
         <div style={styles.subSlotRow}>
           {visibleSlots.map(slot => {
             const info = getSlotInfo(slot)
@@ -982,9 +1002,11 @@ export default function TodayPage() {
                 onClick={() => goToSlot(slot)}
               >
                 <div style={styles.subSlotIconZone}>
+                  {/* 아이콘 색은 선택 여부가 아니라 "데이터 있음" 기준으로 켠다 — 선택 안 된 슬롯도
+                      상태/참여(참여완료 포함)가 있으면 바로 눈에 띄어야 한다. */}
                   {info.key === 'open' || info.key === 'skip' || info.key === 'closed'
-                    ? <StatusIcon statusKey={info.key} muted={!isSelected} style={styles.subSlotIconImg} />
-                    : <SlotIcon slot={slot} muted={!isSelected || info.key === '참여완료'} style={styles.subSlotIconImg} />}
+                    ? <StatusIcon statusKey={info.key} muted={!info.label && !isSelected} style={styles.subSlotIconImg} />
+                    : <SlotIcon slot={slot} muted={!info.label && !isSelected} style={styles.subSlotIconImg} />}
                 </div>
                 <div style={{ ...styles.subSlotLabelZone, background: info.label ? info.bg : 'var(--color-surface-2)' }}>
                   <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
@@ -993,6 +1015,7 @@ export default function TodayPage() {
             )
           })}
         </div>
+        )}
       </div>
         )
       })()}
@@ -1094,7 +1117,16 @@ export default function TodayPage() {
               )
             })
           })() : viewMode === 'friend' ? (
-            <FriendSlotCard friends={ungroupedFriends} statuses={friendStatuses} slot={selectedSlot} myUserId={user.id} dateStr={dateStr} />
+            <FriendSlotCard
+              friends={ungroupedFriends}
+              statuses={friendStatuses}
+              slot={selectedSlot}
+              myUserId={user.id}
+              dateStr={dateStr}
+              shareSettingsMap={friendShareSettingsMap}
+              onToggleShare={handleToggleFriendShare}
+              onShowToast={showToast}
+            />
           ) : (
             <AllPotsView groups={groups} potsMap={potsMap} myUserId={user.id} onNavigate={navigate} dayLabel={getRelativeLabel(currentDate).label} />
           )}
@@ -2444,7 +2476,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
 // 친구 보기 — 나와 그룹을 공유하지 않는 친구의 오늘 상태를 나열하고, "같이 먹자" 제안도 보낼 수 있다.
 // 제안을 수락하면 그룹에 속하지 않은(group_id NULL) 2인 밥팟이 새로 생긴다(둘만의 약속이라 그룹 팟과 구분).
 // 그룹 카드와 달리 설정/초대/기존 팟에 초대하기 같은 그룹 전용 기능은 없다(그룹이 없으니 붙일 곳이 없음).
-function FriendSlotCard({ friends, statuses, slot, myUserId, dateStr }) {
+function FriendSlotCard({ friends, statuses, slot, myUserId, dateStr, shareSettingsMap, onToggleShare, onShowToast }) {
   const [proposeTarget, setProposeTarget] = useState(null) // { id, nickname }
   const [proposeMenu, setProposeMenu] = useState('')
   const [proposeSending, setProposeSending] = useState(false)
@@ -2534,6 +2566,27 @@ function FriendSlotCard({ friends, statuses, slot, myUserId, dateStr }) {
               <span style={{ fontSize: 'var(--font-size-xs)', fontWeight: 500, color: '#1A1A1A', letterSpacing: '-0.2px', flexShrink: 0 }}>
                 {friend.nickname}
               </span>
+              {/* 이 친구에게 내 상태를 공유할지 — 그룹처럼 그룹 전체가 아니라 친구마다 개별로 켜고 끈다.
+                  이미 같이 있는 팟(참여중/참여완료)이면 상대가 어차피 알고 있으니 끌 수 없게 잠근다. */}
+              {(() => {
+                const isFriendShared = shareSettingsMap[friend.id] ?? true
+                const isLocked = data?.status === '참여중' || data?.status === '참여완료'
+                return (
+                  <button
+                    style={{ ...styles.groupHeaderIconBtn, width: 24, height: 24 }}
+                    aria-label={isFriendShared ? '공유중' : '비공유'}
+                    onClick={() => {
+                      if (isLocked) {
+                        onShowToast?.('같이 있는 밥팟이 있어 오늘은 이 친구에게 공유를 멈출 수 없어요')
+                        return
+                      }
+                      onToggleShare(friend.id, !isFriendShared)
+                    }}
+                  >
+                    {isFriendShared ? <BroadcastIcon size={13} strokeWidth={2} /> : <BroadcastOffIcon size={13} strokeWidth={2} />}
+                  </button>
+                )
+              })()}
               <span style={{ flex: 1, minWidth: 0, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                 {timeStr}
               </span>
@@ -2849,8 +2902,11 @@ const styles = {
   mainStatusMeta: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   mainStatusDesc: { fontSize: 'var(--font-size-2xs)', color: '#ADA59B', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   mainStatusEmpty: { fontSize: 'var(--font-size-base)', color: '#ADA59B', fontWeight: 600, whiteSpace: 'pre-line', lineHeight: 1.4 },
-  subSlotRow: { display: 'flex', alignItems: 'stretch', gap: 4 },
-  subSlotBtn: { display: 'flex', flexDirection: 'column', flex: '1 1 0', minWidth: 0, height: 60, boxSizing: 'border-box', padding: 0, border: '1.5px solid', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
+  // 슬롯이 4개보다 적으면 남는 공간을 가운데로 몰아준다 — 버튼 자체가 커지지 않도록 justifyContent로 처리
+  subSlotRow: { display: 'flex', alignItems: 'stretch', justifyContent: 'center', gap: 4 },
+  // flex-basis를 "4개 배열 기준 크기"로 고정하고 grow는 0으로 꺼서, 슬롯이 4개보다 적어도 이 크기 밑으로
+  // 커지지 않는다. 4개보다 많으면(5~6개) shrink:1이 동일하게 나눠 줄여서 기존처럼 한 줄에 다 들어간다.
+  subSlotBtn: { display: 'flex', flexDirection: 'column', flex: '0 1 calc((100% - 12px) / 4)', minWidth: 0, height: 60, boxSizing: 'border-box', padding: 0, border: '1.5px solid', borderRadius: 12, overflow: 'hidden', cursor: 'pointer', transition: 'border-color 0.15s, background 0.15s', WebkitTapHighlightColor: 'transparent' },
   subSlotIconZone: { flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' },
   subSlotIconImg: { position: 'absolute', top: '50%', left: '50%', width: '80%', height: '80%', transform: 'translate(-50%, -50%)', objectFit: 'cover' },
   subSlotLabelZone: { flexShrink: 0, display: 'flex', justifyContent: 'center', padding: '1px 0 4px' },

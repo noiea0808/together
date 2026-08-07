@@ -1504,6 +1504,43 @@ export async function setGroupShareSettingBulk(userId, groupId, centerDate, isSh
   }
 }
 
+// ── 친구 공유 설정 (친구 × 날짜 단위 — 그룹처럼 "그룹 전체"가 아니라 친구마다 따로 켜고 끈다) ──
+// 사전 조건: scripts/add_friend_share_settings.sql 실행 필요
+export async function getFriendShareSettings(userId, date) {
+  const { data, error } = await supabase
+    .from('friend_share_settings')
+    .select('friend_id, is_shared')
+    .eq('user_id', userId)
+    .eq('date', date)
+  if (error) throw error
+  return data
+}
+
+// centerDate 전후 모든 날짜(과거·미래 60일씩)에 공유 설정 적용 — group_share_settings와 동일한 방식.
+export async function setFriendShareSettingBulk(userId, friendId, centerDate, isShared) {
+  if (isShared) {
+    const { error } = await supabase
+      .from('friend_share_settings')
+      .delete()
+      .eq('user_id', userId)
+      .eq('friend_id', friendId)
+    if (error) throw error
+  } else {
+    const rows = []
+    const d = new Date(centerDate)
+    d.setDate(d.getDate() - 60)
+    for (let i = 0; i < 121; i++) {
+      const dateStr = d.toISOString().slice(0, 10)
+      rows.push({ user_id: userId, friend_id: friendId, date: dateStr, is_shared: false })
+      d.setDate(d.getDate() + 1)
+    }
+    const { error } = await supabase
+      .from('friend_share_settings')
+      .upsert(rows, { onConflict: 'user_id,friend_id,date' })
+    if (error) throw error
+  }
+}
+
 export async function updateNickname(userId, nickname) {
   const { error } = await supabase
     .from('users')
