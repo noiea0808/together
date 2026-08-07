@@ -45,6 +45,10 @@ async function generate() {
   // 실제 밥공기 사진(rice-bowl.png)의 실루엣을 그대로 단색화하면 그릇+밥이 뭉쳐서
   // 작은 크기에선 그냥 동그라미로 보인다. 그래서 사진에서 뽑아내는 대신, 그릇 테두리
   // 틈과 김 모락모락 표시가 살아있는 단순한 그림을 직접 픽셀로 그린다.
+  //
+  // 그릇과 밥 사이에 틈(안 채운 픽셀 band)을 두면 96px에서는 테두리 선처럼 보이지만,
+  // 실제 상태바 표시 크기인 24dp까지 줄어들면 그 틈이 두 개의 분리된 도형(눈사람/UFO)처럼
+  // 보여버려 밥공기로 안 읽힌다. 그래서 밥과 그릇을 틈 없이 하나로 이어 붙인 실루엣으로 그린다.
   const badgeSize = 96
   const badge = new Jimp({ width: badgeSize, height: badgeSize, color: 0x00000000 })
   const WHITE = 0xffffffff
@@ -59,17 +63,19 @@ async function generate() {
   }
 
   // 그릇 몸통 — 넓고 얕은 타원 아랫부분만 남겨 사발(컵) 모양을 만든다
-  const bowlCx = cx, bowlCy = 54, bowlRx = 32, bowlRy = 20
+  const bowlCx = cx, bowlCy = 56, bowlRx = 34, bowlRy = 22
   fillIf((x, y) => y >= bowlCy && ((x - bowlCx) ** 2) / bowlRx ** 2 + ((y - bowlCy) ** 2) / bowlRy ** 2 <= 1)
 
   // 받침대
-  fillIf((x, y) => y >= 78 && y < 84 && Math.abs(x - cx) <= 8)
+  fillIf((x, y) => y >= 80 && y < 86 && Math.abs(x - cx) <= 9)
 
-  // 밥 — 그릇 테두리보다 살짝 더 넓게 봉긋 쌓인 언덕. 그릇과는 틈을 둬서 테두리 선이 또렷이 보이게 한다
-  const riceCx = cx, riceCy = 46, riceRx = 27, riceRy = 15
+  // 밥 — 그릇 위에 봉긋 쌓인 언덕. 그릇 라인(bowlCy)에서 바로 이어 붙여 틈 없는 하나의
+  // 실루엣으로 합친다 — 폭이 그릇보다 좁아 자연스러운 잘록한 허리(테두리 느낌)만 남는다
+  const riceCx = cx, riceCy = bowlCy, riceRx = 26, riceRy = 16
   fillIf((x, y) => y <= riceCy && ((x - riceCx) ** 2) / riceRx ** 2 + ((y - riceCy) ** 2) / riceRy ** 2 <= 1)
 
-  // 김 — 밥 위에 짧고 굵게, 서로 가깝게 세워서 "김이 모락모락" 나는 느낌만 남긴다
+  // 김 — 밥 위에 짧고 굵게, 서로 더 가깝게 모아서 작은 크기에서도 "귀"처럼 안 보이고
+  // 하나의 김 뭉치로 읽히게 한다
   const steamStroke = (x0, y0, x1, y1, thickness) => {
     const steps = 20
     for (let i = 0; i <= steps; i++) {
@@ -84,8 +90,8 @@ async function generate() {
       }
     }
   }
-  steamStroke(cx - 6, 27, cx - 8, 16, 4)
-  steamStroke(cx + 6, 27, cx + 8, 16, 4)
+  steamStroke(cx - 4, 29, cx - 5, 20, 5)
+  steamStroke(cx + 4, 29, cx + 5, 20, 5)
 
   await badge.write(join(publicDir, 'badge-monochrome.png'))
   console.log('✓ badge-monochrome.png 생성됨')
