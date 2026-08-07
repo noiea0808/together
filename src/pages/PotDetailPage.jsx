@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams, useLocation } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getPot, joinPot, leavePotWithCleanup, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, setPotMomentScope, getGroupMembers, invitePotFriend, getPublicOrigin } from '../lib/db'
+import { getPot, joinPot, leavePotWithCleanup, kickPotMember, updatePot, updatePotCreator, deletePot, getMyPotsForSlotAllGroups, generatePotInviteCode, setGroupShareSetting, joinPotAsGuest, notifyPotMembers, setPotMomentScope, getGroupMembers, invitePotFriend, getPublicOrigin } from '../lib/db'
 import { invalidateCache } from '../lib/cache'
 import { setPendingRoute } from '../lib/pendingRoute'
 import { shareLink, copyToClipboard, canShare } from '../lib/share'
@@ -338,7 +338,7 @@ export default function PotDetailPage() {
     if (!confirmKick || actionLoading) return
     setActionLoading(true)
     try {
-      await leavePotWithCleanup(pot.id, confirmKick.id)
+      await kickPotMember(pot.id, confirmKick.id)
       invalidateBoard()
       setConfirmKick(null)
       await loadPot()

@@ -23,6 +23,7 @@ function formatDate(dateStr) {
 const EVENT_META = {
   join: { label: '참여', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
   leave: { label: '나가기', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
+  kicked: { label: '내보내짐', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
   update: { label: '수정', color: 'var(--color-info)', bg: 'var(--color-info-bg)', border: 'var(--color-info-border)' },
   comment: { label: '코멘트', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
   invite: { label: '초대', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
@@ -36,7 +37,7 @@ const DECLINE_REASON_PRESETS = ['선약이 있어요', '오늘은 혼자 먹을�
 
 // event_type을 알림함 상단 분류 탭으로 묶는다. 여기 없는 타입(예: feedback_reply)은 '기타'로 빠진다.
 const CATEGORY_EVENT_TYPES = {
-  pot: ['join', 'leave', 'update', 'comment', 'invite', 'invite_new', 'invite_declined'],
+  pot: ['join', 'leave', 'kicked', 'update', 'comment', 'invite', 'invite_new', 'invite_declined'],
   friend: ['friend_request', 'friend_accepted'],
   wish: ['wish_like', 'wish_comment', 'wish_mention'],
 }

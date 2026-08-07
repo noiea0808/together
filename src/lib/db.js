@@ -1298,6 +1298,41 @@ export async function leavePot(potId, userId) {
   if (error) throw error
 }
 
+// 방장/기본팟 관리자가 다른 멤버를 강제로 내보낸다. leavePot(자진 탈퇴)과 달리 나가는 이유가
+// 본인의 선택이 아니므로 당사자에게도 알림이 가야 하는데, notifyPotMembers는 "나간 사람 본인"을
+// 항상 제외하도록 설계돼 있어(자진 탈퇴 시 본인에게 "나갔다"는 알림이 뜰 필요가 없어서) 그대로
+// 재사용하면 정작 쫓겨난 사람만 알림을 못 받는 문제가 있었다. 여기서는 당사자에게 별도 알림을 더 보낸다.
+export async function kickPotMember(potId, targetUserId) {
+  const { data: target } = await supabase.from('users').select('nickname').eq('id', targetUserId).single()
+
+  // 다른 멤버들에게: 기존 leavePot과 동일한 "나갔어요" 알림 (targetUserId 제외)
+  await notifyPotMembers(potId, targetUserId, {
+    title: '같이 먹자',
+    body: `${target?.nickname ?? '누군가'}님이 밥팟에서 나갔어요.`,
+    eventType: 'leave',
+  })
+
+  // 쫓겨난 당사자에게: 별도 문구로 직접 알림 + 푸시
+  const { data: pot } = await supabase.from('meal_pots').select('title').eq('id', potId).single()
+  const title = '밥팟에서 나가게 됐어요'
+  const body = `[${pot?.title ?? '밥팟'}]에서 방장에 의해 내보내졌어요.`
+  const { error: insertError } = await supabase.from('notifications').insert({
+    user_id: targetUserId, pot_id: potId, title, body, event_type: 'kicked',
+  })
+  if (insertError) console.error('kickPotMember 알림 insert 실패:', insertError)
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { userIds: [targetUserId], title, body },
+  })
+  logPushResult('kickPotMember', pushError, pushResult)
+
+  const { error } = await supabase
+    .from('pot_members')
+    .delete()
+    .match({ pot_id: potId, user_id: targetUserId })
+  if (error) throw error
+}
+
 // 나간 뒤 기본팟이 아니고 멤버가 없으면 팟 자동 삭제
 export async function leavePotWithCleanup(potId, userId) {
   const { data: pot } = await supabase
