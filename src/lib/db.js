@@ -592,13 +592,13 @@ export async function getMyFriendRequests() {
 
 async function notifyFriendRequest(requestId, toUserId, fromUserId, { title, body, eventType }) {
   const url = '/group?friend_requests=1'
-  const { error: notifError } = await supabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await supabase.from('notifications').insert({
     user_id: toUserId, friend_request_id: requestId, title, body, url, event_type: eventType,
-  })
-  if (notifError) console.error('friend notification insert 실패:', notifError)
+  }).select('id').single()
+  if (notifError) { console.error('friend notification insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('friend notification', pushError, pushResult)
 }
@@ -722,13 +722,13 @@ export async function inviteGroupFriend(groupId, fromUserId, toUserId) {
   const body = `${from?.nickname ?? '누군가'}님이 "${group?.name ?? '그룹'}"에 초대했어요.`
   const url = `/join/${group?.invite_code}`
 
-  const { error } = await supabase.from('notifications').insert({
+  const { data: notif, error } = await supabase.from('notifications').insert({
     user_id: toUserId, group_id: groupId, title, body, url, event_type: 'invite',
-  })
+  }).select('id').single()
   if (error) throw error
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('inviteGroupFriend', pushError, pushResult)
 }
@@ -1013,17 +1013,19 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
     // 알림함 기록 — 푸시 구독/권한 여부와 무관하게 항상 남긴다.
     // supabase-js는 insert 실패 시 throw하지 않고 {error}만 채워서 반환하므로 직접 체크해야 한다.
     const rows = userIds.map(user_id => ({ user_id, pot_id: potId, title, body, url, event_type: eventType ?? null }))
-    const { error: insertError } = await supabase.from('notifications').insert(rows)
+    let { data: inserted, error: insertError } = await supabase.from('notifications').insert(rows).select('id')
     if (insertError) {
       // event_type 컬럼이 DB에 아직 없는 경우(마이그레이션 미실행) 대비 — 컬럼 없이 재시도
       console.error('notifyPotMembers insert 실패, event_type 없이 재시도:', insertError)
       const fallbackRows = rows.map(({ event_type, ...rest }) => rest)
-      const retry = await supabase.from('notifications').insert(fallbackRows)
-      if (retry.error) console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error)
+      const retry = await supabase.from('notifications').insert(fallbackRows).select('id')
+      if (retry.error) { console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error); return }
+      inserted = retry.data
     }
+    if (!inserted || inserted.length === 0) return
 
     const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-      body: { userIds, title, body, url },
+      body: { notificationIds: inserted.map(n => n.id) },
     })
     logPushResult('notifyPotMembers', pushError, pushResult)
   } catch (e) {
@@ -1043,13 +1045,13 @@ export async function invitePotFriend(potId, fromUserId, toUserId, menu) {
   const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = `/pot/${potId}`
 
-  const { error } = await supabase.from('notifications').insert({
+  const { data: notif, error } = await supabase.from('notifications').insert({
     user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite', invite_status: 'pending',
-  })
+  }).select('id').single()
   if (error) throw error
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('invitePotFriend', pushError, pushResult)
 }
@@ -1093,13 +1095,16 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
   const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = '/notifications'
 
-  const { error: notifError } = await supabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await supabase.from('notifications').insert({
     user_id: toUserId, invitation_id: inv.id, title, body, url, event_type: 'invite_new',
-  })
-  if (notifError) console.error('proposeMealTogether 알림 insert 실패:', notifError)
+  }).select('id').single()
+  if (notifError) {
+    console.error('proposeMealTogether 알림 insert 실패:', notifError)
+    return inv
+  }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('proposeMealTogether', pushError, pushResult)
 
@@ -1181,13 +1186,13 @@ export async function declinePotInvitation(invitationId, userId, reason) {
     : `${me?.nickname ?? '상대'}님이 ${inv.slot} 제안을 거절했어요.`
   const url = '/notifications'
 
-  const { error: notifError } = await supabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await supabase.from('notifications').insert({
     user_id: inv.from_user_id, invitation_id: invitationId, title, body, url, event_type: 'invite_declined',
-  })
-  if (notifError) console.error('declinePotInvitation 알림 insert 실패:', notifError)
+  }).select('id').single()
+  if (notifError) { console.error('declinePotInvitation 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [inv.from_user_id], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('declinePotInvitation', pushError, pushResult)
 }
@@ -1390,13 +1395,13 @@ export async function kickPotMember(potId, targetUserId) {
   const { data: pot } = await supabase.from('meal_pots').select('title').eq('id', potId).single()
   const title = '밥팟에서 나가게 됐어요'
   const body = `[${pot?.title ?? '밥팟'}]에서 방장에 의해 내보내졌어요.`
-  const { error: insertError } = await supabase.from('notifications').insert({
+  const { data: notif, error: insertError } = await supabase.from('notifications').insert({
     user_id: targetUserId, pot_id: potId, title, body, event_type: 'kicked',
-  })
-  if (insertError) console.error('kickPotMember 알림 insert 실패:', insertError)
+  }).select('id').single()
+  if (insertError) { console.error('kickPotMember 알림 insert 실패:', insertError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [targetUserId], title, body },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('kickPotMember', pushError, pushResult)
 
@@ -2017,13 +2022,13 @@ async function notifyWishPlaceOwner({ wishPlaceId, fromUserId, insertPayload, ti
   const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" ${bodyPrefix}`
   const url = '/account?tab=wish'
 
-  const { error: notifError } = await supabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await supabase.from('notifications').insert({
     user_id: ownerId, title, body, url, ...insertPayload,
-  })
-  if (notifError) console.error('wish place 알림 insert 실패:', notifError)
+  }).select('id').single()
+  if (notifError) { console.error('wish place 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [ownerId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('wish place', pushError, pushResult)
 }
@@ -2101,14 +2106,14 @@ async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, ment
   const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" 댓글에서 나를 언급했어요.`
   const url = '/account?tab=wish'
 
-  const { error: notifError } = await supabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await supabase.from('notifications').insert({
     user_id: mentionedUserId, title, body, url,
     wish_place_mention_comment_id: commentId, event_type: 'wish_mention',
-  })
-  if (notifError) console.error('wish mention 알림 insert 실패:', notifError)
+  }).select('id').single()
+  if (notifError) { console.error('wish mention 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [mentionedUserId], title, body, url },
+    body: { notificationIds: [notif.id] },
   })
   logPushResult('wish mention', pushError, pushResult)
 }

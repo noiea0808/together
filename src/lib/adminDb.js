@@ -153,15 +153,17 @@ export async function replyToFeedbackAdmin(feedbackId, adminId, userId, reply) {
     .single()
   if (error) throw error
 
-  const { error: notifError } = await adminSupabase.from('notifications').insert({
+  const { data: notif, error: notifError } = await adminSupabase.from('notifications').insert({
     user_id: userId, title: '의견에 답변이 달렸어요', body: reply, url: '/account', event_type: 'feedback_reply',
-  })
-  if (notifError) console.error('feedback reply 알림 insert 실패:', notifError)
-
-  const { error: pushError } = await adminSupabase.functions.invoke('send-push', {
-    body: { userIds: [userId], title: '의견에 답변이 달렸어요', body: reply, url: '/account' },
-  })
-  if (pushError) console.warn('feedback reply send-push 실패:', pushError)
+  }).select('id').single()
+  if (notifError) {
+    console.error('feedback reply 알림 insert 실패:', notifError)
+  } else {
+    const { error: pushError } = await adminSupabase.functions.invoke('send-push', {
+      body: { notificationIds: [notif.id] },
+    })
+    if (pushError) console.warn('feedback reply send-push 실패:', pushError)
+  }
 
   return data
 }
