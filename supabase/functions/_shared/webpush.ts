@@ -73,7 +73,11 @@ export async function sendPushToUsers(
     if (r.status === 'rejected') {
       const reason = r.reason as { statusCode?: number; body?: string; message?: string }
       const statusCode = reason?.statusCode
-      if (statusCode === 404 || statusCode === 410) staleEndpoints.push(subs![i].endpoint)
+      // 404/410: 브라우저가 구독을 폐기한 경우.
+      // 403: VAPID 키를 재발급하기 전에 만들어진 구독 — 지금 서버 키로는 영영 서명이 안 맞아
+      //      매 발송마다 실패만 쌓인다. 지워두면 그 사람이 다음에 앱을 열 때 push.js의
+      //      syncPushSubscription이 현재 공개키로 새로 구독하므로 저절로 복구된다.
+      if (statusCode === 404 || statusCode === 410 || statusCode === 403) staleEndpoints.push(subs![i].endpoint)
       // endpoint 전체는 구독자 식별에 쓰일 수 있어 응답엔 끝 8자만 남긴다.
       failures.push({
         target: '...' + subs![i].endpoint.slice(-8),

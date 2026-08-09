@@ -12,7 +12,11 @@ export { getPublicOrigin } from './platform'
 // 찍혀 원인을 못 본다. JSON으로 풀어서 실제 값이 보이게 한다.
 function logPushResult(label, pushError, pushResult) {
   if (pushError) console.warn(`${label} send-push 실패:`, JSON.stringify(pushError))
-  else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
+  // sent를 같이 찍는다 — failures만 보면 "일부만 실패"인지 "한 명도 못 받았는지" 구분이 안 돼서,
+  // 구독 하나가 낡은 건지 발송 경로 전체가 죽은 건지 로그만으로는 판단할 수 없었다.
+  else if (pushResult?.failed > 0) {
+    console.warn(`${label} send-push 실패 ${pushResult.failed}건 (성공 ${pushResult.sent}건):`, JSON.stringify(pushResult.failures))
+  }
 }
 
 // send-push는 이미 저장된 notifications 행의 id만 받으므로(클라이언트가 보낸 title/body를 믿지
