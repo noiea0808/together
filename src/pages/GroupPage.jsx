@@ -30,7 +30,8 @@ function formatDate(date) {
 }
 
 function getRelativeLabel(date) {
-  const diff = Math.round((date - TODAY) / (1000 * 60 * 60 * 24))
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
   if (diff === 0)  return { label: '오늘',   color: 'var(--color-primary)' }
   if (diff === -1) return { label: '어제',   color: 'var(--color-info)' }
   if (diff === 1)  return { label: '내일',   color: 'var(--color-success)' }
@@ -42,7 +43,11 @@ function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
 }
 
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+// 자정을 넘겨도 항상 실제 오늘을 가리키도록 호출 시점에 계산 — 모듈 로드 시 한 번만 고정하면
+// 앱을 자정 너머까지 켜둔 세션에서 "오늘"이 실제로는 어제인 상태로 굳어버린다.
+function getToday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d
+}
 const isActiveStatus = st => st === '참여중' || st === '참여완료'
 
 // 나와 같은 팟인지에 따라 참여 상태 라벨을 구분 — 같은 팟: 같이 먹을 예정/같이 먹음, 다른 팟: 밥팟 참여 예정/밥팟 참여완료
@@ -58,6 +63,8 @@ export default function GroupPage() {
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [friendsModalTab, setFriendsModalTab] = useState('search')
   usePageHeader({ title: '그룹 멤버들', action: { label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } } })
+
+  const TODAY = getToday()
 
   // 친구 요청 알림(/group?friend_requests=1)을 눌러 들어온 경우, 요청 탭이 열린 채로 바로 뜬다.
   useEffect(() => {

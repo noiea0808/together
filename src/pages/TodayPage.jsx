@@ -150,7 +150,11 @@ function getRelativeLabel(date) {
 function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
 }
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+// 자정을 넘겨도 항상 실제 오늘을 가리키도록 호출 시점에 계산 — 모듈 로드 시 한 번만 고정하면
+// 앱을 자정 너머까지 켜둔 세션에서 "오늘"이 실제로는 어제인 상태로 굳어버린다.
+function getToday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d
+}
 
 // 드래그 도중 텍스트가 선택됐는지 — 마우스로 천천히/빠르게 텍스트를 드래그해도, 실제로 글자가
 // 선택돼 있으면 스와이프 제스처가 아니라 텍스트 선택 시도였다고 판단해 내비게이션을 건너뛴다.
@@ -173,6 +177,7 @@ export default function TodayPage() {
   const { user } = useUser()
   usePageHeader({ brand: { icon: <RiceBowlIcon size={40} />, label: '같이 먹자' } })
 
+  const TODAY = getToday()
   const initialDate = (() => {
     const d = searchParams.get('date')
     if (d) { const parsed = new Date(d); parsed.setHours(0,0,0,0); if (!isNaN(parsed)) return parsed }
