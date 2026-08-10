@@ -196,7 +196,7 @@ export default function FriendsSearchModal({ myUserId, initialTab = 'search', on
 
 const S = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
-  dialog: { width: '100%', maxWidth: 'var(--max-width)', maxHeight: '82vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
+  dialog: { width: '100%', maxWidth: 'var(--max-width)', maxHeight: '82vh', overflowY: 'auto', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 'calc(32px + var(--safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   title: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   tabs: { display: 'flex', gap: 6 },
   tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
