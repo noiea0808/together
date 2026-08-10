@@ -4,7 +4,7 @@ import { Capacitor } from '@capacitor/core'
 import { App } from '@capacitor/app'
 import { Browser } from '@capacitor/browser'
 import { PushNotifications } from '@capacitor/push-notifications'
-import { handleNativeOAuthCallback } from '../lib/db'
+import { handleNativeOAuthCallback, NATIVE_OAUTH_SCHEME } from '../lib/db'
 import { takePendingRoute } from '../lib/pendingRoute'
 import { supabase } from '../lib/supabase'
 
@@ -32,8 +32,11 @@ export default function NativeDeepLinkHandler() {
       let parsed
       try { parsed = new URL(url) } catch { return }
 
-      // OAuth 콜백 — Chrome Custom Tab에서 돌아온 gachimeokja://oauth-callback?code=...
-      if (parsed.protocol === 'gachimeokja:') {
+      // OAuth 콜백 — Chrome Custom Tab에서 돌아온 <스킴>://oauth-callback?code=...
+      // 스킴은 빌드에 따라 다르므로(프로덕션 gachimeokja / STG gachimeokjastg) db.js가
+      // redirectTo에 실어보낸 값과 같은 상수를 쓴다. 여기에 문자열을 직접 적으면 STG 빌드에서
+      // 콜백이 이 분기에 안 걸려 code 교환 없이 그대로 흘러가버린다.
+      if (parsed.protocol === `${NATIVE_OAUTH_SCHEME}:`) {
         try {
           await handleNativeOAuthCallback(url)
           // 웹은 redirectTo에 복귀 경로를 실어 보내지만(db.js oauthReturnPath), 네이티브는

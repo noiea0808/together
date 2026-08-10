@@ -33,7 +33,11 @@ function newNotificationId() {
 // intent-filter와 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로
 // 돌아오면 AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
 // STG는 프로덕션 앱과 스킴이 겹치면 로그인 복귀 시 OS가 앱 선택창을 띄우므로 별도 스킴을 쓴다.
-const NATIVE_OAUTH_REDIRECT = IS_STG ? 'gachimeokjastg://oauth-callback' : 'gachimeokja://oauth-callback'
+// NativeDeepLinkHandler가 돌아온 딥링크의 protocol을 이 값과 대조하므로 스킴을 따로 export한다 —
+// 양쪽에 문자열을 각자 적어두면 STG처럼 한쪽만 달라졌을 때 콜백이 조용히 무시되고(아무 분기에도
+// 안 걸림) 로그인 화면으로 되돌아온 것처럼만 보인다.
+export const NATIVE_OAUTH_SCHEME = IS_STG ? 'gachimeokjastg' : 'gachimeokja'
+const NATIVE_OAUTH_REDIRECT = `${NATIVE_OAUTH_SCHEME}://oauth-callback`
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {
@@ -132,7 +136,7 @@ export async function signInWithKakao() {
   if (error) throw error
 }
 
-// NativeDeepLinkHandler가 gachimeokja://oauth-callback 딥링크를 받으면 호출한다.
+// NativeDeepLinkHandler가 <NATIVE_OAUTH_SCHEME>://oauth-callback 딥링크를 받으면 호출한다.
 // PKCE 플로우라 code 쿼리 파라미터 하나만 교환하면 세션이 생기고, UserContext의
 // onAuthStateChange 구독이 SIGNED_IN을 받아 나머지(라우팅 등)는 기존 흐름 그대로 이어진다.
 export async function handleNativeOAuthCallback(url) {
