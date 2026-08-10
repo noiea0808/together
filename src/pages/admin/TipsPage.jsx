@@ -51,7 +51,11 @@ export default function TipsPage() {
     try {
       let image_url = editing.image_url ?? null
       if (editing._newImageFile) {
-        const blob = await resizeImageFile(editing._newImageFile)
+        // 팁/시작하기 이미지는 대부분 UI 스샷 — 글자가 읽혀야 해서 사진보다 후하게 잡는다.
+        // 모달 폭이 최대 380px이라 3배 화면 기준 1140px은 있어야 늘어나 보이지 않는다.
+        const blob = await resizeImageFile(editing._newImageFile, {
+          maxWidth: 1280, maxHeight: 2560, quality: 0.95,
+        })
         image_url = await uploadDailyTipImage(blob)
       }
       const payload = {
@@ -155,7 +159,7 @@ export default function TipsPage() {
                     {t.is_active ? 'ON' : 'OFF'}
                   </button>
                 </td>
-                <td style={{ ...s.td, maxWidth: 360, cursor: 'pointer' }} onClick={() => openEdit(t)}>{truncate(t.content, 60)}</td>
+                <td style={{ ...s.td, maxWidth: 360, cursor: 'pointer', whiteSpace: 'pre-line' }} onClick={() => openEdit(t)}>{truncate(t.content, 60)}</td>
                 <td style={s.td}>
                   {t.image_url ? <img src={t.image_url} alt="" style={s.thumb} /> : <div style={s.thumbEmpty}>—</div>}
                 </td>

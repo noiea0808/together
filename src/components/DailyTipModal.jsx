@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useUser } from '../lib/UserContext'
 import { getActiveDailyTips } from '../lib/db'
 import { useScrollLock } from '../lib/useScrollLock'
@@ -66,6 +66,8 @@ export default function DailyTipModal() {
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)
   const scrollRef = useRef(null)
+  const itemRefs = useRef([])
+  const [trackHeight, setTrackHeight] = useState(null)
   const dragScroll = useDragScroll()
   // 카드가 좌우로 넘어간다는 걸 처음 진입한 사용자에게만 몸으로 알려주는 1회성 넛지.
   // TodayPage의 나의 상태 카드 넛지와 같은 애니메이션(statusCardSwipeHint)을 재사용한다.
@@ -132,6 +134,36 @@ export default function DailyTipModal() {
   const items = tabItems?.[activeTab] ?? []
   const availableTabs = tabItems ? Object.keys(TABS).filter(k => tabItems[k]?.length > 0) : []
 
+  const indexRef = useRef(index)
+  indexRef.current = index
+
+  // 카드들은 가로 스크롤 트랙 안에 나란히 놓여 있어서, 그냥 두면 트랙(=팝업) 높이가
+  // 가장 큰 카드에 맞춰 고정되고 짧은 카드에는 빈 공간이 남는다. 지금 보고 있는 카드의
+  // 높이를 재서 트랙에 직접 물려 준다.
+  // observer를 카드 하나가 아니라 전체 카드에 계속 걸어두는 이유: 이전에는 index가 바뀔 때마다
+  // 옛 observer를 끊고 새로 만들었는데, 이미지 로딩이 늦어 "지금 보고 있는 카드의 리사이즈 알림"이
+  // 하필 그 끊고-다시-거는 순간에 겹치면 통째로 유실될 수 있었다. 그러면 트랙이 이미지가 뒤늦게
+  // 키운 높이로 못 줄어들고 그대로 눌러앉는다(한번 커지면 안 줄어드는 버그). 모든 카드를 계속
+  // 관찰하고 콜백에서 "지금 카드"인지만 걸러내면 이 유실 구간이 아예 없어진다.
+  useLayoutEffect(() => {
+    const els = itemRefs.current.slice(0, items.length)
+    if (els.every(el => !el)) return
+    const indexOf = new Map(els.map((el, i) => [el, i]))
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (indexOf.get(entry.target) === indexRef.current) setTrackHeight(entry.target.offsetHeight)
+      }
+    })
+    els.forEach(el => el && ro.observe(el))
+    return () => ro.disconnect()
+  }, [activeTab, open, items.length])
+
+  // 카드를 전환한 그 순간에는 리사이즈 알림을 기다리지 않고 바로 현재 카드 높이로 맞춘다.
+  useLayoutEffect(() => {
+    const el = itemRefs.current[index]
+    if (el) setTrackHeight(el.offsetHeight)
+  }, [index])
+
   if (!open || items.length === 0) return null
 
   const handleScroll = () => {
@@ -185,13 +217,13 @@ export default function DailyTipModal() {
         >
           <div
             className="no-scrollbar"
-            style={styles.scroll}
+            style={{ ...styles.scroll, height: trackHeight ?? undefined }}
             ref={scrollRef}
             onScroll={handleScroll}
             {...dragScroll}
           >
-            {items.map(item => (
-              <div key={item.id} style={styles.item}>
+            {items.map((item, i) => (
+              <div key={item.id} ref={el => { itemRefs.current[i] = el }} style={styles.item}>
                 {item.image_url && <img src={item.image_url} alt="" style={styles.image} loading="lazy" />}
                 {item.content && <p style={styles.body}>{item.content}</p>}
               </div>
@@ -235,7 +267,15 @@ const styles = {
     fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', cursor: 'pointer',
   },
   tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-primary, #FF6B35)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  scroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab' },
+  // alignItems: center — 기본값(stretch)이면 모든 카드가 가장 큰 카드 높이로 늘어나 카드별
+  // 실제 높이를 잴 수 없다. 그렇다고 늘리진 않되, minHeight로 바닥을 깔아둔 상태(글자 한두 줄짜리
+  // 짧은 카드)에서 내용이 위쪽에 붙지 않고 가운데에 오도록 center로 정렬한다.
+  // 높이는 trackHeight로 직접 물려 주고 부드럽게 전환한다.
+  scroll: {
+    display: 'flex', overflowX: 'auto', overflowY: 'hidden', alignItems: 'center', minHeight: 300,
+    scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab',
+    transition: 'height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+  },
   item: {
     flex: '0 0 100%', scrollSnapAlign: 'start',
     display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center',

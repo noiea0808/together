@@ -933,8 +933,14 @@ const styles = {
 
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },
 
-  friendGroupFilterRow: { display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, marginBottom: 4 },
-  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  // flexShrink:0 필수 — overflow-x:auto가 있는 flex 아이템은 flexbox 규칙상 자동 최소 높이가
+  // 0으로 취급돼, 부모(body)의 세로 콘텐츠가 넘칠 때(친구 많은 "전체" 필터 등) 스크롤 대신
+  // 이 줄이 먼저 짜부라져 거의 안 보이게 된다. 오버플로는 body의 overflowY:auto가 처리해야 한다.
+  friendGroupFilterRow: { display: 'flex', flexShrink: 0, gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, marginBottom: 4 },
+  // 배경(--color-surface-2)이 페이지 배경(--color-bg)과 명도 차가 거의 없어(약 1.1:1) 채움색이
+  // 사실상 안 보이고 얇은 테두리+흐린 글자만 남아 칩이 있는지도 모를 만큼 흐릿해진다. 흰 배경(--color-surface)과
+  // 진한 글자색으로 바꿔 대비를 WCAG 기준(4.5:1) 위로 끌어올린다.
+  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
   friendGroupFilterChipActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a10)', border: '1px solid var(--color-primary)' },
 
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)' },

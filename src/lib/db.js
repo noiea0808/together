@@ -4,6 +4,7 @@ import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
 import { takePendingRoute } from './pendingRoute'
 import { getPublicOrigin, IS_STG } from './platform'
+import { imageExtFor } from './resizeImage'
 
 export { getPublicOrigin } from './platform'
 
@@ -353,12 +354,13 @@ export async function deleteDailyTip(id) {
   if (error) throw error
 }
 
-// blob: resizeImageFile로 재인코딩한 JPEG 이미지 (크롭 없이 원본 비율 유지 — 스샷 등)
+// blob: resizeImageFile을 거친 이미지 (크롭 없이 원본 비율 유지 — 스샷 등).
+// 줄일 필요가 없으면 원본 PNG가 그대로 오기도 해서 확장자/타입을 blob에서 가져온다.
 export async function uploadDailyTipImage(blob) {
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${imageExtFor(blob)}`
   const { error: uploadError } = await supabase.storage
     .from('daily-tips')
-    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+    .upload(path, blob, { cacheControl: '3600', contentType: blob.type || 'image/jpeg' })
   if (uploadError) throw uploadError
 
   const { data: { publicUrl } } = supabase.storage.from('daily-tips').getPublicUrl(path)
@@ -1829,15 +1831,15 @@ export async function getPotPhotosCount(potId) {
   return data ?? 0
 }
 
-// blob: PhotoAdjustModal에서 정사각형으로 잘라 재인코딩한 JPEG 이미지
+// blob: PhotoAdjustModal에서 정사각형으로 자르거나 resizeImageFile을 거친 이미지
 export async function addPotPhoto(potId, userId, blob) {
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) throw new Error('로그인이 필요합니다.')
 
-  const path = `${authUser.id}/${potId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const path = `${authUser.id}/${potId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${imageExtFor(blob)}`
   const { error: uploadError } = await supabase.storage
     .from('pot-photos')
-    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+    .upload(path, blob, { cacheControl: '3600', contentType: blob.type || 'image/jpeg' })
   if (uploadError) throw uploadError
 
   const { data: { publicUrl } } = supabase.storage.from('pot-photos').getPublicUrl(path)

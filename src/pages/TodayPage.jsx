@@ -1007,11 +1007,11 @@ export default function TodayPage() {
                 onClick={() => goToSlot(slot)}
               >
                 <div style={styles.subSlotIconZone}>
-                  {/* 아이콘 색은 선택 여부가 아니라 "데이터 있음" 기준으로 켠다 — 선택 안 된 슬롯도
-                      상태/참여(참여완료 포함)가 있으면 바로 눈에 띄어야 한다. */}
+                  {/* 아이콘 색은 선택 여부와 무관하게 "데이터 있음" 기준으로만 켠다 — 선택 안 된 슬롯도
+                      상태/참여(참여완료 포함)가 있으면 바로 눈에 띄고, 선택했더라도 상태가 없으면 흐릿하게 남는다. */}
                   {info.key === 'open' || info.key === 'skip' || info.key === 'closed'
-                    ? <StatusIcon statusKey={info.key} muted={!info.label && !isSelected} style={styles.subSlotIconImg} />
-                    : <SlotIcon slot={slot} muted={!info.label && !isSelected} style={styles.subSlotIconImg} />}
+                    ? <StatusIcon statusKey={info.key} muted={!info.label} style={styles.subSlotIconImg} />
+                    : <SlotIcon slot={slot} muted={!info.label} style={styles.subSlotIconImg} />}
                 </div>
                 <div style={{ ...styles.subSlotLabelZone, background: info.label ? info.bg : 'var(--color-surface-2)' }}>
                   <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
