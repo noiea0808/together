@@ -1240,7 +1240,10 @@ export async function cancelPotInvitation(invitationId, userId) {
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name))')
+    // friend_requests를 같이 읽는 이유 — 밥팟 초대는 처리 여부가 알림 행(invite_status)이나
+    // pot_invitations.status에 남지만, 친구 요청은 알림 행에 상태 컬럼이 없어서 원본 요청의
+    // status를 봐야 알림함에서 "이미 수락/거절한 요청"에 버튼을 다시 띄우지 않을 수 있다.
+    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name)), friend_requests(id, status, to_user_id)')
     .eq('user_id', userId)
     .neq('event_type', 'lunch_reminder')
     .order('created_at', { ascending: false })

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyNotifications, markAllNotificationsRead, getMyPotsForSlotAllGroups, leavePotWithCleanup, acceptPotInvitation, declinePotInvitation, acceptPotFriendInvite, declinePotFriendInvite } from '../lib/db'
+import { getMyNotifications, markAllNotificationsRead, getMyPotsForSlotAllGroups, leavePotWithCleanup, acceptPotInvitation, declinePotInvitation, acceptPotFriendInvite, declinePotFriendInvite, acceptFriendRequest, declineFriendRequest } from '../lib/db'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 
@@ -31,6 +31,8 @@ const EVENT_META = {
   invite_declined: { label: '거절', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
   wish_like: { label: '하트', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
   wish_comment: { label: '댓글', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
+  friend_request: { label: '친구 요청', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
+  friend_accepted: { label: '친구', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
 }
 
 const DECLINE_REASON_PRESETS = ['선약이 있어요', '오늘은 혼자 먹을게요', '컨디션이 안 좋아요', '다음에 같이 해요']
@@ -176,6 +178,40 @@ export default function NotificationsPage() {
     }
   }
 
+  // 친구 요청 수락/거절 — 알림 행에는 처리 상태가 없어서 조인해온 friend_requests.status를 보고,
+  // 처리 결과는 friend_requests.id를 키로 localOverrides에 담는다(밥팟 초대에서 쓰는
+  // pot_invitations.id / notifications.id와는 다른 UUID라 한 맵에 같이 둬도 충돌하지 않는다).
+  // 거절은 db.declineFriendRequest가 상대에게 따로 알리지 않는다 — 그쪽 정책을 그대로 따른다.
+  const handleAcceptFriend = async (e, n) => {
+    e.stopPropagation()
+    const req = n.friend_requests
+    if (!req || actingId) return
+    setActingId(req.id)
+    try {
+      await acceptFriendRequest(req.id, user.id)
+      setLocalOverrides(prev => ({ ...prev, [req.id]: { status: 'accepted' } }))
+    } catch (e2) {
+      console.error(e2)
+    } finally {
+      setActingId(null)
+    }
+  }
+
+  const handleDeclineFriend = async (e, n) => {
+    e.stopPropagation()
+    const req = n.friend_requests
+    if (!req || actingId) return
+    setActingId(req.id)
+    try {
+      await declineFriendRequest(req.id, user.id)
+      setLocalOverrides(prev => ({ ...prev, [req.id]: { status: 'declined' } }))
+    } catch (e2) {
+      console.error(e2)
+    } finally {
+      setActingId(null)
+    }
+  }
+
   const handleConflictLeaveAndAccept = async () => {
     if (!conflict) return
     const { notification, otherPot } = conflict
@@ -242,9 +278,17 @@ export default function NotificationsPage() {
             const dateLabel = formatDate(pot?.date || inv?.date)
             const metaLine = [pot?.groups?.name || inv?.groups?.name, dateLabel, pot?.title || inv?.title].filter(Boolean).join(' · ')
             const isNew = newIds.has(n.id)
-            const isPending = (n.event_type === 'invite_new' && invStatus === 'pending')
+            // 친구 요청 — 내게 온 요청일 때만 처리 버튼을 띄운다. friend_accepted(내가 보낸 요청이
+            // 수락됐다는 알림)도 같은 friend_requests 행을 물고 오므로 event_type으로 갈라야 한다.
+            const friendReq = n.friend_requests
+            const isFriendRequest = n.event_type === 'friend_request' && friendReq?.to_user_id === user?.id
+            const friendReqStatus = friendReq ? (localOverrides[friendReq.id]?.status ?? friendReq.status) : null
+            const isFriendPending = isFriendRequest && friendReqStatus === 'pending'
+            const isPotInvitePending = (n.event_type === 'invite_new' && invStatus === 'pending')
               || (isPlainInvite && plainInviteStatus === 'pending')
-            const isBusy = actingId === (inv?.id ?? n.id)
+            // 아직 처리 안 한 알림은 탭해도 이동하지 않는다 — 버튼으로만 처리하게 한다.
+            const isPending = isPotInvitePending || isFriendPending
+            const isBusy = actingId === (inv?.id ?? friendReq?.id ?? n.id)
             const handleItemClick = () => {
               if (isPending) return
               if (invStatus === 'accepted') {
@@ -279,7 +323,7 @@ export default function NotificationsPage() {
                   </div>
                   {metaLine && <div style={S.itemMeta}>{metaLine}</div>}
                   {n.body && <div style={S.itemText}>{n.body}</div>}
-                  {isPending && (
+                  {isPotInvitePending && (
                     <div style={S.inviteBtnRow}>
                       <button
                         style={S.inviteAcceptBtn}
@@ -294,6 +338,20 @@ export default function NotificationsPage() {
                         disabled={isBusy}
                       >거절</button>
                     </div>
+                  )}
+                  {isFriendPending && (
+                    <div style={S.inviteBtnRow}>
+                      <button style={S.inviteAcceptBtn} onClick={e => handleAcceptFriend(e, n)} disabled={isBusy}>
+                        {isBusy ? '처리 중...' : '수락'}
+                      </button>
+                      <button style={S.inviteDeclineBtn} onClick={e => handleDeclineFriend(e, n)} disabled={isBusy}>거절</button>
+                    </div>
+                  )}
+                  {isFriendRequest && friendReqStatus === 'accepted' && (
+                    <div style={S.inviteStatusDone}>✓ 친구가 됐어요</div>
+                  )}
+                  {isFriendRequest && friendReqStatus === 'declined' && (
+                    <div style={S.inviteStatusDeclined}>거절한 요청이에요</div>
                   )}
                   {n.event_type === 'invite_new' && invStatus === 'accepted' && (
                     <div style={S.inviteStatusDone}>✓ 수락했어요 · 밥팟으로 이동</div>
