@@ -333,7 +333,7 @@ export default function MomentPage() {
 const S = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
 
-  list: { flex: 1, overflowY: 'auto', padding: '4px 16px 80px', display: 'flex', flexDirection: 'column', gap: 12 },
+  list: { flex: 1, overflowY: 'auto', padding: '4px 16px calc(var(--bottom-nav-space) + 12px)', display: 'flex', flexDirection: 'column', gap: 12 },
   loadingState: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
   loadingMoreState: { display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '12px 0' },
   sentinel: { height: 1 },

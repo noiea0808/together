@@ -100,6 +100,15 @@
      (android/.../MainActivity.java)에서 Android일 때만 실측 인셋 px로 덮어쓴다. iOS/웹은 env() 그대로. */
   --safe-area-inset-top: env(safe-area-inset-top, 0px);
   --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* BottomNav는 position:fixed라 문서 흐름에서 빠져 있다 — 탭 화면의 본문은 화면 아래끝까지
+     차지하고 그 위에 내비가 겹쳐 뜨는 구조라, 본문 쪽에서 이만큼 padding-bottom을 두지 않으면
+     마지막 항목이 내비 뒤에 가려진다. 인셋이 0인 데스크톱/버튼 내비 기기에서는 우연히 티가
+     안 나고, 제스처 내비(인셋 24~48px) 기기에서만 잘려 보인다.
+     아래 높이는 BottomNav.jsx가 height로 직접 못박아 쓰므로 실제 렌더 높이와 항상 일치한다
+     (탭 padding 14px*2 + 아이콘 40px + borderTop 1px). */
+  --bottom-nav-height: 69px;
+  --bottom-nav-space: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom));
 }
 
 /* ===== 기본 타이포 & 바디 ===== */

@@ -193,7 +193,7 @@ const S = {
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
   dateNavLabel: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
 
-  list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
+  list: { flex: 1, overflowY: 'auto', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)', paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 
   monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', padding: '12px 4px 6px', letterSpacing: '0.3px' },

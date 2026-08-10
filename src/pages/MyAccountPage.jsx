@@ -1103,7 +1103,7 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--spacing-xl) + var(--safe-area-inset-bottom))' },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },
 
   // 프로필 카드와 3개 설정 섹션을 한 그룹으로 묶어, 페이지 내 다른 블록(설치 안내, 로그아웃)과는
   // 구분되는 넉넉한 간격을 준다.

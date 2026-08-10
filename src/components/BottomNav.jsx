@@ -133,10 +133,14 @@ export default function BottomNav() {
 }
 
 const styles = {
+  // height를 못박아 --bottom-nav-height를 "실제 렌더 높이"로 만든다 — 본문 쪽 padding-bottom이
+  // 이 변수를 기준으로 잡히므로, 여기 높이가 콘텐츠에 따라 흘러 다니면 그 여백이 어긋난다.
+  // (box-sizing:border-box라 borderTop 1px + 탭 68px = 69px이 정확히 맞물린다.)
   nav: {
     position: 'fixed', bottom: 0, left: '50%',
     transform: 'translateX(-50%)',
     width: '100%', maxWidth: 'var(--max-width)',
+    height: 'var(--bottom-nav-space)',
     display: 'flex', borderTop: '1px solid var(--color-border)',
     background: 'var(--color-surface)',
     paddingBottom: 'var(--safe-area-inset-bottom)',
