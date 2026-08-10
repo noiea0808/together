@@ -207,17 +207,22 @@ export default function DailyTipModal() {
           </div>
         )}
 
-        {/* 넛지 애니메이션을 scroll-snap 컨테이너 자신이 아니라 이 바깥 래퍼에 건다.
-            iOS Safari는 overflow-x:auto + scroll-snap-type이 걸린 요소에 transform
-            애니메이션까지 같이 주면 애니메이션 종료 시 스냅 위치를 잘못 계산해, 첫 카드가
-            아니라 두세 번째 카드로 스냅해버리는 버그가 있다. */}
+        {/* 넛지 애니메이션과 카드별 높이 트랜지션을 scroll-snap 컨테이너 자신이 아니라 이 바깥
+            래퍼에 건다. iOS Safari/모바일 WebView는 overflow-x:auto + scroll-snap-type이 걸린
+            요소에 transform·height 같은 애니메이션까지 같이 주면 스냅 위치 계산이 꼬이거나
+            (엉뚱한 카드로 스냅) 레이아웃 갱신이 멈춰버리는(카드가 커진 뒤 다시 안 줄어드는)
+            버그가 있어, 애니메이션은 항상 스크롤 컨테이너 밖의 래퍼가 담당한다. */}
         <div
-          style={{ animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined }}
+          style={{
+            height: trackHeight ?? undefined, minHeight: 300, overflow: 'hidden',
+            transition: 'height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+            animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined,
+          }}
           onAnimationEnd={dismissSwipeHint}
         >
           <div
             className="no-scrollbar"
-            style={{ ...styles.scroll, height: trackHeight ?? undefined }}
+            style={{ ...styles.scroll, height: '100%' }}
             ref={scrollRef}
             onScroll={handleScroll}
             {...dragScroll}
@@ -268,13 +273,12 @@ const styles = {
   },
   tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-primary, #FF6B35)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
   // alignItems: center — 기본값(stretch)이면 모든 카드가 가장 큰 카드 높이로 늘어나 카드별
-  // 실제 높이를 잴 수 없다. 그렇다고 늘리진 않되, minHeight로 바닥을 깔아둔 상태(글자 한두 줄짜리
-  // 짧은 카드)에서 내용이 위쪽에 붙지 않고 가운데에 오도록 center로 정렬한다.
-  // 높이는 trackHeight로 직접 물려 주고 부드럽게 전환한다.
+  // 실제 높이를 잴 수 없다. 그렇다고 늘리진 않되, 바깥 래퍼의 minHeight로 바닥을 깔아둔 상태
+  // (글자 한두 줄짜리 짧은 카드)에서 내용이 위쪽에 붙지 않고 가운데에 오도록 center로 정렬한다.
+  // height/transition은 스냅 버그를 피해 바깥 래퍼가 담당하므로 여기서는 100%로 그걸 채우기만 한다.
   scroll: {
-    display: 'flex', overflowX: 'auto', overflowY: 'hidden', alignItems: 'center', minHeight: 300,
+    display: 'flex', overflowX: 'auto', overflowY: 'hidden', alignItems: 'center',
     scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab',
-    transition: 'height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
   },
   item: {
     flex: '0 0 100%', scrollSnapAlign: 'start',
