@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getMyFriendRequests, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getMyFriendRequests, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest, cancelFriendRequest } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
@@ -132,11 +132,17 @@ export default function GroupPage() {
   const [sendingRequestId, setSendingRequestId] = useState(null)
   const [pendingSentIds, setPendingSentIds] = useState(new Set()) // 내가 보낸 pending 요청 상대
   const [pendingReceivedIds, setPendingReceivedIds] = useState(new Set()) // 상대가 나한테 보낸 pending 요청
+  // 요청 취소(cancelFriendRequest)에는 friend_requests.id가 필요한데 pendingSentIds는
+  // 상대 id만 들고 있어서 별도로 상대 id -> 요청 id 맵을 하나 더 둔다.
+  const [pendingSentRequestIds, setPendingSentRequestIds] = useState(new Map())
+  const [cancelingRequest, setCancelingRequest] = useState(false)
 
   const reloadFriendRequests = () =>
     getMyFriendRequests()
       .then(rows => {
-        setPendingSentIds(new Set(rows.filter(r => r.direction === 'sent').map(r => r.other_id)))
+        const sent = rows.filter(r => r.direction === 'sent')
+        setPendingSentIds(new Set(sent.map(r => r.other_id)))
+        setPendingSentRequestIds(new Map(sent.map(r => [r.other_id, r.id])))
         setPendingReceivedIds(new Set(rows.filter(r => r.direction === 'received').map(r => r.other_id)))
       })
       .catch(e => console.error(e))
@@ -269,6 +275,22 @@ export default function GroupPage() {
       console.error(e)
     } finally {
       setUnfriending(false)
+    }
+  }
+
+  const handleCancelSentRequest = async () => {
+    const requestId = pendingSentRequestIds.get(selectedFriendId)
+    if (!requestId || cancelingRequest) return
+    setCancelingRequest(true)
+    try {
+      await cancelFriendRequest(requestId, user.id)
+      setFriendMenuOpen(false)
+      setSelectedFriendId(null)
+      await reloadFriendRequests()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCancelingRequest(false)
     }
   }
 
@@ -586,7 +608,7 @@ export default function GroupPage() {
                   ))}
                 </div>
               </div>
-              {selectedFriend.requestId && (
+              {selectedFriend.requestId ? (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button style={styles.wishMoreBtn} onClick={() => setFriendMenuOpen(v => !v)} aria-label="더보기">
                     <MoreHorizontalIcon size={18} />
@@ -604,6 +626,31 @@ export default function GroupPage() {
                       </div>
                     </>
                   )}
+                </div>
+              ) : pendingSentIds.has(selectedFriendId) && (
+                // 아직 친구는 아니지만 내가 보낸 요청이 pending인 경우 — "요청됨" 칩으로
+                // 상태를 보여주고, 점세개 메뉴로 요청 취소를 제공한다.
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <span style={styles.sheetRequestSentChip}>요청됨</span>
+                  <div style={{ position: 'relative' }}>
+                    <button style={styles.wishMoreBtn} onClick={() => setFriendMenuOpen(v => !v)} aria-label="더보기">
+                      <MoreHorizontalIcon size={18} />
+                    </button>
+                    {friendMenuOpen && (
+                      <>
+                        <div style={styles.menuBackdrop} onClick={() => setFriendMenuOpen(false)} />
+                        <div style={styles.wishMoreDropdown}>
+                          <button
+                            style={{ ...styles.wishMoreItem, color: 'var(--color-danger)' }}
+                            onClick={handleCancelSentRequest}
+                            disabled={cancelingRequest}
+                          >
+                            {cancelingRequest ? '취소하는 중...' : '요청 취소'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -917,6 +964,13 @@ const styles = {
   // 이미 보낸 요청("요청됨")은 더 이상 누를 액션이 아니라 상태 표시라, 눈에 덜 띄는 회색 톤으로 구분한다.
   friendRequestBtnSent: {
     color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+  },
+  // 시트 헤더용 "요청됨" 칩 — 목록 행의 friendRequestBtnSent와 같은 톤이지만 버튼이 아니라
+  // 상태 표시라 padding/폰트 크기를 헤더 옆에 맞게 조금 더 작게 뒀다.
+  sheetRequestSentChip: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
+    background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-full)', padding: '5px 10px', whiteSpace: 'nowrap',
   },
   // 너비를 고정해야 배지 개수가 달라도 모든 친구 행에서 같은 x 위치에서 시작한다(세로 줄맞춤).
   statusChipRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center', gap: 5, flexShrink: 0, width: 120 },
