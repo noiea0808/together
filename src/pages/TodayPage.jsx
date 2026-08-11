@@ -2897,7 +2897,11 @@ const styles = {
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
   groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '3px 9px', whiteSpace: 'nowrap' },
   memberSection: { padding: '0 0 4px', marginBottom: 2, borderBottom: '1px solid var(--warm-300)' },
-  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
+  // 주황 8% 틴트를 깔고 있었는데, 이 알약이 놓이는 groupCard가 이미 크림(warm-100)이라
+  // 틴트와 배경이 거의 같은 밝기였다. 테두리도 검정 16%라 가장자리가 안 잡혀서, 누를 수 있는
+  // 것처럼 보이질 않았다. 흰 채움으로 크림 위에서 면을 띄우고 테두리에 실제 밝기를 주는
+  // 쪽으로 바꿨다 — 색을 쓰지 않는 건 이 버튼이 멤버마다 하나씩 반복되기 때문이다.
+  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)', background: 'var(--color-surface)', border: '1px solid var(--warm-400)', borderRadius: 'var(--radius-full)', padding: '4px 10px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-success)', whiteSpace: 'nowrap' },
   memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
   memberProposeSendBtn: { ...PRIMARY_ACTION_BUTTON },

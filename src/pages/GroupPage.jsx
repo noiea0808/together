@@ -915,7 +915,7 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
@@ -957,10 +957,13 @@ const styles = {
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
   groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-chip-text)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 500 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  // 헤더의 '친구 찾기'(.app-header-action)와 같은 알약이다. 보조 액션은 무채색으로 두고 색은
+  // 화면당 하나뿐인 주요 CTA에만 남긴다는 규칙이 이 버튼에만 적용되지 않아 혼자 벽돌색이었다.
   friendRequestBtn: {
-    flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-primary-text)',
+    flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)',
     background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)',
-    borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
+    borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
   },
   // 이미 보낸 요청("요청됨")은 더 이상 누를 액션이 아니라 상태 표시라, 눈에 덜 띄는 회색 톤으로 구분한다.
   friendRequestBtnSent: {
