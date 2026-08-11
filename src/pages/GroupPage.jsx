@@ -17,7 +17,7 @@ import ReportModal from '../components/ReportModal'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
-import { avatarColor } from '../lib/avatarColor'
+import { avatarColor, avatarGray } from '../lib/avatarColor'
 import { getRelativeLabel, REL_TONE_FILL, REL_TONE_TEXT } from '../lib/relativeDay'
 
 function toDateStr(d) {
@@ -541,7 +541,7 @@ export default function GroupPage() {
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} alt="" style={styles.avatarImg} />
                     ) : (
-                      <div style={{ ...styles.avatar, background: avatarColor(friend.nickname) }}>{friend.nickname[0]}</div>
+                      <div style={{ ...styles.avatar, background: avatarGray(friend.nickname) }}>{friend.nickname[0]}</div>
                     )}
                     {hasNewWish && <span style={styles.avatarDot} />}
                   </div>
@@ -591,7 +591,7 @@ export default function GroupPage() {
               {selectedFriend.avatar_url ? (
                 <img src={selectedFriend.avatar_url} alt="" style={styles.avatarLgImg} />
               ) : (
-                <div style={{ ...styles.avatarLg, background: avatarColor(selectedFriend.nickname) }}>{selectedFriend.nickname[0]}</div>
+                <div style={{ ...styles.avatarLg, background: avatarGray(selectedFriend.nickname) }}>{selectedFriend.nickname[0]}</div>
               )}
               <div style={styles.sheetHeaderInfo}>
                 <div style={styles.sheetName}>{selectedFriend.nickname}</div>

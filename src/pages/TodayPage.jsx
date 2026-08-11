@@ -20,7 +20,7 @@ import PotIcon from '../components/PotIcon'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_THEME, SLOT_CHIP_COLOR } from '../lib/slotTheme'
-import { avatarColor } from '../lib/avatarColor'
+import { avatarGray } from '../lib/avatarColor'
 import { getRelativeLabel, REL_TONE_FILL, REL_TONE_TEXT } from '../lib/relativeDay'
 
 // 받침 유무에 따라 은/는을 골라 단어에 붙인다 (한글 유니코드 완성형 범위에서 종성 코드로 판별).
@@ -2148,7 +2148,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                   {member.avatar_url ? (
                     <img src={member.avatar_url} alt="" style={{ width: 28, height: 28, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
                   ) : (
-                    <div style={{ ...styles.avatar, background: avatarColor(member.nickname) }}>
+                    <div style={{ ...styles.avatar, background: avatarGray(member.nickname) }}>
                       {member.nickname[0]}
                     </div>
                   )}
@@ -2406,7 +2406,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 ) : (
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%',
-                    background: isMe ? 'var(--color-selected)' : 'var(--color-text-muted)',
+                    background: isMe ? 'var(--color-selected)' : avatarGray(member.nickname),
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 700, flexShrink: 0,
                     border: '2px solid var(--color-border)', boxSizing: 'border-box',
@@ -2533,7 +2533,7 @@ function FriendSlotCard({ friends, statuses, slot, myUserId, dateStr, shareSetti
               ) : (
                 <div style={{
                   width: 40, height: 40, borderRadius: '50%',
-                  background: 'var(--color-text-muted)',
+                  background: avatarGray(friend.nickname),
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 700, flexShrink: 0,
                   border: '2px solid var(--color-border)', boxSizing: 'border-box',
