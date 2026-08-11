@@ -9,6 +9,7 @@ import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { avatarColor } from '../lib/avatarColor'
 import { SLOT_TIME_PRESETS, DURATION_OPTIONS, MOMENT_SCOPE_OPTIONS, MIN_POT_PEOPLE, MAX_POT_PEOPLE } from '../lib/potConstants'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { MegaphoneIcon, MoreHorizontalIcon } from '../components/GroupIcons'
@@ -101,10 +102,10 @@ function GuestGate({ potId, onJoined, navigate }) {
 const gateStyles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 24, gap: 8, textAlign: 'center' },
   logo: { fontSize: 52, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, margin: 0 },
   sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', margin: '4px 0 16px' },
-  card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: '#fff', border: '1.5px solid #EDE8E3', borderRadius: 20, padding: 24 },
-  input: { width: '100%', padding: '13px 16px', border: '1.5px solid #EDE8E3', borderRadius: 12, fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
+  card: { width: '100%', maxWidth: 360, display: 'flex', flexDirection: 'column', gap: 12, background: '#fff', border: '1.5px solid var(--warm-200)', borderRadius: 20, padding: 24 },
+  input: { width: '100%', padding: '13px 16px', border: '1.5px solid var(--warm-200)', borderRadius: 12, fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
   error: { fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', margin: 0 },
   guestBtn: { ...PRIMARY_ACTION_BUTTON },
   loginLink: { background: 'none', border: 'none', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', textDecoration: 'underline', cursor: 'pointer', padding: 4 },
@@ -481,7 +482,7 @@ export default function PotDetailPage() {
               <span style={S.slotTag}>{pot.slot}</span>
               {isMaster ? (
                 <button
-                  style={{ ...S.publicToggle, background: pot.is_public ? 'var(--color-info-bg)' : '#F5F0EB', color: pot.is_public ? 'var(--color-info)' : 'var(--color-text-muted)', borderColor: pot.is_public ? 'var(--color-info)' : '#EDE8E3' }}
+                  style={{ ...S.publicToggle, background: pot.is_public ? 'var(--color-info-bg)' : 'var(--warm-100)', color: pot.is_public ? 'var(--color-info)' : 'var(--color-text-muted)', borderColor: pot.is_public ? 'var(--color-info)' : 'var(--warm-200)' }}
                   onClick={togglePublic}
                 >
                   {pot.is_public ? '🌐 전체 공개' : '🔒 그룹만'}
@@ -841,8 +842,8 @@ export default function PotDetailPage() {
                   <div style={{ position: 'relative' }}>
                     <div style={{
                       ...S.memberCircle,
-                      background: member ? (isMe ? 'var(--color-selected)' : '#C7BFB6') : '#F5F0EB',
-                      border: member ? 'none' : '2px dashed #C7BFB6',
+                      background: member ? (isMe ? 'var(--color-selected)' : avatarColor(member.nickname)) : 'var(--warm-100)',
+                      border: member ? 'none' : '2px dashed var(--warm-400)',
                       padding: 0, overflow: 'hidden',
                     }}>
                       {member?.avatar_url
@@ -983,7 +984,7 @@ export default function PotDetailPage() {
                 <div style={S.shareLabel}>초대 코드</div>
                 {pot.invite_code ? (
                   <div style={S.shareRow}>
-                    <span style={{ ...S.shareText, fontSize: 22, fontWeight: 800, letterSpacing: 4 }}>{pot.invite_code}</span>
+                    <span style={{ ...S.shareText, fontSize: 22, fontWeight: 700, letterSpacing: 4 }}>{pot.invite_code}</span>
                     <button style={{ ...S.shareCopyBtn, background: copied === 'code' ? 'var(--color-success)' : 'var(--color-primary)' }} onClick={() => copyText(pot.invite_code, 'code')}>
                       {copied === 'code' ? '✓' : '복사'}
                     </button>
@@ -1146,29 +1147,29 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
     lineHeight: 1,
   },
-  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   headerSub: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
-  headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, whiteSpace: 'nowrap' },
+  headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, whiteSpace: 'nowrap' },
 
   body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' },
   footer: { flexShrink: 0, padding: '10px 16px calc(10px + var(--safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
 
   /* Hero card (view mode) */
-  heroCard: { background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
+  heroCard: { background: 'linear-gradient(135deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%)', border: '1.5px solid var(--color-hero-border)', borderRadius: 20, padding: 18 },
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
-  defaultTag: { fontSize: 'var(--font-size-xs)', background: 'var(--color-success-bg)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-success)', fontWeight: 700 },
+  defaultTag: { fontSize: 'var(--font-size-xs)', background: 'var(--color-success-bg)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-success)', fontWeight: 600 },
   slotTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
   publicTag: { fontSize: 'var(--font-size-xs)', background: 'rgba(255,255,255,0.6)', borderRadius: 6, padding: '2px 8px', color: 'var(--color-text-muted)' },
-  publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
+  publicToggle: { fontSize: 'var(--font-size-xs)', fontWeight: 600, border: '1px solid', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: {
     width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
     background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
-  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 700, marginTop: 2 },
+  heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.5px' },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, marginTop: 2 },
   heroEditBadge: {
     width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
     background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
@@ -1185,10 +1186,10 @@ const S = {
   },
   infoPanelRow: { display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', overflow: 'hidden' },
   infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, flexShrink: 0 },
-  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
+  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
 
   momentScopeRow: { marginTop: 10, paddingTop: 10, borderTop: '1px solid rgba(255,255,255,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' },
-  momentScopeLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', flexShrink: 0 },
+  momentScopeLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', flexShrink: 0 },
   momentScopeChips: { display: 'flex', gap: 5 },
   momentScopeChip: {
     padding: '4px 9px', background: 'rgba(255,255,255,0.7)', border: 'none',
@@ -1201,7 +1202,7 @@ const S = {
   editSections: { display: 'flex', flexDirection: 'column', gap: 6 },
   editSection: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 10 },
   editSectionRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 7 },
+  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 7 },
 
   editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   editChip: {
@@ -1213,7 +1214,7 @@ const S = {
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
   editStepperNum: {
-    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    fontWeight: 700, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
     padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-selected)', color: 'var(--color-selected)',
   },
 
@@ -1235,7 +1236,7 @@ const S = {
 
   editDivider: { display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' },
   editDividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
-  editDividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
+  editDividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
 
   editTray: { background: 'var(--color-tray)', borderRadius: 'var(--radius-lg)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 },
   editTrayInput: {
@@ -1251,19 +1252,19 @@ const S = {
   /* Members card */
   membersCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 18, padding: 16 },
   membersHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  membersTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  membersTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   membersCount: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
   membersList: { display: 'flex', gap: 10, overflowX: 'auto', WebkitOverflowScrolling: 'touch', touchAction: 'pan-x' },
   memberItem: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 },
   memberCircle: { width: 48, height: 48, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-base)', position: 'relative' },
-  guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: '#FF9800', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
-  kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--color-danger)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 800, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
+  guestBadge: { position: 'absolute', top: -2, right: -2, width: 18, height: 18, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid #fff' },
+  kickBtn: { position: 'absolute', top: -4, right: -4, width: 20, height: 20, borderRadius: '50%', border: 'none', background: 'var(--color-danger)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0 },
   memberName: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 
   /* Action buttons */
   joinBtn: { ...PRIMARY_ACTION_BUTTON },
   leaveBtn: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
-  expiredCard: { background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 15, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 700, letterSpacing: '-0.2px' },
+  expiredCard: { background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', padding: 15, textAlign: 'center', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', fontWeight: 600, letterSpacing: '-0.2px' },
   shareBtn: { width: '100%', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', gap: 6, padding: 14, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 
   // 참여 중일 땐 나가기/더보기(좁은 칸)와 '같이 먹자고 하기'(넓은 칸)를 한 행에 배치해
@@ -1297,10 +1298,10 @@ const S = {
 
   /* Share panel */
   sharePanel: { display: 'flex', flexDirection: 'column', gap: 8, padding: 16, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
-  shareLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  shareLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
   shareRow: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '8px 10px', border: '1px solid var(--color-border)' },
   shareText: { flex: 1, fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', wordBreak: 'break-all', lineHeight: 1.4 },
-  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer' },
+  shareCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 600, cursor: 'pointer' },
 
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },
@@ -1308,20 +1309,20 @@ const S = {
   shareTabBtnActive: { border: '1.5px solid var(--color-selected)', background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60 },
   shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
-  shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   shareFriendEmpty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '16px 0' },
 
   /* Carousel popup */
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   timeDialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-sm)' },
+  timeDialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-sm)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
+  timeColon: { fontSize: 20, fontWeight: 700, color: 'var(--color-text-muted)' },
   timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 
   /* Dialogs */
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },

@@ -104,7 +104,7 @@ export default function CarouselPicker({ items, value, onChange, disabled, width
           key={anim.n}
           style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800, color: 'var(--color-text)',
+            fontSize: 20, fontWeight: 700, color: 'var(--color-text)',
             animation: anim.dir !== 0 ? `${anim.dir > 0 ? 'carouselUp' : 'carouselDown'} 0.18s ease-out` : 'none',
           }}
         >{get(0)}</div>

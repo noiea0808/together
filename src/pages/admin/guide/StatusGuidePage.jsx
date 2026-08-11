@@ -541,7 +541,7 @@ const s = {
   statusCardTop: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
   statusBadgeWrap: { display: 'flex', alignItems: 'center', gap: 8 },
   statusBadge: { display: 'inline-block', padding: '3px 10px', borderRadius: 9999, fontSize: 13, fontWeight: 600 },
-  autoTag: { fontSize: 10, fontWeight: 700, background: '#FFF3E0', color: '#E65100', padding: '2px 6px', borderRadius: 4 },
+  autoTag: { fontSize: 10, fontWeight: 600, background: '#FFF3E0', color: '#E65100', padding: '2px 6px', borderRadius: 4 },
   keyTag: { fontSize: 11, background: '#F0F0F0', color: '#666', padding: '2px 7px', borderRadius: 4 },
   statusDesc: { fontSize: 13, color: '#444', marginBottom: 10, lineHeight: 1.6 },
   ruleList: { marginBottom: 12 },
@@ -574,7 +574,7 @@ const s = {
   transitionState: { fontSize: 12, background: '#F5F5F7', color: '#444', padding: '3px 8px', borderRadius: 5, fontWeight: 500 },
   transitionStateTo: { background: '#E8F5E9', color: '#2E7D32' },
   transitionArrow: { color: '#BDBDBD', fontWeight: 700 },
-  directionTag: { fontSize: 10, fontWeight: 700, padding: '2px 7px', borderRadius: 4, marginLeft: 'auto' },
+  directionTag: { fontSize: 10, fontWeight: 600, padding: '2px 7px', borderRadius: 4, marginLeft: 'auto' },
   transitionTrigger: { fontSize: 12, color: '#555', marginBottom: 6 },
   transitionNote: { fontSize: 11, color: '#888', lineHeight: 1.6 },
 

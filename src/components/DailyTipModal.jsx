@@ -276,11 +276,11 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--spacing-lg)' },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  headerTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   tabRow: { display: 'flex', gap: 6, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)', padding: 4, margin: '0 var(--spacing-lg)' },
   tabBtn: {
     flex: 1, padding: '8px 10px', background: 'none', border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', cursor: 'pointer',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer',
   },
   tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-selected)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
   // alignItems: center — 기본값(stretch)이면 모든 카드가 가장 큰 카드 높이로 늘어나 카드별
@@ -302,8 +302,8 @@ const styles = {
   dotActive: { background: 'var(--color-selected)' },
   btnRow: { width: '100%', display: 'flex', gap: 8, padding: '0 var(--spacing-lg)' },
   closeBtn: {
-    flex: 1, padding: 11, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer',
+    flex: 1, padding: 11, background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-light))', color: '#fff',
+    border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer',
   },
   dismissBtn: { flex: 1, padding: 11, background: 'none', color: 'var(--color-text-muted)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }

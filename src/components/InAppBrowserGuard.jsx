@@ -29,14 +29,14 @@ const styles = {
   banner: {
     position: 'fixed', top: 0, left: 0, right: 0, zIndex: 500,
     display: 'flex', alignItems: 'center', gap: 8,
-    padding: '10px 14px', background: '#1a1a1a', color: '#fff',
+    padding: '10px 14px', background: 'var(--color-text)', color: '#fff',
     fontSize: 'var(--font-size-xs)', lineHeight: 1.4,
   },
   text: { flex: 1 },
   btn: {
     flexShrink: 0, padding: '6px 10px', borderRadius: 'var(--radius-full)',
     border: 'none', background: 'var(--color-primary)', color: '#fff',
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 600, cursor: 'pointer',
   },
   close: {
     flexShrink: 0, background: 'none', border: 'none', color: '#fff',

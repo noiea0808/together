@@ -11,6 +11,11 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-title" content="같이먹자" />
     <link rel="apple-touch-icon" href="/icon-192.png" />
+    <!-- 본문 서체. dynamic-subset은 한글 글리프를 92개 unicode-range로 쪼개 두어 실제로
+         화면에 뜬 글자가 속한 조각만 내려받는다(전체 variable 파일은 1MB가 넘는다).
+         가변 폰트라 45~920 굵기가 파일 하나에 들어 있어, 굵기를 추가해도 요청이 늘지 않는다. -->
+    <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" />
     <title>같이 먹자</title>
     <meta name="description" content="오늘 같이 먹을 사람, 묻지 말고 확인하기" />
     <meta property="og:type" content="website" />

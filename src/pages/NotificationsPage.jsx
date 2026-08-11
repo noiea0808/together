@@ -20,19 +20,27 @@ function formatDate(dateStr) {
   return `${Number(m)}.${Number(d)}`
 }
 
+// 뱃지에 색을 주는 기준은 "사용자가 반응해야 하는가"다. 참여·친구수락은 반가운 소식(초록),
+// 나가기·내보내짐·거절은 확인이 필요한 소식(빨강), 나머지는 그냥 일어난 일이라 무채색으로 둔다.
+// '수정'은 예전에 파랑이었는데, 밥팟 정보가 바뀌었다는 중립 사실일 뿐이라 한 줄에 색이
+// 셋씩 늘어서는 것에 비해 얻는 게 없었다. 파랑은 "공개" 상태 표시에만 남겼다.
+const NEUTRAL_BADGE = { color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' }
+const SUCCESS_BADGE = { color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' }
+const DANGER_BADGE = { color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' }
+
 const EVENT_META = {
-  join: { label: '참여', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
-  leave: { label: '나가기', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
-  kicked: { label: '내보내짐', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
-  update: { label: '수정', color: 'var(--color-info)', bg: 'var(--color-info-bg)', border: 'var(--color-info-border)' },
-  comment: { label: '코멘트', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  invite: { label: '초대', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
-  invite_new: { label: '제안', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
-  invite_declined: { label: '거절', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
-  wish_like: { label: '하트', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
-  wish_comment: { label: '댓글', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  friend_request: { label: '친구 요청', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
-  friend_accepted: { label: '친구', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
+  join: { label: '참여', ...SUCCESS_BADGE },
+  leave: { label: '나가기', ...DANGER_BADGE },
+  kicked: { label: '내보내짐', ...DANGER_BADGE },
+  update: { label: '수정', ...NEUTRAL_BADGE },
+  comment: { label: '코멘트', ...NEUTRAL_BADGE },
+  invite: { label: '초대', ...NEUTRAL_BADGE },
+  invite_new: { label: '제안', ...NEUTRAL_BADGE },
+  invite_declined: { label: '거절', ...DANGER_BADGE },
+  wish_like: { label: '하트', ...NEUTRAL_BADGE },
+  wish_comment: { label: '댓글', ...NEUTRAL_BADGE },
+  friend_request: { label: '친구 요청', ...NEUTRAL_BADGE },
+  friend_accepted: { label: '친구', ...SUCCESS_BADGE },
 }
 
 const DECLINE_REASON_PRESETS = ['선약이 있어요', '오늘은 혼자 먹을게요', '컨디션이 안 좋아요', '다음에 같이 해요']
@@ -443,7 +451,7 @@ const S = {
     color: 'var(--color-text-muted)', fontSize: 20, cursor: 'pointer', display: 'flex',
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0, lineHeight: 1,
   },
-  headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
   categoryTabRow: { display: 'flex', gap: 6, padding: '10px 16px 0', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0 },
   categoryTab: {
@@ -470,7 +478,7 @@ const S = {
   // 연한 배경 위의 색 글자라, 굵으면 번져 보여서 500으로 둔다.
   newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-selected)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
   eventBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, borderRadius: 'var(--radius-full)', padding: '1px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
-  itemTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
+  itemTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' },
   itemMeta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', marginTop: 3, fontWeight: 600 },
   itemText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', marginTop: 3, wordBreak: 'break-word', lineHeight: 1.5 },
@@ -478,12 +486,12 @@ const S = {
   inviteBtnRow: { display: 'flex', gap: 8, marginTop: 8 },
   inviteAcceptBtn: { ...PRIMARY_ACTION_BUTTON, flex: 1, width: undefined, padding: '9px 0', fontSize: 'var(--font-size-xs)' },
   inviteDeclineBtn: { flex: 1, padding: '9px 0', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  inviteStatusDone: { marginTop: 8, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-success)' },
+  inviteStatusDone: { marginTop: 8, fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-success)' },
   inviteStatusDeclined: { marginTop: 8, fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },

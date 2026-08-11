@@ -118,7 +118,7 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { marginBottom: 8 },
-  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-xl)', fontWeight: 900 },
+  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-xl)', fontWeight: 700 },
   card: {
     width: '100%', background: 'var(--color-surface)',
     border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
@@ -126,7 +126,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  label: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   input: {
     width: '100%', padding: '13px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',

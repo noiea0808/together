@@ -36,7 +36,7 @@ const styles = {
   },
   top: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, textAlign: 'center' },
   logo: { marginBottom: 4 },
-  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-xl)', fontWeight: 900, margin: 0 },
+  title: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-xl)', fontWeight: 700, margin: 0 },
   card: {
     width: '100%', background: 'var(--color-surface)',
     border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',

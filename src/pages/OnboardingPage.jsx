@@ -324,7 +324,7 @@ const styles = {
   top: { textAlign: 'center', marginBottom: 32 },
   logo: { fontSize: 56, marginBottom: 18 },
   tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
-  title: { fontFamily: 'var(--font-title)', fontSize: 40, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.25, letterSpacing: '-0.5px', margin: 0 },
+  title: { fontFamily: 'var(--font-title)', fontSize: 40, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.25, letterSpacing: '-0.5px', margin: 0 },
   card: {
     width: '100%', background: 'var(--color-surface)',
     border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
@@ -340,7 +340,7 @@ const styles = {
     width: 'min(78vw, calc(var(--max-width) * 0.78))', display: 'flex', alignItems: 'center', justifyContent: 'center',
     gap: 10, padding: '11px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer',
+    fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer',
   },
   googleBtn: { background: '#fff', color: '#3c4043' },
   kakaoBtn: { background: '#F9DD3B', color: '#3C1E1E', border: '1.5px solid #F9DD3B' },
@@ -360,7 +360,7 @@ const styles = {
     color: 'var(--color-on-selected)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  label: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   input: {
     width: '100%', padding: '13px var(--spacing-md)',
     border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',

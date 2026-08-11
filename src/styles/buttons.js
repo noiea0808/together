@@ -3,7 +3,7 @@
 export const PRIMARY_ACTION_BUTTON = {
   width: '100%',
   padding: 13,
-  background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)',
+  background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-light))',
   color: '#fff',
   border: 'none',
   borderRadius: 'var(--radius-full)',

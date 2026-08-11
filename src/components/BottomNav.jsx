@@ -162,6 +162,6 @@ const styles = {
     width: 40, height: 40, borderRadius: '50%', boxSizing: 'border-box',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
     background: 'var(--color-selected)', color: 'white',
-    fontSize: 'var(--font-size-sm)', fontWeight: 800,
+    fontSize: 'var(--font-size-sm)', fontWeight: 700,
   },
 }

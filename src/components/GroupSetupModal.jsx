@@ -252,7 +252,7 @@ const styles = {
     width: 56, height: 56, borderRadius: '50%', background: 'var(--color-chip-bg)',
     color: 'var(--color-chip-text)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
@@ -284,6 +284,6 @@ const styles = {
     padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     background: 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
   },
-  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)' },
+  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
   searchResultCount: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
 }

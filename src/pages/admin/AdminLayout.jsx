@@ -132,7 +132,7 @@ const s = {
     borderBottom: '1px solid #2E2E42',
   },
   brandIcon: { fontSize: 28 },
-  brandName: { fontSize: 15, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 },
+  brandName: { fontSize: 15, fontWeight: 600, color: '#FFFFFF', lineHeight: 1.2 },
   brandSub: { fontSize: 11, color: '#FF6B35', fontWeight: 600, letterSpacing: 1 },
   brandSince: { fontSize: 10, color: '#8888A8', marginTop: 2 },
   accountBar: {
@@ -147,7 +147,7 @@ const s = {
   navSection: { marginBottom: 4 },
   navSectionTitle: {
     fontSize: 11,
-    fontWeight: 800,
+    fontWeight: 700,
     color: '#A8A8C8',
     letterSpacing: 1,
     textTransform: 'uppercase',

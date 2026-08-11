@@ -164,7 +164,7 @@ const styles = {
   },
   shot: { width: 'min(85vw, 340px)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--color-border)' },
   tagline: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 600, lineHeight: 1.4, margin: '0 0 2px' },
-  title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 900, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px', whiteSpace: 'pre-line' },
+  title: { fontFamily: 'var(--font-title)', fontSize: 28, fontWeight: 700, color: 'var(--color-text)', lineHeight: 1.3, letterSpacing: '-0.5px', margin: '0 0 14px', whiteSpace: 'pre-line' },
   body: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', lineHeight: 1.7, whiteSpace: 'pre-line', margin: 0 },
   extra: { marginTop: 'var(--spacing-xl)', width: 'min(78vw, calc(var(--max-width) * 0.78))' },
   footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-md) var(--spacing-lg) var(--spacing-lg)' },

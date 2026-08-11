@@ -17,6 +17,8 @@ import ReportModal from '../components/ReportModal'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { avatarColor } from '../lib/avatarColor'
+import { getRelativeLabel, REL_TONE_FILL } from '../lib/relativeDay'
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -29,16 +31,6 @@ function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
 
-// 오늘만 알약을 두는 이유는 TodayPage의 같은 함수 주석 참고.
-function getRelativeLabel(date) {
-  const today = new Date(); today.setHours(0, 0, 0, 0)
-  const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
-  if (diff === 0)  return { label: '오늘' }
-  if (diff === -1) return { label: '어제' }
-  if (diff === 1)  return { label: '내일' }
-  if (diff < 0)    return { label: `${Math.abs(diff)}일 전` }
-  return { label: `${diff}일 뒤` }
-}
 
 function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
@@ -469,7 +461,7 @@ export default function GroupPage() {
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          <span style={isToday ? styles.relBadgeToday : styles.relLabel}>{relLabel.label}</span>
+          <span style={relLabel.tone ? { ...styles.relBadge, background: REL_TONE_FILL[relLabel.tone] } : styles.relLabel}>{relLabel.label}</span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -549,7 +541,7 @@ export default function GroupPage() {
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} alt="" style={styles.avatarImg} />
                     ) : (
-                      <div style={styles.avatar}>{friend.nickname[0]}</div>
+                      <div style={{ ...styles.avatar, background: avatarColor(friend.nickname) }}>{friend.nickname[0]}</div>
                     )}
                     {hasNewWish && <span style={styles.avatarDot} />}
                   </div>
@@ -599,7 +591,7 @@ export default function GroupPage() {
               {selectedFriend.avatar_url ? (
                 <img src={selectedFriend.avatar_url} alt="" style={styles.avatarLgImg} />
               ) : (
-                <div style={styles.avatarLg}>{selectedFriend.nickname[0]}</div>
+                <div style={{ ...styles.avatarLg, background: avatarColor(selectedFriend.nickname) }}>{selectedFriend.nickname[0]}</div>
               )}
               <div style={styles.sheetHeaderInfo}>
                 <div style={styles.sheetName}>{selectedFriend.nickname}</div>
@@ -744,7 +736,7 @@ export default function GroupPage() {
                                     {c.avatar_url ? (
                                       <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                     ) : (
-                                      <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                      <div style={{ ...styles.wishProposalAvatar, background: avatarColor(c.nickname) }}>{c.nickname?.[0] ?? '?'}</div>
                                     )}
                                     <div style={styles.wishProposalTextCol}>
                                       <span style={styles.wishProposalName}>{c.nickname}</span>
@@ -923,7 +915,7 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
@@ -931,9 +923,9 @@ const styles = {
   // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(500~600).
   datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
-  relBadgeToday: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', background: 'var(--color-selected)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
+  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
-  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },
 
@@ -951,7 +943,7 @@ const styles = {
 
   friendList: { display: 'flex', flexDirection: 'column', gap: 8 },
   friendRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', cursor: 'pointer' },
-  avatar: { width: 36, height: 36, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
+  avatar: { width: 36, height: 36, borderRadius: '50%', background: 'var(--warm-600)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
   avatarImg: { width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   avatarWrap: { position: 'relative', flexShrink: 0, display: 'inline-flex' },
   avatarDot: {
@@ -960,7 +952,7 @@ const styles = {
   },
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
   friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   groupNameRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   groupNameText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 500 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
@@ -968,7 +960,7 @@ const styles = {
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   friendRequestBtn: {
     flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-primary-text)',
-    background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)',
+    background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)',
     borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
   },
   // 이미 보낸 요청("요청됨")은 더 이상 누를 액션이 아니라 상태 표시라, 눈에 덜 띄는 회색 톤으로 구분한다.
@@ -989,31 +981,31 @@ const styles = {
   sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 'calc(32px + var(--safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '80vh', overflowY: 'auto' },
   sheetHeader: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingBottom: 6 },
   sheetHeaderInfo: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1, paddingTop: 4 },
-  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: 'var(--warm-600)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   avatarLgImg: { width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
-  sheetName: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  sheetName: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
   sheetTabs: { display: 'flex', gap: 6, marginBottom: 12 },
   sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: 'none', borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)', fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
   sheetTabBtnActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   sheetTabDot: { position: 'absolute', top: 6, right: 10, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)' },
-  sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
+  sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 8 },
   friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   friendWishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   friendWishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 },
-  friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
   friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
   wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
   wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
   wishLikeBtnActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
-  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
   wishCommentsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8 },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
-  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishMoreBtn: {
@@ -1038,11 +1030,11 @@ const styles = {
   statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 },
   slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0 },
   statusCellRight: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
-  statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
-  statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
-  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
-  sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
+  statusDash: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-success)' },
+  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
+  sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
 
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
@@ -1053,7 +1045,7 @@ const styles = {
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },

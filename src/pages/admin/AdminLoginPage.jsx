@@ -82,10 +82,10 @@ const s = {
     padding: 32, display: 'flex', flexDirection: 'column', gap: 18,
   },
   brand: { display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 },
-  brandName: { fontSize: 16, fontWeight: 700, color: '#FFFFFF', lineHeight: 1.2 },
+  brandName: { fontSize: 16, fontWeight: 600, color: '#FFFFFF', lineHeight: 1.2 },
   brandSub: { fontSize: 11, color: '#FF6B35', fontWeight: 600, letterSpacing: 1 },
   field: { display: 'flex', flexDirection: 'column', gap: 6 },
-  label: { fontSize: 12, fontWeight: 700, color: '#9090A8' },
+  label: { fontSize: 12, fontWeight: 600, color: '#9090A8' },
   input: {
     padding: '11px 12px', border: '1.5px solid #3A3A54', borderRadius: 8,
     fontSize: 14, outline: 'none', boxSizing: 'border-box', background: '#1E1E2E', color: '#FFFFFF',
@@ -93,6 +93,6 @@ const s = {
   error: { fontSize: 12, color: '#FF6B6B', margin: 0 },
   btn: {
     padding: 13, background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8,
-    fontSize: 14, fontWeight: 700, cursor: 'pointer',
+    fontSize: 14, fontWeight: 600, cursor: 'pointer',
   },
 }

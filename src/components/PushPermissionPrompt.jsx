@@ -115,7 +115,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)',
   },
   emoji: { fontSize: 44 },
-  title: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.4 },
+  title: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.4 },
   desc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   error: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', textAlign: 'center', margin: 0 },
   btnCol: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },

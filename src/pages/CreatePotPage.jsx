@@ -517,21 +517,21 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
     lineHeight: 1,
   },
-  headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', flex: 1, textAlign: 'center', fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
   body: { flex: 1, overflowY: 'auto', paddingBottom: 20 },
-  hero: { padding: '10px 16px 6px', fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  hero: { padding: '10px 16px 6px', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
   /* Hero card — 밥팟 상세 화면과 동일한 스타일 */
-  heroCard: { margin: '0 16px', background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 20, padding: 18 },
+  heroCard: { margin: '0 16px', background: 'linear-gradient(135deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%)', border: '1.5px solid var(--color-hero-border)', borderRadius: 20, padding: 18 },
 
   // 그룹·시간대 선택 — 주황 히어로 카드 배경과 선명하게 대비되도록 클린 틸 톤을 쓴다.
   heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
   chipWrap: { position: 'relative', display: 'inline-flex' },
   chipBtn: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: '#0D9488', borderRadius: 999,
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: 'var(--color-selected)', borderRadius: 999,
     padding: '6px 14px', color: '#fff', border: 'none',
-    cursor: 'pointer', fontFamily: "'Pretendard', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif",
+    cursor: 'pointer', fontFamily: 'var(--font-body)',
     display: 'inline-flex', alignItems: 'center', gap: 5,
   },
   groupPickerOverlay: { position: 'fixed', inset: 0, zIndex: 90, background: 'transparent' },
@@ -546,14 +546,14 @@ const S = {
     border: 'none', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600,
     fontFamily: 'inherit', whiteSpace: 'nowrap', textAlign: 'left',
   },
-  groupPickerItemActive: { color: 'var(--color-selected)', fontWeight: 800, background: 'var(--color-chip-bg)' },
+  groupPickerItemActive: { color: 'var(--color-selected)', fontWeight: 700, background: 'var(--color-chip-bg)' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: {
     width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
     background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
-  heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
-  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 700, marginTop: 2 },
+  heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.5px' },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, marginTop: 2 },
   heroEditBadge: {
     width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
     background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
@@ -570,9 +570,9 @@ const S = {
   },
   infoPanelRow: { display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', overflow: 'hidden' },
   infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, flexShrink: 0 },
-  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
+  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
 
-  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 7 },
+  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 7 },
   editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   editChip: {
     padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
@@ -583,7 +583,7 @@ const S = {
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
   editStepperNum: {
-    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    fontWeight: 700, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
     padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-selected)', color: 'var(--color-selected)',
   },
   editSectionInput: {
@@ -597,13 +597,13 @@ const S = {
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
 
   timeDialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  timeDialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
+  timeColon: { fontSize: 20, fontWeight: 700, color: 'var(--color-text-muted)' },
   timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 }

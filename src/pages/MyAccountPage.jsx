@@ -24,6 +24,7 @@ import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/
 import WishCategoryIcon from '../components/WishCategoryIcon'
 import WishCategoryPicker from '../components/WishCategoryPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { avatarColor } from '../lib/avatarColor'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
@@ -38,7 +39,7 @@ function ToggleSwitch({ on, onClick, disabled, label }) {
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      style={{ ...styles.toggleTrack, background: on ? 'var(--color-success)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
+      style={{ ...styles.toggleTrack, background: on ? 'var(--color-toggle-on)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
     >
       <span style={{ ...styles.toggleThumb, transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
     </button>
@@ -901,7 +902,7 @@ export default function MyAccountPage() {
                                 {l.avatar_url ? (
                                   <img src={l.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                 ) : (
-                                  <div style={styles.wishProposalAvatar}>{l.nickname?.[0] ?? '?'}</div>
+                                  <div style={{ ...styles.wishProposalAvatar, background: avatarColor(l.nickname) }}>{l.nickname?.[0] ?? '?'}</div>
                                 )}
                                 <span style={styles.wishProposalName}>{l.nickname}</span>
                               </div>
@@ -922,7 +923,7 @@ export default function MyAccountPage() {
                                   {c.avatar_url ? (
                                     <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                   ) : (
-                                    <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                    <div style={{ ...styles.wishProposalAvatar, background: avatarColor(c.nickname) }}>{c.nickname?.[0] ?? '?'}</div>
                                   )}
                                   <div style={styles.wishProposalTextCol}>
                                     <button style={styles.wishProposalNameBtn} onClick={() => insertMention(c)}>{c.nickname}</button>
@@ -1115,23 +1116,23 @@ const styles = {
     borderRadius: 'var(--radius-lg)', cursor: 'pointer',
   },
   avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
-  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   avatarImg: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', display: 'block' },
   avatarEditBadge: {
     position: 'absolute', bottom: -2, right: -2, width: 19, height: 19, borderRadius: '50%',
-    background: '#5C5650', color: '#fff', fontSize: 11, display: 'flex',
+    background: 'var(--warm-800)', color: '#fff', fontSize: 11, display: 'flex',
     alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)',
   },
   avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-danger)', margin: 0 },
   profileInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
-  profileName: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' },
+  profileName: { fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600, margin: '2px 0 0' },
 
   // 섹션 = 제목(굵게, 카드 밖) + 카드 하나(그 안에서 행들을 얇은 구분선으로만 나눔).
   // 카드를 행마다 만들지 않고 섹션마다 하나만 써서 테두리가 과도해지지 않게 한다.
   settingsSection: { display: 'flex', flexDirection: 'column', gap: 10 },
-  settingsSectionTitle: { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 0 4px' },
+  settingsSectionTitle: { fontSize: 16, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 0 4px' },
   settingsList: {
     display: 'flex', flexDirection: 'column',
     background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
@@ -1158,9 +1159,9 @@ const styles = {
   slotCardFace: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '0 2px', boxSizing: 'border-box', borderRadius: 12, overflow: 'hidden', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' },
   slotCardFront: { background: 'var(--color-primary-a05)', border: '1.5px solid var(--color-primary)' },
   slotCardBack: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', transform: 'rotateY(180deg)' },
-  slotCardLabel: { fontSize: 9.5, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.15 },
-  slotCardBadgeOn: { fontSize: 8.5, fontWeight: 700, color: 'var(--color-primary-text)' },
-  slotCardBadgeOff: { fontSize: 8.5, fontWeight: 600, color: 'var(--color-text-muted)' },
+  slotCardLabel: { fontSize: 11, fontWeight: 600, color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.15 },
+  slotCardBadgeOn: { fontSize: 11, fontWeight: 600, color: 'var(--color-chip-text)' },
+  slotCardBadgeOff: { fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)' },
 
   toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
   toggleThumb: { display: 'block', width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s' },
@@ -1171,7 +1172,7 @@ const styles = {
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, textAlign: 'center' },
   dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
@@ -1182,14 +1183,14 @@ const styles = {
   withdrawWrap: { display: 'flex', justifyContent: 'center', marginTop: 14 },
   withdrawLink: { background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.55 },
   withdrawIcon: { fontSize: 40, textAlign: 'center', marginBottom: 8 },
-  withdrawTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
+  withdrawTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.6, marginBottom: 'var(--spacing-md)' },
-  withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: '#FFF0F0', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#c62828', lineHeight: 1.8 },
+  withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: 'var(--color-danger-bg)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', lineHeight: 1.8 },
   withdrawConfirmLabel: { fontSize: 'var(--font-size-sm)', textAlign: 'center', marginBottom: 8, color: 'var(--color-text)' },
   withdrawInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawInput: { flex: 1, padding: '12px var(--spacing-md)', border: '1.5px solid var(--color-danger)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
   withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
-  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
+  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 
   tabs: { display: 'flex', gap: 6, padding: '10px var(--spacing-md) 0', flexShrink: 0 },
@@ -1199,12 +1200,12 @@ const styles = {
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   wishHeaderBtns: { display: 'flex', alignItems: 'center', gap: 6 },
-  wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
 
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   wishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
-  wishModalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
+  wishModalTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
   wishModalInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
 
   wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2, marginBottom: 14 },
@@ -1219,7 +1220,7 @@ const styles = {
   wishScopeGroupChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   wishMenuBtn: {
     width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
-    color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 900, cursor: 'pointer',
+    color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 700, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, flexShrink: 0,
   },
   wishMenuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
@@ -1237,20 +1238,20 @@ const styles = {
   wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
   wishProposalsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishReactionRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' },
-  wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
+  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' },
+  wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-primary-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
-  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
-  wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)' },
+  wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishProposalConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
   wishProposalConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-  wishProposalConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishProposalConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishCommentInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 },
   wishCommentInput: { flex: 1, padding: '8px 12px', fontSize: 'var(--font-size-2xs)' },
 

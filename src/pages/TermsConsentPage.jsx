@@ -119,7 +119,7 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 48, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, marginBottom: 8 },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 8 },
   sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', whiteSpace: 'pre-line', lineHeight: 1.6 },
   card: {
     width: '100%', background: 'var(--color-surface)',
@@ -145,17 +145,17 @@ const styles = {
   termRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   termCheck: { display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0', flex: 1, textAlign: 'left' },
   termLabel: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', lineHeight: 1.4 },
-  tagReq: { color: 'var(--color-primary-text)', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
+  tagReq: { color: 'var(--color-primary-text)', fontWeight: 600, fontSize: 'var(--font-size-xs)' },
   tagOpt: { color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-xs)' },
   checkbox: {
     width: 22, height: 22, borderRadius: '50%', border: '2px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    color: '#fff', fontSize: 13, fontWeight: 800,
+    color: '#fff', fontSize: 13, fontWeight: 700,
   },
   checkboxSm: {
     width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    color: '#fff', fontSize: 12, fontWeight: 800,
+    color: '#fff', fontSize: 12, fontWeight: 700,
   },
   checkboxOn: { background: 'var(--color-selected)', borderColor: 'var(--color-selected)' },
   viewBtn: {
@@ -176,7 +176,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  modalTitle: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   modalClose: { background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' },
   modalBody: {
     flex: 1, overflowY: 'auto', fontSize: 'var(--font-size-sm)',

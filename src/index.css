@@ -14,13 +14,10 @@
   font-display: swap;
 }
 
-@font-face {
-  font-family: 'Pretendard';
-  src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/woff2/Pretendard-Regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
+/* Pretendard 본체는 index.html에서 가변 폰트로 불러온다(굵기 45~920이 파일 하나).
+   예전에는 여기서 Regular 하나만 @font-face로 잡아 두고 body 스택에는 넣지 않아,
+   실제 화면은 기기 기본 서체(안드로이드 Noto Sans CJK / iOS Apple SD Gothic Neo)로
+   렌더되고 있었다 — 같은 화면이 기기마다 다른 서체로 보이던 원인. */
 
 /* ===== 디자인 토큰 ===== */
 :root {
@@ -42,6 +39,12 @@
   --color-primary-text: #C2410C;
   /* var(--color-primary)18 형태(토큰 뒤에 hex 알파를 이어붙이는 표기)는 유효한 CSS가
      아니라 배경이 투명 처리됨 — 대신 이 알파 변형 토큰들을 쓴다. */
+  /* 히어로 카드(밥팟 만들기·상세·그룹 설정 상단의 큰 살구빛 카드)의 배경 그라데이션과 테두리.
+     네 화면이 같은 값을 각자 적어 두고 있어서, 한 곳만 고치면 나머지가 어긋나는 상태였다. */
+  --color-hero-from: #FFF4EF;
+  --color-hero-to: #FFE8DC;
+  --color-hero-border: #FFD6C0;
+
   --color-primary-a05: rgba(255, 107, 53, 0.05);
   --color-primary-a07: rgba(255, 107, 53, 0.07);
   --color-primary-a08: rgba(255, 107, 53, 0.08);
@@ -53,7 +56,7 @@
      "연한 배경 + 같은 색 어두운 글자"가 아니라 채움으로 가는 이유: 연한 배경 방식은
      선택/미선택 차이가 배경 명도 한 단뿐이라 칩이 여러 개 늘어선 줄에서 뭐가 켜졌는지
      한눈에 안 들어왔다. 채움은 명도 차가 커서 훑는 것만으로 읽힌다. */
-  --color-selected: #46403A;
+  --color-selected: var(--warm-900);
   --color-on-selected: #FFFFFF;
   /* 누를 수 없는 정적 표시(방장 배지, 그룹 태그 등). 채움이 아니라 연한 회색이라
      "이건 상태가 아니라 그냥 라벨"이라는 게 형태로 구분된다. */
@@ -63,28 +66,98 @@
   --color-selected-a12: rgba(70, 64, 58, 0.10);
   --color-selected-a20: rgba(70, 64, 58, 0.16);
 
-  --color-bg: #FAF8F5;
+  /* 웜그레이 사다리. 이 화면들의 무채색은 순회색이 아니라 크림 배경에 맞춘 따뜻한 회색이라,
+     중간 톤이 필요할 때마다 그 자리에서 hex를 하나씩 만들어 쓰는 일이 반복됐다 — 정리하기
+     전에는 사용자 화면에만 20종 48곳이 흩어져 있었고, 그중 #F5F0EB는 --color-surface-2와
+     값이 완전히 같았다. 새 화면에서 회색이 필요하면 여기서 고르면 되고, 여기 없는 단계가
+     정말 필요한 경우에만 사다리에 추가한다.
+     아래 시맨틱 토큰들은 이 사다리를 가리키게 해 두 벌이 따로 놀지 않게 했다. */
+  --warm-50:  #FAF8F5;
+  --warm-100: #F5F0EB;
+  --warm-200: #EDE8E3;
+  --warm-300: #E4E0DA;
+  --warm-400: #C7BFB6;
+  --warm-500: #ADA59B;
+  --warm-600: #9B9285;
+  --warm-700: #6F6862;
+  --warm-800: #5A5148;
+  --warm-900: #46403A;
+
+  --color-bg: var(--warm-50);
   --color-surface: #FFFFFF;
-  --color-surface-2: #F5F0EB;
+  --color-surface-2: var(--warm-100);
   --color-tray: #F0E3CF;
 
   --color-text: #1A1A1A;
-  /* 기존 #857B72는 4.3:1로 AA 미달이었다. 갈색기를 빼고 한 단 어둡게 해 5.5:1. */
-  --color-text-muted: #6F6862;
+  /* 기존 #857B72는 4.3:1로 AA 미달이었다. 갈색기를 빼고 한 단 어둡게 해 5.5:1.
+     사다리에서 글자로 쓸 수 있는 가장 연한 단계가 여기다 — warm-600은 3.07:1이라
+     본문에 쓰면 안 된다. 연한 회색 글자가 필요해 보이면 색이 아니라 크기나 굵기로 낮춘다. */
+  --color-text-muted: var(--warm-700);
   /* 테두리는 한 단 연하게 — 얇은 선이 진하면 화면이 칸으로 잘게 쪼개져 보인다. */
-  --color-border: #E4E0DA;
+  --color-border: var(--warm-300);
 
-  --color-success: #4CAF50;
-  --color-success-bg: #E8F5E9;
-  --color-success-border: #A5D6A7;
+  /* 상태색. 원래는 Material 기본 팔레트(#4CAF50 / #f44336 / Material blue)를 그대로 썼는데,
+     크림 바탕에 맞춘 나머지 화면 위에서 그 자리만 차갑게 떠 보였고 대비도 모자랐다
+     — #4CAF50은 흰 배경에서 2.78:1이라 AA(4.5:1) 근처에도 못 갔고, 그 색을 12px 글자에
+     56곳에서 쓰고 있었다. 노랑기를 섞어 크림 쪽으로 당기고, 흰 배경·자기 tint 위 양쪽에서
+     4.5:1을 넘는 값으로 낮췄다.
+     각 색은 세 벌로 쓴다: 본색(글자·테두리·채움), -bg(연한 tint 배경), -border(그 tint의 테두리).
+     본색은 tint 위에 얹혀도 읽혀야 하므로 tint 대비도 함께 맞춰 뒀다. */
 
-  --color-danger: #f44336;
-  --color-danger-bg: #FFEBEE;
-  --color-danger-border: #FFCDD2;
+  /* 대비를 채도가 아니라 명도로만 확보하는 게 요령이다. 한때 이 세 색을 어둡게만 눌러
+     맞췄더니(success S26% / info S38%) 전부 탁해 보였다 — 어중간하게 채도가 빠진 색은
+     회색이 섞인 것처럼 읽힌다. 지금 값은 채도를 원래 수준으로 되돌리고(50~62%) 명도만
+     낮춰 4.5:1을 넘긴다. 대비도 5.0 근처로만 잡는다. 6:1까지 올리면 그만큼 어두워질 뿐
+     AA에는 아무 보탬이 안 된다.
+     tint는 L95%로 둔다 — 더 밝히면 흰 카드 위에서 뱃지 배경이 사라지고, 더 낮추면 그 위
+     글자가 4.5:1을 못 넘긴다. 셋 다 흰 배경·크림 배경·자기 tint 위 모두에서 AA를 넘는다. */
 
-  --color-info: #2563EB;
-  --color-info-bg: #E3F2FD;
-  --color-info-border: #BBDEFB;
+  /* 흰 5.01 · 크림 4.73 · tint 위 4.60. 채움 배경으로는 쓰이지 않고 글자와 테두리 전용. */
+  --color-success: #2A7E4D;
+  --color-success-bg: #EBF9EC;
+  --color-success-border: #BAE8BE;
+
+  /* 날짜 줄의 "오늘" 알약 채움. 이 줄은 화면 맨 위에 늘 떠 있어서, 여기가 무채색이면
+     페이지 전체가 회색으로 가라앉아 보인다.
+     브랜드 주황을 그대로 채우고 흰 글자를 얹는다. 그 조합의 대비는 2.84로, 이 앱에서
+     유일하게 AA(4.5:1)를 비켜 갈 뿐 아니라 큰 텍스트 기준(3:1)에도 못 미치는 자리다.
+     근거는 "오늘"이 단독으로 정보를 지고 있지 않다는 것 — 바로 옆 "8월 11일 (화)"가 같은
+     사실을 이미 말하고 있어서, 이 알약을 못 읽어도 잃는 정보가 없다. 그 대신 날짜 줄이
+     화면의 색 기준점 노릇을 한다.
+     이 예외는 "브랜드 주황 채움 + 흰 글자"라는 조합에만 해당한다. 같은 주황을 쓰면서
+     대비가 필요하면 글자를 흰색 대신 아주 진한 색으로 바꾸면 된다(#3C2A20이면 4.80으로
+     AA를 넘긴다). 정보를 단독으로 지는 글자에는 --color-primary-text(5.18)를 쓴다. */
+  --color-today-fill: #FF6B35;
+
+  /* 내일·모레(future)와 어제·엊그제(past)의 알약 채움. 오늘과 나란히 놓이므로 흰 글자 대비를
+     오늘(2.84)과 거의 같은 2.76 / 3.00에 맞췄다 — 셋의 대비가 어긋나면 한 알약만 유독 옅거나
+     탁해 보인다. HSL의 L을 통일하지 않은 건 색마다 휘도가 달라서다. 같은 L 60%로 맞추면
+     청록은 대비 1.9까지 떨어지고 보라는 3.7로 올라가, 숫자로만 같고 눈에는 제각각이 된다.
+     hue는 셋이 90도 이상씩 벌어져 있어 글자를 읽기 전에 지난 날인지 올 날인지 구분된다. */
+  --color-future-fill: #00AACC;
+  --color-past-fill: #B97AE6;
+
+  /* 주말 날짜 숫자 전용. 한때 danger를 그대로 썼는데 두 가지가 어긋났다 — 토요일은 위험이
+     아니라 달력의 관습이고, danger는 글자로 쓸 것을 전제로 어둡게 잡아 둔 값이라 벽돌색으로
+     탁하게 보였다. 이 숫자는 20px 700이라 WCAG의 큰 텍스트(18.66px 이상 굵게)에 해당해
+     3:1만 넘기면 되는데, 이 값은 4.62라 일반 텍스트 기준까지 넘으면서도 훨씬 밝다. */
+  --color-weekend: #D93826;
+
+  /* 토글이 켜졌을 때의 트랙. success보다 한 단 밝다 — 토글은 글자가 아니라 UI 컴포넌트라
+     3:1 기준이 적용되고, 그만큼 명도를 덜 눌러도 된다. 흰 노브와 3.51:1로 구분된다. */
+  --color-toggle-on: #319B5D;
+
+  /* 흰 5.15 · tint 위 4.53. 글자(43곳)와 "정말 삭제" 같은 흰 글자를 얹는 채움 배경(17곳)을
+     겸하는데, 두 용도 모두 어두울수록 유리해서 한 값으로 맞출 수 있었다. 알림 점으로도
+     쓰이므로 채도를 62%로 남겼다 — 점은 작아서 명도보다 채도로 눈에 띈다. */
+  --color-danger: #BE452D;
+  --color-danger-bg: #FAEEEA;
+  --color-danger-border: #EBC3B7;
+
+  /* 흰 5.18 · tint 위 4.62. 남은 용도는 "공개" 상태 표시뿐이라 화면 점유가 작다. */
+  --color-info: #2E72A3;
+  --color-info-bg: #EBF3F9;
+  --color-info-border: #BAD5E8;
 
   --radius-sm: 8px;
   --radius-md: 12px;
@@ -110,7 +183,22 @@
 
   --max-width: 430px;
 
-  --font-title: 'GmarketSansBold', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  --font-title: 'GmarketSansBold', 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  --font-body: 'Pretendard Variable', -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+
+  /* 굵기 단계. 가변 폰트라 어떤 값이든 실제 굵기로 렌더되므로, 오히려 단계를 좁게
+     못박아야 화면이 굵기로 위계를 만든다.
+       body(400)  = 본문·설명
+       label(500) = 메타 정보, 부가 라벨
+       emph(600)  = 강조 라벨, 작은 글자의 강조, 버튼
+       title(700) = 제목, CTA — 상한이다. 800/900은 쓰지 않는다.
+     예전에는 800이 84곳, 900이 19곳까지 늘어 거의 모든 글자가 볼드였는데, 기기 기본
+     서체에는 그 굵기가 없어 700으로 눌려 렌더되느라 티가 안 났다. Pretendard는 920까지
+     실제 굵기가 있어서 그대로 뒀다면 화면이 지금보다 더 굵어졌을 것이다. */
+  --font-weight-body: 400;
+  --font-weight-label: 500;
+  --font-weight-emph: 600;
+  --font-weight-title: 700;
 
   /* 5개 메인 메뉴(홈/일정/모먼트/친구/내 계정)가 공통으로 쓰는 AppHeader 규격 —
      여기 값을 바꾸면 모든 화면 헤더가 같이 바뀐다. */
@@ -146,7 +234,10 @@ html {
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Noto Sans KR', 'Apple SD Gothic Neo', sans-serif;
+  font-family: var(--font-body);
+  /* 한글은 라틴보다 글자당 획이 많아 기본 커닝이 성기게 보인다. 살짝 조여 문단 덩어리가
+     또렷해지게 한다(제목 쪽은 각자 letter-spacing을 더 좁게 잡고 있다). */
+  letter-spacing: -0.2px;
   background-color: #D4B896;
   color: var(--color-text);
   line-height: 1.5;
@@ -172,6 +263,17 @@ img {
   -webkit-user-drag: none;
   user-drag: none;
   -webkit-touch-callout: none;
+}
+
+/* 버튼·입력 요소는 UA 스타일시트가 font-family를 직접 지정하고 있어서 body 스택을
+   상속받지 못한다. 그래서 지금까지는 인라인으로 fontFamily: 'inherit'을 붙여 준 버튼만
+   본문 서체로 나오고, 나머지(전체 버튼 365개 중 대부분)는 브라우저 기본 서체로 렌더돼
+   한 화면 안에 두 서체가 섞여 있었다. 여기서 한 번에 상속시킨다.
+   font-size는 일부러 건드리지 않는다 — 크기를 지정하지 않은 버튼이 갑자기 html 기준
+   18px로 커지면서 레이아웃이 흔들린다. */
+button, input, textarea, select {
+  font-family: inherit;
+  letter-spacing: inherit;
 }
 
 /* ===== 캐러셀 롤링 애니메이션 ===== */
@@ -342,7 +444,7 @@ button:not(:disabled):active, [role="button"]:active {
 
 .app-header__title {
   font-family: var(--font-title);
-  font-weight: 800;
+  font-weight: var(--font-weight-title);
   font-size: 20px;
   color: var(--color-text);
   letter-spacing: -0.5px;
@@ -402,12 +504,14 @@ button:not(:disabled):active, [role="button"]:active {
   /* 보조 알약의 글자는 500로 얇게 둔다. 굵은 획은 색 면적을 키워, 틴트 위의 색 글자를
      번진 것처럼 탁해 보이게 만든다. 굵기가 필요한 건 흰 글자를 얹는 채움 CTA 쪽이다. */
   font-weight: 500;
-  /* 실행이므로 주황 계열은 유지하되, 채움이 아니라 글자 단계로 둬서 화면의 주요 CTA와
-     시선을 다투지 않게 한다. 다만 틴트와 주황 테두리는 남겨야 한다 — 셋을 한꺼번에 빼면
-     색기가 사라져 벽돌색 글자만 남고 탁해 보인다. 낮추는 건 글자색 하나면 충분하다. */
-  color: var(--color-primary-text);
-  background: var(--color-primary-a07);
-  border: 1px solid var(--color-primary-a27);
+  /* 한때 주황 계열을 유지하되 톤만 낮춰 보려 했지만, 주황은 명도를 내리면 갈색으로 변질되는
+     색이라(#FF6B35 L60% → primary-text L40%는 이미 벽돌색이다) 어떻게 조합해도 탁했다.
+     14px 글자는 4.5:1이 필요해 밝은 주황을 쓸 수도 없다. 보조 액션에는 애초에 색이 필요
+     없으므로 무채색으로 내리고, 크림 배경 위에 흰 알약을 얹어 누를 수 있다는 걸 형태로
+     알린다. 색은 화면당 하나뿐인 주요 CTA에 남겨 둔다. */
+  color: var(--color-chip-text);
+  background: var(--color-surface);
+  border: 1px solid var(--color-selected-a20);
   border-radius: var(--radius-full);
   cursor: pointer;
   white-space: nowrap;
@@ -415,7 +519,7 @@ button:not(:disabled):active, [role="button"]:active {
   transition: background 0.12s ease, transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.app-header-action:active { background: var(--color-primary-a10); transform: scale(0.96); }
+.app-header-action:active { background: var(--color-chip-bg); transform: scale(0.96); }
 
 /* 세그먼트 컨트롤(모먼트: 내 그룹 / 전체) — 선택/비선택이 서로 다른 버튼처럼 보이지
    않도록 트랙 하나에 옵션들을 붙여, 선택된 옵션만 배경으로 표시한다 */

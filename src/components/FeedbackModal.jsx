@@ -106,7 +106,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflow: 'hidden',
   },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
-  title: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  title: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   closeBtn: { background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 },
 
   list: { flex: 1, minHeight: 60, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 2 },

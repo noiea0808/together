@@ -140,7 +140,7 @@ const styles = {
   },
   body: { minWidth: 0, display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center' },
   title: {
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', overflow: 'hidden',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)', overflow: 'hidden',
     display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', lineHeight: 1.4,
   },
   host: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', opacity: 0.8 },
@@ -162,7 +162,7 @@ const styles = {
   },
   bodyCompact: { minWidth: 0, display: 'flex', flexDirection: 'column', justifyContent: 'center' },
   titleCompact: {
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)',
     overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   hostCompact: {
