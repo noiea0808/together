@@ -24,6 +24,15 @@ function dismissToday() {
   localStorage.setItem('dailyTipDismissedDate', JSON.stringify(toDateStr(new Date())))
 }
 
+// 방금 온보딩(프로필 설정)을 마친 신규 가입자인지 여부. ProfileSetupPage에서 온보딩 완료 시
+// 심어두는 1회성 플래그를 읽고 바로 지운다 — 그래서 이번 접속에서만 "처음"으로 취급되고,
+// 다음 접속부터는 재방문자와 동일하게 취급된다.
+function consumeFirstTimeFlag() {
+  const isFirstTime = localStorage.getItem('justOnboarded') === '1'
+  if (isFirstTime) localStorage.removeItem('justOnboarded')
+  return isFirstTime
+}
+
 // 별표(is_featured) 팁은 가중치 2, 일반 팁은 가중치 1로 뽑아 순서를 정한다.
 // 매 단계에서 남은 항목 중 가중치에 비례한 확률로 하나를 뽑아 앞으로 보내는 방식이라,
 // 별표 팁이 평균적으로 더 앞쪽(끝까지 안 넘겨도 보일 위치)에 나올 확률이 두 배가 된다.
@@ -56,7 +65,7 @@ export function openDailyTipModal(tab = 'tip') {
 
 // 로그인 후 접속할 때마다 뜨는 팝업. "시작하기"(guide, 정해진 순서)와
 // "오늘의 팁"(tip, 랜덤 순서) 두 탭을 가지며, 탭은 자유롭게 오갈 수 있다.
-// 시작하기 탭이 있으면 항상 그 탭을 기본으로 보여주고, 없으면 오늘의 팁을 보여준다.
+// 방금 온보딩을 마친 신규 가입자는 시작하기 탭을, 그 외(재방문자)는 오늘의 팁 탭을 기본으로 본다.
 // "오늘 하루 보지 않기"는 기기(로컬스토리지) 기준으로만 적용되며, 그냥 닫기는 다음 접속 때 다시 뜬다.
 // GroupInviteModal과 겹치지 않도록 초대 코드가 대기 중이면 이번 접속에서는 띄우지 않는다.
 export default function DailyTipModal() {
@@ -92,8 +101,10 @@ export default function DailyTipModal() {
           setTabItems({ guide: [], tip: [] })
           return
         }
+        // 처음 사용하는(=방금 온보딩을 마친) 사람에게는 "시작하기"를, 그 외에는 "오늘의 팁"을 기본으로.
+        const firstTime = consumeFirstTimeFlag()
         setTabItems({ guide, tip })
-        setActiveTab(guide.length > 0 ? 'guide' : 'tip')
+        setActiveTab(firstTime && guide.length > 0 ? 'guide' : (tip.length > 0 ? 'tip' : 'guide'))
         setOpen(true)
       })
       .catch(() => { if (!cancelled) setTabItems({ guide: [], tip: [] }) })
