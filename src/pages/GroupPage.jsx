@@ -758,7 +758,7 @@ export default function GroupPage() {
                             )}
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
                               <input
-                                style={{ ...styles.proposeInput, flex: 1 }}
+                                style={{ ...styles.proposeInput, flex: 1, minWidth: 0 }}
                                 placeholder="댓글 달기"
                                 value={newWishCommentText}
                                 onChange={e => setNewWishCommentText(e.target.value)}

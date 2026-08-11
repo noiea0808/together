@@ -457,7 +457,10 @@ const S = {
   commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
   commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
   commentInputRowCompact: { marginTop: 10, paddingTop: 10 },
-  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)', transition: 'border-color 0.15s, box-shadow 0.15s' },
+  // minWidth: 0이 없으면 input의 자동 최소 크기(size 속성 기본값 20자 폭)가 하한이 되어
+  // flex:1인데도 그 아래로 줄지 않는다. 줄 폭이 모자라면 대신 옆의 '등록'이 오른쪽 밖으로
+  // 밀려난다 — 화면이 넓은 웹에서는 하한에 걸릴 일이 없어 기기에서만 드러났다.
+  commentInput: { flex: 1, minWidth: 0, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)', transition: 'border-color 0.15s, box-shadow 0.15s' },
   commentInputFocused: { borderColor: 'var(--color-selected)', boxShadow: '0 0 0 3px var(--color-selected-a20)' },
-  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer' },
+  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
 }
