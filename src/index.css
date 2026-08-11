@@ -400,7 +400,9 @@ button:not(:disabled):active, [role="button"]:active {
   align-items: center;
   justify-content: center;
   font-size: 14px;
-  font-weight: 600;
+  /* 보조 알약의 글자는 500로 얇게 둔다. 굵은 획은 색 면적을 키워, 틴트 위의 색 글자를
+     번진 것처럼 탁해 보이게 만든다. 굵기가 필요한 건 흰 글자를 얹는 채움 CTA 쪽이다. */
+  font-weight: 500;
   /* 실행이므로 주황 계열은 유지하되, 채움이 아니라 글자 단계로 둬서 화면의 주요 CTA와
      시선을 다투지 않게 한다. 다만 틴트와 주황 테두리는 남겨야 한다 — 셋을 한꺼번에 빼면
      색기가 사라져 벽돌색 글자만 남고 탁해 보인다. 낮추는 건 글자색 하나면 충분하다. */

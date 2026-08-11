@@ -1149,7 +1149,7 @@ const S = {
   headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   headerSub: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   headerTextBtn: { fontSize: 'var(--font-size-base)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: '4px 8px', whiteSpace: 'nowrap' },
-  headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 700, whiteSpace: 'nowrap' },
+  headerEditPill: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '4px 12px', cursor: 'pointer', fontFamily: 'inherit', fontWeight: 500, whiteSpace: 'nowrap' },
 
   body: { flex: 1, padding: '20px 16px', display: 'flex', flexDirection: 'column', gap: 14, overflowY: 'auto' },
   footer: { flexShrink: 0, padding: '10px 16px calc(10px + var(--safe-area-inset-bottom))', borderTop: '1px solid var(--color-border)', background: 'var(--color-bg)', display: 'flex', flexDirection: 'column', gap: 8 },

@@ -466,8 +466,10 @@ const S = {
   itemBody: { flex: 1, minWidth: 0 },
   itemTopRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   itemTitleRow: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
-  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 800, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
-  eventBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '1px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
+  // 채운 배지(newBadge)는 흰 글자를 색 위에 얹으므로 600까지만 낮춘다. 반대로 eventBadge는
+  // 연한 배경 위의 색 글자라, 굵으면 번져 보여서 500으로 둔다.
+  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
+  eventBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, borderRadius: 'var(--radius-full)', padding: '1px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
   itemTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' },
   itemMeta: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', marginTop: 3, fontWeight: 600 },

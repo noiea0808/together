@@ -29,7 +29,7 @@ function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
 
-// 알약을 뺀 이유는 TodayPage의 같은 함수 주석 참고 — 상대 라벨은 날짜에 이어 붙는 보조 글자다.
+// 오늘만 알약을 두는 이유는 TodayPage의 같은 함수 주석 참고.
 function getRelativeLabel(date) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
@@ -468,11 +468,8 @@ export default function GroupPage() {
       >
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
-          <span style={styles.dateGroup}>
-            <span style={{ ...styles.datePrimary, ...(isToday ? styles.datePrimaryToday : {}) }}>{formatDate(currentDate)}</span>
-            <span style={styles.dateSep}>·</span>
-            <span style={{ ...styles.relLabel, ...(isToday ? styles.relLabelToday : {}) }}>{relLabel.label}</span>
-          </span>
+          <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
+          <span style={isToday ? styles.relBadgeToday : styles.relLabel}>{relLabel.label}</span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -926,18 +923,15 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(500).
-  dateGroup: { display: 'inline-flex', alignItems: 'baseline', gap: 6 },
+  // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(500~600).
   datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
-  datePrimaryToday: { color: 'var(--color-accent)' },
-  dateSep: { fontSize: 'var(--font-size-xs)', color: 'var(--color-border)' },
   relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
-  relLabelToday: { fontWeight: 600, color: 'var(--color-accent)' },
+  relBadgeToday: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
@@ -970,10 +964,10 @@ const styles = {
   groupNameRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   groupNameText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 500 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
-  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
+  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 500 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   friendRequestBtn: {
-    flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-text)',
+    flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-primary-text)',
     background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)',
     borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
   },
@@ -984,7 +978,7 @@ const styles = {
   // 시트 헤더용 "요청됨" 칩 — 목록 행의 friendRequestBtnSent와 같은 톤이지만 버튼이 아니라
   // 상태 표시라 padding/폰트 크기를 헤더 옆에 맞게 조금 더 작게 뒀다.
   sheetRequestSentChip: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)',
     background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', padding: '5px 10px', whiteSpace: 'nowrap',
   },
