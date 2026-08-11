@@ -579,17 +579,17 @@ const S = {
     border: 'none', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600,
     fontFamily: 'inherit', whiteSpace: 'nowrap', textAlign: 'left',
   },
-  pickerItemActive: { color: 'var(--color-primary)', fontWeight: 800, background: '#FFF4EF' },
+  pickerItemActive: { color: 'var(--color-accent)', fontWeight: 800, background: 'var(--color-accent-bg)' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: {
     width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
     background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
-  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 700, marginTop: 2 },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 700, marginTop: 2 },
   heroEditBadge: {
     width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
-    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary)', border: 'none',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
     display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
   },
   infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
@@ -598,7 +598,7 @@ const S = {
   infoPanelEditable: { cursor: 'pointer', paddingRight: 26 },
   infoPanelEditBadge: {
     position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%',
-    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary)',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   infoPanelRow: { display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', overflow: 'hidden' },
@@ -611,13 +611,13 @@ const S = {
     padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
 
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
   editStepperNum: {
     fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
-    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary)',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-accent)', color: 'var(--color-accent)',
   },
   editSectionInput: {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
@@ -635,7 +635,7 @@ const S = {
     padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  chipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
+  chipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
 
   sectionInput: {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',

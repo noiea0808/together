@@ -281,8 +281,8 @@ const styles = {
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)',
-    color: 'var(--color-primary)',
+    border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)',
   },
   card: {
     width: '100%', background: 'var(--color-surface)',

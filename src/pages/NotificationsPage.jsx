@@ -26,12 +26,12 @@ const EVENT_META = {
   kicked: { label: '내보내짐', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
   update: { label: '수정', color: 'var(--color-info)', bg: 'var(--color-info-bg)', border: 'var(--color-info-border)' },
   comment: { label: '코멘트', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  invite: { label: '초대', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
-  invite_new: { label: '제안', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
+  invite: { label: '초대', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
+  invite_new: { label: '제안', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
   invite_declined: { label: '거절', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
-  wish_like: { label: '하트', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
+  wish_like: { label: '하트', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
   wish_comment: { label: '댓글', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  friend_request: { label: '친구 요청', color: 'var(--color-primary)', bg: '#FFF4EF', border: '#FFD6C0' },
+  friend_request: { label: '친구 요청', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
   friend_accepted: { label: '친구', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
 }
 
@@ -451,7 +451,7 @@ const S = {
     background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)',
     padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
   },
-  categoryTabActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a10)', border: '1px solid var(--color-primary)' },
+  categoryTabActive: { color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent)' },
 
   list: { flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 'calc(40px + var(--safe-area-inset-bottom))' },
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
@@ -462,11 +462,11 @@ const S = {
     display: 'flex', gap: 8, padding: '12px 14px', background: 'var(--color-surface)',
     border: '1.5px solid var(--color-border)', borderRadius: 14, cursor: 'pointer',
   },
-  itemUnread: { background: '#FFF4EF', border: '1.5px solid #FFD6C0' },
+  itemUnread: { background: 'var(--color-accent-bg)', border: '1.5px solid var(--color-accent-a20)' },
   itemBody: { flex: 1, minWidth: 0 },
   itemTopRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   itemTitleRow: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
-  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 800, color: '#fff', background: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
+  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 800, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
   eventBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '1px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
   itemTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' },
@@ -490,6 +490,6 @@ const S = {
 
   declineChipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
   declineChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
   declineInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 }

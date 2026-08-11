@@ -115,7 +115,7 @@ const styles = {
   itemMineRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   itemMine: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   itemDate: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
-  itemReply: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  itemReply: { fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   itemPending: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
 
   composeRow: { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },

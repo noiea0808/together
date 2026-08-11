@@ -145,7 +145,7 @@ const styles = {
   termRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   termCheck: { display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0', flex: 1, textAlign: 'left' },
   termLabel: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', lineHeight: 1.4 },
-  tagReq: { color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
+  tagReq: { color: 'var(--color-primary-text)', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
   tagOpt: { color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-xs)' },
   checkbox: {
     width: 22, height: 22, borderRadius: '50%', border: '2px solid var(--color-border)',
@@ -157,7 +157,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     color: '#fff', fontSize: 12, fontWeight: 800,
   },
-  checkboxOn: { background: 'var(--color-primary)', borderColor: 'var(--color-primary)' },
+  checkboxOn: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)' },
   viewBtn: {
     flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
     fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)',

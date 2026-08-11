@@ -356,8 +356,8 @@ const styles = {
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    borderColor: 'var(--color-primary)', background: 'var(--color-primary-a10)',
-    color: 'var(--color-primary)',
+    borderColor: 'var(--color-accent)', background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
@@ -379,5 +379,5 @@ const styles = {
     width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',
   },
-  inviteBanner: { background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a20)', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5 },
+  inviteBanner: { background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 600, lineHeight: 1.5 },
 }

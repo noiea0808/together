@@ -249,8 +249,8 @@ const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   iconBadge: {
-    width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,107,53,0.14)',
-    color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: '50%', background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
@@ -267,8 +267,8 @@ const styles = {
     color: 'var(--color-text-muted)', fontFamily: 'inherit',
   },
   tabActive: {
-    border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)',
-    color: 'var(--color-primary)', fontWeight: 700,
+    border: '2px solid var(--color-accent)', background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)', fontWeight: 700,
   },
   input: {
     width: '100%', padding: '11px 14px',

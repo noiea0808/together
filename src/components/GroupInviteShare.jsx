@@ -91,8 +91,8 @@ export default function GroupInviteShare({ group, onDone }) {
 const styles = {
   wrap: { width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   iconBadge: {
-    width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,107,53,0.14)',
-    color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: '50%', background: 'var(--color-accent-bg)',
+    color: 'var(--color-accent)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
   title: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   desc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0 },

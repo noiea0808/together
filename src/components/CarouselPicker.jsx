@@ -97,8 +97,8 @@ export default function CarouselPicker({ items, value, onChange, disabled, width
     >
       <div style={sideCell} onClick={() => step(-1)}>{get(-1)}</div>
       <div style={{ height: 40, width: '100%', position: 'relative', overflow: 'hidden',
-        borderTop: '1.5px solid var(--color-primary)', borderBottom: '1.5px solid var(--color-primary)',
-        background: 'rgba(255,107,53,0.05)' }}
+        borderTop: '1.5px solid var(--color-accent)', borderBottom: '1.5px solid var(--color-accent)',
+        background: 'var(--color-accent-a08)' }}
       >
         <div
           key={anim.n}

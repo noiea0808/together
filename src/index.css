@@ -24,9 +24,17 @@
 
 /* ===== 디자인 토큰 ===== */
 :root {
+  /* 색은 역할로 나눠 쓴다. 예전에는 --color-primary 하나가 CTA·배지·칩·탭·아이콘·테두리를
+     전부 겸해서(29개 파일 145곳) 화면에 강조가 너무 많아 오히려 아무것도 강조되지 않았다.
+       주황  = "누르면 뭔가 일어난다" — 화면당 주요 CTA 하나 + 작은 액션 글자
+       네이비 = "지금 이것" / "그냥 사실" — 선택·활성 상태, 제목, 정적 배지
+     새 화면을 만들 때도 이 구분을 기준으로 고르면 된다. */
   --color-primary: #FF6B35;
   --color-primary-light: #FF8C5A;
   --color-primary-dark: #E05520;
+  /* 주황을 글자·아이콘·얇은 선에 쓸 때 전용. #FF6B35는 흰 배경 대비 2.8:1로 WCAG AA(4.5:1)에
+     못 미쳐 작은 글자에서 안 읽히고 채도만 튄다. 이 값은 5.2:1로 통과한다. */
+  --color-primary-text: #C2410C;
   /* var(--color-primary)18 형태(토큰 뒤에 hex 알파를 이어붙이는 표기)는 유효한 CSS가
      아니라 배경이 투명 처리됨 — 대신 이 알파 변형 토큰들을 쓴다. */
   --color-primary-a05: rgba(255, 107, 53, 0.05);
@@ -36,14 +44,31 @@
   --color-primary-a20: rgba(255, 107, 53, 0.20);
   --color-primary-a27: rgba(255, 107, 53, 0.27);
 
+  /* 보조 강조 — 크림 배경 위에서 유일하게 차가운 색이라, 온도 대비로 눈에 띈다.
+     명도 34%·채도 39%로, 이보다 더 어둡게 잡으면 안 된다: 이 색이 실제로 쓰이는 자리는
+     26px 아바타, 11px 배지 글자, 1.5px 테두리처럼 면적이 작아서, 명도가 25% 아래로 내려가면
+     색조가 안 읽히고 그냥 검정으로 보인다(그러면 온도 대비라는 도입 목적 자체가 사라진다).
+     넓은 면적을 채우는 브랜드들이 훨씬 어두운 네이비를 쓰는 건 면적이 색조를 살려주기 때문.
+     --color-info(#2563EB)와는 색상이 19도 떨어진 데다 채도 39 대 83, 명도 34 대 53으로
+     갈려서 "탁한 청록빛 네이비"와 "쨍한 파랑"으로 구분된다. 흰 배경 대비 6.7:1. */
+  --color-accent: #35617A;
+  --color-accent-dark: #2C5266;
+  /* 클릭할 수 없는 정적 표시(방장 배지 등)의 배경. 글자는 --color-accent를 쓴다. */
+  --color-accent-bg: #E7EFF3;
+  --color-accent-a08: rgba(53, 97, 122, 0.08);
+  --color-accent-a12: rgba(53, 97, 122, 0.12);
+  --color-accent-a20: rgba(53, 97, 122, 0.20);
+
   --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
   --color-surface-2: #F5F0EB;
   --color-tray: #F0E3CF;
 
   --color-text: #1A1A1A;
-  --color-text-muted: #857B72;
-  --color-border: #DCD4C9;
+  /* 기존 #857B72는 4.3:1로 AA 미달이었다. 갈색기를 빼고 한 단 어둡게 해 5.5:1. */
+  --color-text-muted: #6F6862;
+  /* 테두리는 한 단 연하게 — 얇은 선이 진하면 화면이 칸으로 잘게 쪼개져 보인다. */
+  --color-border: #E4E0DA;
 
   --color-status-lunch: #3DBB5C;
   --color-status-dinner: #1E88E5;
@@ -245,7 +270,7 @@ img {
 }
 
 .input:focus {
-  border-color: var(--color-primary);
+  border-color: var(--color-accent);
 }
 
 input::placeholder,
@@ -258,7 +283,7 @@ textarea::placeholder {
 .text-center { text-align: center; }
 
 button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
-  outline: 2px solid var(--color-primary);
+  outline: 2px solid var(--color-accent);
   outline-offset: 2px;
 }
 
@@ -355,7 +380,7 @@ button:not(:disabled):active, [role="button"]:active {
   transition: background 0.12s ease, transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.app-header-icon-btn:active { background: var(--color-primary-a08); transform: scale(0.92); }
+.app-header-icon-btn:active { background: var(--color-accent-a08); transform: scale(0.92); }
 .app-header-icon-btn__dot {
   position: absolute;
   top: 9px;
@@ -376,8 +401,11 @@ button:not(:disabled):active, [role="button"]:active {
   justify-content: center;
   font-size: 14px;
   font-weight: 600;
-  color: var(--color-primary);
-  background: var(--color-primary-a08);
+  /* 실행이므로 주황 계열은 유지하되, 채움이 아니라 글자 단계로 둬서 화면의 주요 CTA와
+     시선을 다투지 않게 한다. 다만 틴트와 주황 테두리는 남겨야 한다 — 셋을 한꺼번에 빼면
+     색기가 사라져 벽돌색 글자만 남고 탁해 보인다. 낮추는 건 글자색 하나면 충분하다. */
+  color: var(--color-primary-text);
+  background: var(--color-primary-a07);
   border: 1px solid var(--color-primary-a27);
   border-radius: var(--radius-full);
   cursor: pointer;
@@ -386,7 +414,7 @@ button:not(:disabled):active, [role="button"]:active {
   transition: background 0.12s ease, transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.app-header-action:active { background: var(--color-primary-a20); transform: scale(0.96); }
+.app-header-action:active { background: var(--color-primary-a10); transform: scale(0.96); }
 
 /* 세그먼트 컨트롤(모먼트: 내 그룹 / 전체) — 선택/비선택이 서로 다른 버튼처럼 보이지
    않도록 트랙 하나에 옵션들을 붙여, 선택된 옵션만 배경으로 표시한다 */
@@ -418,7 +446,9 @@ button:not(:disabled):active, [role="button"]:active {
   transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.app-header-segmented__option.is-active { color: var(--color-primary); background: var(--color-primary-a10); }
+/* 선택된 옵션은 색 틴트 없이 흰 배경만으로 "올라와 있음"을 표현한다 — 트랙이
+   surface-2라 흰색만으로도 충분히 대비되고, 색을 아껴 CTA에 남겨둘 수 있다. */
+.app-header-segmented__option.is-active { color: var(--color-accent); background: var(--color-surface); }
 .app-header-segmented__option:active { transform: scale(0.96); }
 .app-header-segmented__dot {
   position: absolute;

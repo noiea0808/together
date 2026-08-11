@@ -136,16 +136,23 @@ function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
 
+// 상대 라벨(오늘/어제/내일)은 날짜에 이어 붙는 보조 글자로 그린다. 예전에는 모든 날에 연한
+// 알약을 둘렀는데 두 가지가 문제였다:
+//  (1) "연한 배경 + 같은 색상의 어두운 글자" 구조라 채도 대비가 없어서, 색상을 스틸/초록/보라/
+//      앰버 뭘로 바꿔도 똑같이 탁해 보였다 — 색이 아니라 구조가 원인이었다.
+//  (2) 같은 줄의 '오늘로'(실제로 누르는 버튼)와 생김새가 같아, 못 누르는 표시가 누를 수 있는
+//      것처럼 보였다. 이제 이 줄에서 알약은 '오늘로' 하나뿐이라 알약 = 누르는 것으로 통일된다.
+// 오늘일 때는 날짜 글자 자체가 강조색으로 바뀌므로 별도 배지 없이도 구분된다.
 function getRelativeLabel(date) {
   const today = new Date(); today.setHours(0, 0, 0, 0)
   const diff = Math.round((date - today) / (1000 * 60 * 60 * 24))
-  if (diff === 0)  return { label: '오늘',   color: 'var(--color-primary)' }
-  if (diff === -1) return { label: '어제',   color: 'var(--color-info)' }
-  if (diff === -2) return { label: '엊그제', color: 'var(--color-info)' }
-  if (diff === 1)  return { label: '내일',   color: 'var(--color-success)' }
-  if (diff === 2)  return { label: '모레',   color: 'var(--color-success)' }
-  if (diff < 0)   return { label: `${Math.abs(diff)}일 전`, color: '#9E9E9E' }
-  return { label: `${diff}일 뒤`, color: '#9E9E9E' }
+  if (diff === 0)  return { label: '오늘' }
+  if (diff === -1) return { label: '어제' }
+  if (diff === -2) return { label: '엊그제' }
+  if (diff === 1)  return { label: '내일' }
+  if (diff === 2)  return { label: '모레' }
+  if (diff < 0)   return { label: `${Math.abs(diff)}일 전` }
+  return { label: `${diff}일 뒤` }
 }
 function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
@@ -855,8 +862,11 @@ export default function TodayPage() {
           <svg width="7" height="12" viewBox="0 0 9 15" fill="none"><path d="M7.5 1.5L1.5 7.5L7.5 13.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg>
         </button>
         <div style={styles.dateText}>
-          <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          {(() => { const r = getRelativeLabel(currentDate); return <span style={{ ...styles.relBadge, background: r.color }}>{r.label}</span> })()}
+          <span style={styles.dateGroup}>
+            <span style={{ ...styles.datePrimary, ...(isToday ? styles.datePrimaryToday : {}) }}>{formatDate(currentDate)}</span>
+            <span style={styles.dateSep}>·</span>
+            <span style={{ ...styles.relLabel, ...(isToday ? styles.relLabelToday : {}) }}>{getRelativeLabel(currentDate).label}</span>
+          </span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -1000,7 +1010,7 @@ export default function TodayPage() {
                 style={{
                   ...styles.subSlotBtn,
                   background: '#fff',
-                  borderColor: isSelected ? 'var(--color-primary)' : 'var(--color-border)',
+                  borderColor: isSelected ? 'var(--color-accent)' : 'var(--color-border)',
                   borderWidth: isSelected ? 2 : 1.5,
                   opacity: info.isPastDate ? 0.65 : 1,
                 }}
@@ -1014,7 +1024,7 @@ export default function TodayPage() {
                     : <SlotIcon slot={slot} muted={!info.label} style={styles.subSlotIconImg} />}
                 </div>
                 <div style={{ ...styles.subSlotLabelZone, background: info.label ? info.bg : 'var(--color-surface-2)' }}>
-                  <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-primary)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
+                  <span style={{ ...styles.subSlotLabel, color: isSelected ? 'var(--color-accent)' : (info.label ? info.color : '#9E958B') }}>{slot}</span>
                 </div>
               </button>
             )
@@ -1319,9 +1329,9 @@ export default function TodayPage() {
             <button
               style={{
                 ...styles.slotPopupStatusBtn,
-                borderColor: !draftData.status ? 'var(--color-primary)' : 'var(--color-border)',
-                background: !draftData.status ? 'rgba(255,107,53,0.08)' : 'var(--color-surface-2)',
-                color: !draftData.status ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                borderColor: !draftData.status ? 'var(--color-accent)' : 'var(--color-border)',
+                background: !draftData.status ? 'var(--color-accent-bg)' : 'var(--color-surface-2)',
+                color: !draftData.status ? 'var(--color-accent)' : 'var(--color-text-muted)',
               }}
               onClick={() => setDraftData(prev => ({ ...prev, status: undefined }))}
             >
@@ -1372,10 +1382,10 @@ export default function TodayPage() {
                           key={t}
                           style={{
                             padding: '6px 11px',
-                            border: `1.5px solid ${isActive ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            border: `1.5px solid ${isActive ? 'var(--color-accent)' : 'var(--color-border)'}`,
                             borderRadius: 'var(--radius-full)',
-                            background: isActive ? 'rgba(255,107,53,0.09)' : 'transparent',
-                            color: isActive ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                            background: isActive ? 'var(--color-accent-bg)' : 'transparent',
+                            color: isActive ? 'var(--color-accent)' : 'var(--color-text-muted)',
                             fontSize: 12,
                             fontWeight: isActive ? 700 : 500,
                             cursor: 'pointer',
@@ -1396,10 +1406,10 @@ export default function TodayPage() {
                           type="button"
                           style={{
                             padding: '6px 11px',
-                            border: `1.5px solid ${isCustom ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                            border: `1.5px solid ${isCustom ? 'var(--color-accent)' : 'var(--color-border)'}`,
                             borderRadius: 'var(--radius-full)',
-                            background: isCustom ? 'rgba(255,107,53,0.09)' : 'transparent',
-                            color: isCustom ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                            background: isCustom ? 'var(--color-accent-bg)' : 'transparent',
+                            color: isCustom ? 'var(--color-accent)' : 'var(--color-text-muted)',
                             fontSize: 12,
                             fontWeight: isCustom ? 700 : 500,
                             cursor: 'pointer',
@@ -1414,10 +1424,10 @@ export default function TodayPage() {
                     <button
                       style={{
                         padding: '6px 11px',
-                        border: `1.5px solid ${!timeOn ? 'var(--color-primary)' : 'var(--color-border)'}`,
+                        border: `1.5px solid ${!timeOn ? 'var(--color-accent)' : 'var(--color-border)'}`,
                         borderRadius: 'var(--radius-full)',
-                        background: !timeOn ? 'rgba(255,107,53,0.09)' : 'transparent',
-                        color: !timeOn ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                        background: !timeOn ? 'var(--color-accent-bg)' : 'transparent',
+                        color: !timeOn ? 'var(--color-accent)' : 'var(--color-text-muted)',
                         fontSize: 12,
                         fontWeight: !timeOn ? 700 : 500,
                         cursor: 'pointer',
@@ -1433,7 +1443,7 @@ export default function TodayPage() {
                       <div style={styles.slotPopupFieldLabel}>종료시간</div>
                       <button
                         type="button"
-                        style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, background: 'var(--color-surface)', color: dur > 0 ? 'var(--color-primary)' : 'var(--color-text)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px', cursor: 'pointer' }}
+                        style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, background: 'var(--color-surface)', color: dur > 0 ? 'var(--color-accent)' : 'var(--color-text)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: '4px 10px', cursor: 'pointer' }}
                         onClick={() => setSlotEndPickerOpen(v => !v)}
                       >
                         {draftData.end_time || '--:--'}
@@ -1442,13 +1452,13 @@ export default function TodayPage() {
                     <div style={{ display: 'flex', gap: 4, flexWrap: 'nowrap' }}>
                       {[{ min: 30, label: '30분' }, { min: 60, label: '1시간' }, { min: 90, label: '1.5시간' }, { min: 120, label: '2시간' }].map(o => (
                         <button key={o.min}
-                          style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === o.min ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === o.min ? 'rgba(255,107,53,0.09)' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === o.min ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: dur === o.min ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
+                          style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === o.min ? 'var(--color-accent)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === o.min ? 'var(--color-accent-bg)' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === o.min ? 'var(--color-accent)' : 'var(--color-text-muted)', fontWeight: dur === o.min ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
                           onClick={() => setSlotDuration(o.min)}>
                           {o.label}
                         </button>
                       ))}
                       <button
-                        style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === 0 ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === 0 ? 'rgba(255,107,53,0.09)' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === 0 ? 'var(--color-primary)' : 'var(--color-text-muted)', fontWeight: dur === 0 ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
+                        style={{ flex: 1, padding: '4px 4px', border: `1.5px solid ${dur === 0 ? 'var(--color-accent)' : 'var(--color-border)'}`, borderRadius: 'var(--radius-full)', background: dur === 0 ? 'var(--color-accent-bg)' : 'transparent', fontSize: 11, cursor: 'pointer', color: dur === 0 ? 'var(--color-accent)' : 'var(--color-text-muted)', fontWeight: dur === 0 ? 700 : 500, whiteSpace: 'nowrap', textAlign: 'center' }}
                         onClick={() => { setSlotDuration(0); setSlotEndPickerOpen(true) }}>
                         직접입력
                       </button>
@@ -2435,7 +2445,7 @@ function GroupSlotCard({ group, slot, members, statuses, pots, myUserId, mySlotD
                 ) : (
                   <div style={{
                     width: 40, height: 40, borderRadius: '50%',
-                    background: isMe ? 'var(--color-primary)' : 'var(--color-text-muted)',
+                    background: isMe ? 'var(--color-accent)' : 'var(--color-text-muted)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
                     color: 'white', fontSize: 'var(--font-size-xs)', fontWeight: 800, flexShrink: 0,
                     border: '2px solid var(--color-border)', boxSizing: 'border-box',
@@ -2794,8 +2804,8 @@ const potListStyles = {
   joinBtnJoined: { background: 'var(--color-success-bg)', color: 'var(--color-success)', border: '1px solid var(--color-success-border)' },
   metaRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 1 },
   slotBadge: {
-    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-dark)',
-    background: 'rgba(255,107,53,0.08)', borderRadius: 'var(--radius-full)',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-accent)',
+    background: 'var(--color-accent-bg)', borderRadius: 'var(--radius-full)',
     padding: '3px 10px', whiteSpace: 'nowrap', display: 'inline-flex', alignItems: 'center', gap: 3,
   },
   groupNameText: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
@@ -2815,10 +2825,16 @@ const styles = {
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: '#A89E93', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', flexShrink: 0 },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
-  todayBadge: { fontSize: 'var(--font-size-xs)', background: 'var(--color-primary)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
-  relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
-  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+  // 날짜 행은 날짜(700) > 상대 라벨(500) 순으로 굵기를 벌려둔다. 예전에는 800/700/700이라
+  // 셋이 같은 대역에 몰려 위계가 없었고, 굵은 획이 색 면적을 키워 색이 실제보다 무겁게 보였다.
+  dateGroup: { display: 'inline-flex', alignItems: 'baseline', gap: 6 },
+  datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
+  datePrimaryToday: { color: 'var(--color-accent)' },
+  dateSep: { fontSize: 'var(--font-size-xs)', color: 'var(--color-border)' },
+  relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
+  relLabelToday: { fontWeight: 600, color: 'var(--color-accent)' },
+  // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
+  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
@@ -2864,7 +2880,7 @@ const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   dialogIconBadge: {
-    width: 52, height: 52, borderRadius: '50%', background: 'var(--color-surface-2)', color: 'var(--color-primary)',
+    width: 52, height: 52, borderRadius: '50%', background: 'var(--color-surface-2)', color: 'var(--color-accent)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
@@ -2892,7 +2908,7 @@ const styles = {
   mainStatusCard: { display: 'flex', flexDirection: 'column', gap: 8, width: '100%', boxSizing: 'border-box', padding: '12px 16px', borderRadius: 16, background: '#fff', border: '1px solid var(--color-border)', boxShadow: '0 1px 3px rgba(0,0,0,0.04)' },
   mainStatusHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   mainStatusTitle: { fontWeight: 600, fontSize: 'var(--font-size-xs)', letterSpacing: '-0.2px', color: 'var(--color-text-muted)' },
-  duplicatePotBadge: { fontSize: 'var(--font-size-2xs)', color: '#FF6B35', background: '#FFF4EF', border: '1px solid #FFD6C0', borderRadius: 'var(--radius-full)', padding: '1px 6px', fontWeight: 700 },
+  duplicatePotBadge: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a20)', borderRadius: 'var(--radius-full)', padding: '1px 6px', fontWeight: 700 },
   mainStatusBody: { display: 'flex', alignItems: 'center', gap: 12 },
   // 아이콘 원본 png에 연한 받침 원이 같이 그려져 있어, 확대 후 원형으로 잘라내 여백을 줄이고 흰 테두리로 마무리한다.
   mainStatusIconWrap: {
@@ -2924,19 +2940,19 @@ const styles = {
   groupStatusSummary: { display: 'flex', gap: 6, marginBottom: 10 },
   groupStatusChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '3px 9px', whiteSpace: 'nowrap' },
   memberSection: { padding: '0 0 4px', marginBottom: 2, borderBottom: '1px solid #E8E3DC' },
-  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.08)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
+  memberProposeBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-text)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '3px 9px', cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit' },
   memberProposeDone: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', whiteSpace: 'nowrap' },
   memberCancelBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: 'inherit', textDecoration: 'underline' },
   memberProposeSendBtn: { ...PRIMARY_ACTION_BUTTON },
   proposeMenuInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
   groupMealList: { marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 },
-  inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.07)', border: '1px solid rgba(255,107,53,0.27)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
+  inviteBtn: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '3px 10px', cursor: 'pointer', whiteSpace: 'nowrap' },
   groupHeaderIconBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--color-bg)', border: '1px solid #E2DBD3', borderRadius: '50%', fontSize: 14, color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
   viewMenuBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--color-border)', borderRadius: '50%', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
   lowerSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', margin: '0 calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', boxShadow: '0 -1px 6px rgba(0,0,0,0.03)' },
   viewModeTabs: { display: 'flex', gap: 6 },
   viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'transparent', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s, border-color 0.15s' },
-  viewModeTabActive: { color: 'var(--color-primary)', background: 'rgba(255,107,53,0.06)', border: '1px solid var(--color-primary)', fontWeight: 700 },
+  viewModeTabActive: { color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent)', fontWeight: 700 },
   viewModeContent: { display: 'flex', flexDirection: 'column', gap: 4 },
   orderRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
   orderHandle: { fontSize: 16, color: 'var(--color-text-muted)', flexShrink: 0 },
@@ -2953,8 +2969,8 @@ const styles = {
   sheetTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   sheetMaster: {
     display: 'inline-flex', alignItems: 'center', gap: 5,
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)',
-    background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.25)',
+    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-accent)',
+    background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a12)',
     borderRadius: 'var(--radius-full)', padding: '3px 11px',
   },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '8px 0 6px' },
@@ -2967,11 +2983,11 @@ const styles = {
   },
   // 방장 전용 항목(그룹명 변경/멤버 관리/그룹 검색 허용) 아이콘 배지 — "그룹 나가기"의 danger 톤과
   // 같은 방식으로, 소제목 없이도 한눈에 방장 전용 항목임을 구분할 수 있게 한다.
-  sheetRowIconMaster: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
+  sheetRowIconMaster: { background: 'var(--color-accent-bg)', color: 'var(--color-accent)' },
   sheetRowLabel: { flex: 1, display: 'flex', alignItems: 'center', gap: 6 },
   sheetRowChevron: { fontSize: 10, color: 'var(--color-text-muted)' },
   sheetClose: { width: '100%', padding: 12, marginTop: 10, background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-base)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)' },
-  sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'rgba(255,107,53,0.1)', border: '1px solid rgba(255,107,53,0.3)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
+  sheetNicknameBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a12)', borderRadius: 'var(--radius-full)', padding: '1px 7px' },
   sheetMemberRow: { display: 'flex', alignItems: 'center', gap: 8, padding: '6px 0' },
   sheetMemberName: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 600 },
   sheetRemoveBtn: { flexShrink: 0, padding: '5px 12px', background: 'none', border: '1px solid var(--color-danger-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-danger)', cursor: 'pointer' },
@@ -2982,7 +2998,7 @@ const styles = {
 
   searchToggleRow: { display: 'flex', width: '100%', gap: 6 },
   searchToggleBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', background: 'var(--color-bg)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  searchToggleBtnActive: { border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)', color: 'var(--color-primary)', fontWeight: 700 },
+  searchToggleBtnActive: { border: '2px solid var(--color-accent)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)', fontWeight: 700 },
   searchPasswordRow: { width: '100%', display: 'flex', alignItems: 'center', gap: 6 },
   searchPasswordInput: { flex: 1, minWidth: 0, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
   searchPasswordSaveBtn: { flexShrink: 0, padding: '10px 14px', border: 'none', borderRadius: 'var(--radius-md)', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', fontFamily: 'inherit' },
@@ -2991,7 +3007,7 @@ const styles = {
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },
   shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  shareTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'rgba(255,107,53,0.09)', color: 'var(--color-primary)' },
+  shareTabBtnActive: { border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)' },
   shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60, maxHeight: '40vh', overflowY: 'auto' },
   shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
@@ -3006,7 +3022,7 @@ const styles = {
   inviteCodeBox: { display: 'flex', alignItems: 'center', gap: 8, background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)', padding: '6px 10px', border: '1px solid var(--color-border)' },
   inviteCode: { flex: 1, fontSize: 'var(--font-size-base)', fontWeight: 800, letterSpacing: 2, color: 'var(--color-text)', wordBreak: 'break-all' },
   inviteCopyBtn: { flexShrink: 0, padding: '4px 10px', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer', transition: 'background 0.2s' },
-  activityDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--color-primary)' },
+  activityDot: { width: 8, height: 8, borderRadius: '50%', background: 'var(--color-accent)' },
   memberList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)' },
   memberRow: { display: 'flex', alignItems: 'center', gap: 8 },
   avatar: { width: 28, height: 28, borderRadius: '50%', color: '#fff', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
@@ -3018,7 +3034,7 @@ const styles = {
   memberStatusEmpty: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   potsArea: { padding: '10px var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 8 },
   potsLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
-  createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
+  createBtn: { width: '100%', padding: 12, background: 'none', border: 'none', borderTop: '1px solid var(--color-border)', color: 'var(--color-primary-text)', fontWeight: 700, fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
   fabWrap: {
     position: 'fixed', bottom: 'calc(72px + var(--safe-area-inset-bottom))', left: '50%', transform: 'translateX(-50%)',
     width: '100%', maxWidth: 'var(--max-width)', zIndex: 90, pointerEvents: 'none',
