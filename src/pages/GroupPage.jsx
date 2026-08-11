@@ -18,7 +18,7 @@ import { MoreHorizontalIcon } from '../components/GroupIcons'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { avatarColor } from '../lib/avatarColor'
-import { getRelativeLabel, REL_TONE_FILL } from '../lib/relativeDay'
+import { getRelativeLabel, REL_TONE_FILL, REL_TONE_TEXT } from '../lib/relativeDay'
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -461,7 +461,7 @@ export default function GroupPage() {
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          <span style={relLabel.tone ? { ...styles.relBadge, background: REL_TONE_FILL[relLabel.tone] } : styles.relLabel}>{relLabel.label}</span>
+          <span style={{ ...styles.relBadge, background: REL_TONE_FILL[relLabel.tone], color: REL_TONE_TEXT[relLabel.tone] }}>{relLabel.label}</span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -920,11 +920,10 @@ const styles = {
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(500~600).
+  // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(600).
   datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
-  relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
-  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
-  // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
+  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px' },
+  // 배경·글자색은 relativeDay의 REL_TONE_FILL/REL_TONE_TEXT가 날짜에 따라 인라인으로 넣어준다.
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
   body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },

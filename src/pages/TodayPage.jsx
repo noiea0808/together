@@ -21,7 +21,7 @@ import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCar
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
 import { SLOT_THEME, SLOT_CHIP_COLOR } from '../lib/slotTheme'
 import { avatarColor } from '../lib/avatarColor'
-import { getRelativeLabel, REL_TONE_FILL } from '../lib/relativeDay'
+import { getRelativeLabel, REL_TONE_FILL, REL_TONE_TEXT } from '../lib/relativeDay'
 
 // 받침 유무에 따라 은/는을 골라 단어에 붙인다 (한글 유니코드 완성형 범위에서 종성 코드로 판별).
 function withEunNeun(word) {
@@ -827,7 +827,7 @@ export default function TodayPage() {
         </button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          <span style={relInfo.tone ? { ...styles.relBadge, background: REL_TONE_FILL[relInfo.tone] } : styles.relLabel}>{relInfo.label}</span>
+          <span style={{ ...styles.relBadge, background: REL_TONE_FILL[relInfo.tone], color: REL_TONE_TEXT[relInfo.tone] }}>{relInfo.label}</span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -2786,12 +2786,11 @@ const styles = {
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', boxShadow: '0 1px 2px rgba(0,0,0,0.05)', flexShrink: 0 },
   settingBtn: { background: 'none', border: 'none', fontSize: 20, cursor: 'pointer', padding: '4px 8px' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  // 날짜 행은 날짜(700) > 상대 라벨(500~600) 순으로 굵기를 벌려둔다. 예전에는 800/700/700이라
+  // 날짜 행은 날짜(700) > 상대 라벨(600) 순으로 굵기를 벌려둔다. 예전에는 800/700/700이라
   // 셋이 같은 대역에 몰려 위계가 없었고, 굵은 획이 색 면적을 키워 색이 실제보다 무겁게 보였다.
   datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
-  relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
-  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
-  // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
+  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px' },
+  // 배경·글자색은 relativeDay의 REL_TONE_FILL/REL_TONE_TEXT가 날짜에 따라 인라인으로 넣어준다.
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
   myStatusSection: { display: 'flex', flexDirection: 'column', gap: 6, margin: 'calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: '#EFE6D6' },
   slotResetBtn: { marginLeft: 3, fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', opacity: 0.6, lineHeight: 1 },
@@ -2909,7 +2908,7 @@ const styles = {
   viewMenuBtn: { width: 28, height: 28, flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'none', border: '1px solid var(--color-border)', borderRadius: '50%', color: 'var(--color-text-muted)', cursor: 'pointer', padding: 0, boxSizing: 'border-box' },
   lowerSection: { display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', margin: '0 calc(-1 * var(--spacing-md))', padding: 'var(--spacing-md)', background: 'var(--color-surface)', borderTop: '1px solid var(--color-border)', boxShadow: '0 -1px 6px rgba(0,0,0,0.03)' },
   viewModeTabs: { display: 'flex', gap: 6 },
-  viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s' },
+  viewModeTab: { flex: 1, padding: '6px 0', fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', cursor: 'pointer', fontFamily: 'inherit', transition: 'background 0.15s, color 0.15s' },
   viewModeTabActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
   viewModeContent: { display: 'flex', flexDirection: 'column', gap: 4 },
   orderRow: { display: 'flex', alignItems: 'center', gap: 10, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1px solid var(--color-border)' },
