@@ -50,5 +50,5 @@ const S = {
     background: 'var(--color-surface)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
     flexShrink: 0,
   },
-  btnActive: { border: '2px solid var(--color-accent)' },
+  btnActive: { border: '2px solid var(--color-primary)' },
 }

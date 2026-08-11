@@ -24,11 +24,16 @@
 
 /* ===== 디자인 토큰 ===== */
 :root {
-  /* 색은 역할로 나눠 쓴다. 예전에는 --color-primary 하나가 CTA·배지·칩·탭·아이콘·테두리를
-     전부 겸해서(29개 파일 145곳) 화면에 강조가 너무 많아 오히려 아무것도 강조되지 않았다.
-       주황  = "누르면 뭔가 일어난다" — 화면당 주요 CTA 하나 + 작은 액션 글자
-       네이비 = "지금 이것" / "그냥 사실" — 선택·활성 상태, 제목, 정적 배지
-     새 화면을 만들 때도 이 구분을 기준으로 고르면 된다. */
+  /* 화면에서 채도 있는 색은 주황 하나뿐이다. 나머지는 전부 무채색 — 크림 배경의
+     따뜻한 회색 계열로 간다.
+       주황   = "누르면 뭔가 일어난다" — 화면당 주요 CTA 하나 + 작은 액션 글자
+       다크   = "지금 이것" — 선택·활성 상태. 채움(다크 배경 + 흰 글자)으로 표현한다
+       연회색 = "그냥 사실" — 누를 수 없는 정적 배지, 부가 정보
+     예전에는 보조 강조로 네이비(#35617A)를 뒀는데, 선택 상태를 전부 그 색이 맡으면서
+     188곳까지 번졌다. 화면당 파란 면적이 주황보다 커져 브랜드색이 뭔지 흐려졌고,
+     같은 파랑이 "선택됨"과 --color-info "안내" 두 뜻을 겸해 색이 정보를 잃었다.
+     선택 상태를 무채색으로 내리면 주황이 화면에서 유일한 채도가 되어 저절로 도드라진다.
+     새 화면에서도 "이 색이 꼭 채도를 가져야 하나"를 먼저 물어보고 고르면 된다. */
   --color-primary: #FF6B35;
   --color-primary-light: #FF8C5A;
   --color-primary-dark: #E05520;
@@ -44,20 +49,19 @@
   --color-primary-a20: rgba(255, 107, 53, 0.20);
   --color-primary-a27: rgba(255, 107, 53, 0.27);
 
-  /* 보조 강조 — 크림 배경 위에서 유일하게 차가운 색이라, 온도 대비로 눈에 띈다.
-     명도 34%·채도 39%로, 이보다 더 어둡게 잡으면 안 된다: 이 색이 실제로 쓰이는 자리는
-     26px 아바타, 11px 배지 글자, 1.5px 테두리처럼 면적이 작아서, 명도가 25% 아래로 내려가면
-     색조가 안 읽히고 그냥 검정으로 보인다(그러면 온도 대비라는 도입 목적 자체가 사라진다).
-     넓은 면적을 채우는 브랜드들이 훨씬 어두운 네이비를 쓰는 건 면적이 색조를 살려주기 때문.
-     --color-info(#2563EB)와는 색상이 19도 떨어진 데다 채도 39 대 83, 명도 34 대 53으로
-     갈려서 "탁한 청록빛 네이비"와 "쨍한 파랑"으로 구분된다. 흰 배경 대비 6.7:1. */
-  --color-accent: #35617A;
-  --color-accent-dark: #2C5266;
-  /* 클릭할 수 없는 정적 표시(방장 배지 등)의 배경. 글자는 --color-accent를 쓴다. */
-  --color-accent-bg: #E7EFF3;
-  --color-accent-a08: rgba(53, 97, 122, 0.08);
-  --color-accent-a12: rgba(53, 97, 122, 0.12);
-  --color-accent-a20: rgba(53, 97, 122, 0.20);
+  /* 선택·활성 상태의 채움색. 글자는 --color-on-selected(흰색)를 얹는다.
+     "연한 배경 + 같은 색 어두운 글자"가 아니라 채움으로 가는 이유: 연한 배경 방식은
+     선택/미선택 차이가 배경 명도 한 단뿐이라 칩이 여러 개 늘어선 줄에서 뭐가 켜졌는지
+     한눈에 안 들어왔다. 채움은 명도 차가 커서 훑는 것만으로 읽힌다. */
+  --color-selected: #46403A;
+  --color-on-selected: #FFFFFF;
+  /* 누를 수 없는 정적 표시(방장 배지, 그룹 태그 등). 채움이 아니라 연한 회색이라
+     "이건 상태가 아니라 그냥 라벨"이라는 게 형태로 구분된다. */
+  --color-chip-bg: #F5F1EA;
+  --color-chip-text: #4A443F;
+  --color-selected-a08: rgba(70, 64, 58, 0.06);
+  --color-selected-a12: rgba(70, 64, 58, 0.10);
+  --color-selected-a20: rgba(70, 64, 58, 0.16);
 
   --color-bg: #FAF8F5;
   --color-surface: #FFFFFF;
@@ -69,11 +73,6 @@
   --color-text-muted: #6F6862;
   /* 테두리는 한 단 연하게 — 얇은 선이 진하면 화면이 칸으로 잘게 쪼개져 보인다. */
   --color-border: #E4E0DA;
-
-  --color-status-lunch: #3DBB5C;
-  --color-status-dinner: #1E88E5;
-  --color-status-coffee: #FB8C00;
-  --color-status-pass: #A8A29B;
 
   --color-success: #4CAF50;
   --color-success-bg: #E8F5E9;
@@ -270,7 +269,7 @@ img {
 }
 
 .input:focus {
-  border-color: var(--color-accent);
+  border-color: var(--color-selected);
 }
 
 input::placeholder,
@@ -283,7 +282,7 @@ textarea::placeholder {
 .text-center { text-align: center; }
 
 button:focus-visible, [role="button"]:focus-visible, a:focus-visible {
-  outline: 2px solid var(--color-accent);
+  outline: 2px solid var(--color-selected);
   outline-offset: 2px;
 }
 
@@ -380,7 +379,7 @@ button:not(:disabled):active, [role="button"]:active {
   transition: background 0.12s ease, transform 0.08s ease;
   -webkit-tap-highlight-color: transparent;
 }
-.app-header-icon-btn:active { background: var(--color-accent-a08); transform: scale(0.92); }
+.app-header-icon-btn:active { background: var(--color-selected-a08); transform: scale(0.92); }
 .app-header-icon-btn__dot {
   position: absolute;
   top: 9px;
@@ -450,7 +449,7 @@ button:not(:disabled):active, [role="button"]:active {
 }
 /* 선택된 옵션은 색 틴트 없이 흰 배경만으로 "올라와 있음"을 표현한다 — 트랙이
    surface-2라 흰색만으로도 충분히 대비되고, 색을 아껴 CTA에 남겨둘 수 있다. */
-.app-header-segmented__option.is-active { color: var(--color-accent); background: var(--color-surface); }
+.app-header-segmented__option.is-active { color: var(--color-selected); background: var(--color-surface); }
 .app-header-segmented__option:active { transform: scale(0.96); }
 .app-header-segmented__dot {
   position: absolute;

@@ -138,9 +138,9 @@ export default function MySchedulePage() {
           const isWeekend = dow === 0 || dow === 6
           const showMonth = idx === 0 || date.getDate() === 1
 
-          const dayColor = isToday ? 'var(--color-accent)' : isWeekend ? '#E53935' : isPast ? 'var(--color-text-muted)' : '#1A1A1A'
-          const cardBg = isToday ? 'var(--color-accent-bg)' : '#FFFFFF'
-          const cardBorder = isToday ? 'var(--color-accent-a20)' : '#EDE8E3'
+          const dayColor = isToday ? 'var(--color-primary-text)' : isWeekend ? '#E53935' : isPast ? 'var(--color-text-muted)' : '#1A1A1A'
+          const cardBg = isToday ? 'var(--color-primary-a05)' : '#FFFFFF'
+          const cardBorder = isToday ? 'var(--color-primary)' : '#EDE8E3'
 
           const chips = SLOT_ORDER
             .filter(slot => dayStatuses[slot])
@@ -206,6 +206,6 @@ const S = {
 
   chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', minWidth: 0 },
   noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
-  todayBadge: { background: 'var(--color-accent)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
+  todayBadge: { background: 'var(--color-selected)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
   goIcon: { color: '#ADA59B', fontSize: 'var(--font-size-base)', fontWeight: 700, flexShrink: 0 },
 }

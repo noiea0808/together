@@ -26,12 +26,12 @@ const EVENT_META = {
   kicked: { label: '내보내짐', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
   update: { label: '수정', color: 'var(--color-info)', bg: 'var(--color-info-bg)', border: 'var(--color-info-border)' },
   comment: { label: '코멘트', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  invite: { label: '초대', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
-  invite_new: { label: '제안', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
+  invite: { label: '초대', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
+  invite_new: { label: '제안', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
   invite_declined: { label: '거절', color: 'var(--color-danger)', bg: 'var(--color-danger-bg)', border: 'var(--color-danger-border)' },
-  wish_like: { label: '하트', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
+  wish_like: { label: '하트', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
   wish_comment: { label: '댓글', color: 'var(--color-text-muted)', bg: '#F5F0EB', border: '#EDE8E3' },
-  friend_request: { label: '친구 요청', color: 'var(--color-accent)', bg: 'var(--color-accent-bg)', border: 'var(--color-accent-a20)' },
+  friend_request: { label: '친구 요청', color: 'var(--color-chip-text)', bg: 'var(--color-chip-bg)', border: 'var(--color-selected-a20)' },
   friend_accepted: { label: '친구', color: 'var(--color-success)', bg: 'var(--color-success-bg)', border: 'var(--color-success-border)' },
 }
 
@@ -447,11 +447,11 @@ const S = {
 
   categoryTabRow: { display: 'flex', gap: 6, padding: '10px 16px 0', overflowX: 'auto', WebkitOverflowScrolling: 'touch', flexShrink: 0 },
   categoryTab: {
-    flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)',
-    background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)',
+    flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)',
+    background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)',
     padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap',
   },
-  categoryTabActive: { color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent)' },
+  categoryTabActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
 
   list: { flex: 1, overflowY: 'auto', padding: '10px 16px', display: 'flex', flexDirection: 'column', gap: 8, paddingBottom: 'calc(40px + var(--safe-area-inset-bottom))' },
   empty: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
@@ -462,13 +462,13 @@ const S = {
     display: 'flex', gap: 8, padding: '12px 14px', background: 'var(--color-surface)',
     border: '1.5px solid var(--color-border)', borderRadius: 14, cursor: 'pointer',
   },
-  itemUnread: { background: 'var(--color-accent-bg)', border: '1.5px solid var(--color-accent-a20)' },
+  itemUnread: { background: 'var(--color-chip-bg)', border: '1.5px solid var(--color-selected-a20)' },
   itemBody: { flex: 1, minWidth: 0 },
   itemTopRow: { display: 'flex', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 },
   itemTitleRow: { display: 'flex', alignItems: 'center', gap: 6, minWidth: 0 },
   // 채운 배지(newBadge)는 흰 글자를 색 위에 얹으므로 600까지만 낮춘다. 반대로 eventBadge는
   // 연한 배경 위의 색 글자라, 굵으면 번져 보여서 500으로 둔다.
-  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
+  newBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-selected)', borderRadius: 'var(--radius-full)', padding: '1px 7px', flexShrink: 0, whiteSpace: 'nowrap' },
   eventBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, borderRadius: 'var(--radius-full)', padding: '1px 8px', flexShrink: 0, whiteSpace: 'nowrap' },
   itemTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   itemTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', flexShrink: 0, whiteSpace: 'nowrap' },
@@ -491,7 +491,7 @@ const S = {
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 
   declineChipRow: { display: 'flex', flexWrap: 'wrap', gap: 6, justifyContent: 'center' },
-  declineChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  declineChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  declineChipActive: { fontSize: 'var(--font-size-2xs)', fontWeight: 400, color: 'var(--color-on-selected)', background: 'var(--color-selected)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 10px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
   declineInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 }

@@ -157,7 +157,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     color: '#fff', fontSize: 12, fontWeight: 800,
   },
-  checkboxOn: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)' },
+  checkboxOn: { background: 'var(--color-selected)', borderColor: 'var(--color-selected)' },
   viewBtn: {
     flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
     fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)',

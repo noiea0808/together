@@ -345,7 +345,7 @@ const S = {
   potCard: { position: 'relative', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 16, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 },
   potHeaderText: { minWidth: 0, cursor: 'pointer', paddingRight: 68 },
   groupTitleRow: { display: 'flex', alignItems: 'baseline', gap: 6, minWidth: 0 },
-  groupLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-accent)', flexShrink: 0 },
+  groupLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-chip-text)', flexShrink: 0 },
   potTitle: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' },
   scopeChip: {
     position: 'absolute', top: 12, right: 12, flexShrink: 0, padding: '2px 7px', borderRadius: 'var(--radius-full)',

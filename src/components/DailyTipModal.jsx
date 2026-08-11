@@ -282,7 +282,7 @@ const styles = {
     flex: 1, padding: '8px 10px', background: 'none', border: 'none', borderRadius: 'var(--radius-full)',
     fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', cursor: 'pointer',
   },
-  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-accent)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-selected)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
   // alignItems: center — 기본값(stretch)이면 모든 카드가 가장 큰 카드 높이로 늘어나 카드별
   // 실제 높이를 잴 수 없다. 그렇다고 늘리진 않되, 바깥 래퍼의 minHeight로 바닥을 깔아둔 상태
   // (글자 한두 줄짜리 짧은 카드)에서 내용이 위쪽에 붙지 않고 가운데에 오도록 center로 정렬한다.
@@ -299,7 +299,7 @@ const styles = {
   body: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0, padding: '0 var(--spacing-lg)' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5 },
   dot: { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-border)' },
-  dotActive: { background: 'var(--color-accent)' },
+  dotActive: { background: 'var(--color-selected)' },
   btnRow: { width: '100%', display: 'flex', gap: 8, padding: '0 var(--spacing-lg)' },
   closeBtn: {
     flex: 1, padding: 11, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff',

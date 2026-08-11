@@ -654,7 +654,7 @@ export default function MyAccountPage() {
           {/* 홈 화면 설치 — 닉네임 카드 바로 아래, 페이지 스크롤을 따라가는 일반 위치.
               설치/바로가기가 이미 돼 있으면 컴포넌트 안에서 알아서 "설치됨" 배지로 바뀐다.
               settingsGroup의 기본 gap 절반만큼 끌어올려 바로 위 카드와의 간격만 좁힌다. */}
-          <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
+          <InstallAppPrompt variant="subtle" hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
 
           {/* 사용 슬롯 설정 — 메인 화면 서브탭에 보여줄 슬롯을 고른다. 카드를 뒤집어 사용/미사용을
               표시하며, 오늘 이후로만 적용되고 지난 날짜 기록은 그대로 보인다. */}
@@ -1115,7 +1115,7 @@ const styles = {
     borderRadius: 'var(--radius-lg)', cursor: 'pointer',
   },
   avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
-  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-accent)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   avatarImg: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', display: 'block' },
   avatarEditBadge: {
     position: 'absolute', bottom: -2, right: -2, width: 19, height: 19, borderRadius: '50%',
@@ -1156,10 +1156,10 @@ const styles = {
   slotCardInner: { position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transition: 'transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1)' },
   // 뒷면은 애초에 180deg 돌려둔 채로 배치 — inner 전체가 뒤집히면 자연스럽게 정면을 보게 된다.
   slotCardFace: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '0 2px', boxSizing: 'border-box', borderRadius: 12, overflow: 'hidden', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' },
-  slotCardFront: { background: 'var(--color-surface)', border: '1.5px solid var(--color-accent)' },
+  slotCardFront: { background: 'var(--color-primary-a05)', border: '1.5px solid var(--color-primary)' },
   slotCardBack: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', transform: 'rotateY(180deg)' },
   slotCardLabel: { fontSize: 9.5, fontWeight: 700, color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.15 },
-  slotCardBadgeOn: { fontSize: 8.5, fontWeight: 700, color: 'var(--color-accent)' },
+  slotCardBadgeOn: { fontSize: 8.5, fontWeight: 700, color: 'var(--color-primary-text)' },
   slotCardBadgeOff: { fontSize: 8.5, fontWeight: 600, color: 'var(--color-text-muted)' },
 
   toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
@@ -1193,8 +1193,8 @@ const styles = {
   withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 
   tabs: { display: 'flex', gap: 6, padding: '10px var(--spacing-md) 0', flexShrink: 0 },
-  tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  tabBtnActive: { border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)' },
+  tabBtn: { flex: 1, padding: '9px 0', border: 'none', borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)', fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  tabBtnActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
 
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
@@ -1210,8 +1210,8 @@ const styles = {
   wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2, marginBottom: 14 },
   wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-accent-bg)', color: 'var(--color-accent)', border: '1px solid var(--color-accent)' },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   wishCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
   wishScopeBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
@@ -1241,7 +1241,7 @@ const styles = {
   wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-accent)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },

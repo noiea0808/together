@@ -170,7 +170,7 @@ const styles = {
   footer: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-md) var(--spacing-lg) var(--spacing-lg)' },
   dots: { display: 'flex', gap: 6 },
   dot: { width: 6, height: 6, borderRadius: '50%', background: 'var(--color-border)', transition: 'all 0.7s cubic-bezier(0.16, 1, 0.3, 1)' },
-  dotActive: { background: 'var(--color-accent)', width: 16 },
+  dotActive: { background: 'var(--color-selected)', width: 16 },
   buttonsRow: { display: 'flex', gap: 8, width: 'min(78vw, calc(var(--max-width) * 0.78))' },
   backBtn: {
     flex: 1, padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)',

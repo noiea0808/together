@@ -63,7 +63,7 @@ export function PeopleIcon({ active }) {
 }
 
 export function UserIcon({ active }) {
-  const borderStyle = { border: `2px solid ${active ? 'var(--color-accent)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
+  const borderStyle = { border: `2px solid ${active ? 'var(--color-selected)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
   return active ? (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style={borderStyle}>
       <circle cx="12" cy="7.5" r="4.3" />
@@ -105,7 +105,7 @@ export default function BottomNav() {
         return (
           <button
             key={path}
-            style={{ ...styles.tab, color: active ? 'var(--color-accent)' : 'var(--color-text-muted)' }}
+            style={{ ...styles.tab, color: active ? 'var(--color-selected)' : 'var(--color-text-muted)' }}
             onClick={() => navigate(path)}
             aria-label={label}
           >
@@ -114,10 +114,10 @@ export default function BottomNav() {
                 <img
                   src={user.avatar_url}
                   alt=""
-                  style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-accent)' : '2px solid transparent' }}
+                  style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-selected)' : '2px solid transparent' }}
                 />
               ) : path === '/account' && user?.nickname ? (
-                <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-accent)' : '2px solid var(--color-border)' }}>
+                <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-selected)' : '2px solid var(--color-border)' }}>
                   {user.nickname[0]}
                 </div>
               ) : (
@@ -161,7 +161,7 @@ const styles = {
   avatarInitial: {
     width: 40, height: 40, borderRadius: '50%', boxSizing: 'border-box',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'var(--color-accent)', color: 'white',
+    background: 'var(--color-selected)', color: 'white',
     fontSize: 'var(--font-size-sm)', fontWeight: 800,
   },
 }

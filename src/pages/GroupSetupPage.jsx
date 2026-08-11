@@ -275,14 +275,14 @@ const styles = {
   tabs: { display: 'flex', width: '100%', gap: 8 },
   tab: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-    padding: '10px 0', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
-    fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer',
+    padding: '10px 0', border: 'none',
+    borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)',
+    fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer',
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)',
-    color: 'var(--color-accent)',
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   card: {
     width: '100%', background: 'var(--color-surface)',

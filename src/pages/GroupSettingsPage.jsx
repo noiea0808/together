@@ -579,14 +579,14 @@ const S = {
     border: 'none', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600,
     fontFamily: 'inherit', whiteSpace: 'nowrap', textAlign: 'left',
   },
-  pickerItemActive: { color: 'var(--color-accent)', fontWeight: 800, background: 'var(--color-accent-bg)' },
+  pickerItemActive: { color: 'var(--color-selected)', fontWeight: 800, background: 'var(--color-chip-bg)' },
   heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
   heroIcon: {
     width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
     background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
-  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 700, marginTop: 2 },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 700, marginTop: 2 },
   heroEditBadge: {
     width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
     background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
@@ -608,16 +608,16 @@ const S = {
   editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 7 },
   editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   editChip: {
-    padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
+  editChipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
 
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
   editStepperNum: {
     fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
-    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-accent)', color: 'var(--color-accent)',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-selected)', color: 'var(--color-selected)',
   },
   editSectionInput: {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
@@ -632,10 +632,10 @@ const S = {
 
   chipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   chip: {
-    padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  chipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
+  chipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
 
   sectionInput: {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',

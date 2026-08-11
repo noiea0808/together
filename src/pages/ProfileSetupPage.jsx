@@ -253,13 +253,13 @@ const styles = {
   birthMask: { flexShrink: 0, color: 'var(--color-text-muted)', letterSpacing: 2, fontSize: 'var(--font-size-sm)' },
   chipRow: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 },
   chip: {
-    padding: '8px 14px', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
+    padding: '8px 14px', border: 'none',
+    borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)',
     fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--color-text-muted)',
   },
   chipActive: {
-    borderColor: 'var(--color-accent)', background: 'var(--color-accent-bg)',
-    color: 'var(--color-accent)', fontWeight: 700,
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   terms: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 'var(--spacing-md)' },
   agreeAll: {
@@ -284,7 +284,7 @@ const styles = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
     color: '#fff', fontSize: 12, fontWeight: 800,
   },
-  checkboxOn: { background: 'var(--color-accent)', borderColor: 'var(--color-accent)' },
+  checkboxOn: { background: 'var(--color-selected)', borderColor: 'var(--color-selected)' },
   viewBtn: {
     flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
     fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)',

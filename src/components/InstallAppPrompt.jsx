@@ -219,7 +219,7 @@ export default function InstallAppPrompt({ style, variant = 'default', hideDesc 
 const styles = {
   wrap: { display: 'flex', flexDirection: 'column', gap: 6 },
   installBtn: { ...PRIMARY_ACTION_BUTTON, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 },
-  installBtnSubtle: { padding: '9px 14px', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', fontSize: 'var(--font-size-xs)', fontWeight: 600, boxShadow: 'none' },
+  installBtnSubtle: { padding: '7.5px 12.5px', background: 'var(--color-surface)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600, boxShadow: 'none' },
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   installedBadge: { textAlign: 'center', fontSize: 'var(--font-size-xs)', color: 'var(--color-success)', fontWeight: 700, padding: 8 },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
@@ -229,8 +229,8 @@ const styles = {
   guideHeader: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 'var(--spacing-lg)' },
   guideHeaderIcon: {
     width: 48, height: 48, borderRadius: 'var(--radius-full)',
-    background: 'var(--color-accent-bg)',
-    border: '1px solid var(--color-accent-a20)',
+    background: 'var(--color-chip-bg)',
+    border: '1px solid var(--color-selected-a20)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   guideHeaderTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', letterSpacing: '-0.3px' },
@@ -242,10 +242,10 @@ const styles = {
     color: 'var(--color-text-muted)', fontWeight: 700, fontSize: 'var(--font-size-xs)',
     cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.2s ease',
   },
-  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-accent)', boxShadow: 'var(--shadow-sm)' },
+  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-selected)', boxShadow: 'var(--shadow-sm)' },
   guideIntro: {
-    fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 600, lineHeight: 1.5,
-    background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)',
+    fontSize: 'var(--font-size-xs)', color: 'var(--color-chip-text)', fontWeight: 600, lineHeight: 1.5,
+    background: 'var(--color-chip-bg)', border: '1px solid var(--color-selected-a20)',
     borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', margin: '0 0 var(--spacing-lg)',
   },
   guideDivider: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', margin: '0 0 var(--spacing-md)' },

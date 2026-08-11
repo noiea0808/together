@@ -841,7 +841,7 @@ export default function PotDetailPage() {
                   <div style={{ position: 'relative' }}>
                     <div style={{
                       ...S.memberCircle,
-                      background: member ? (isMe ? 'var(--color-accent)' : '#C7BFB6') : '#F5F0EB',
+                      background: member ? (isMe ? 'var(--color-selected)' : '#C7BFB6') : '#F5F0EB',
                       border: member ? 'none' : '2px dashed #C7BFB6',
                       padding: 0, overflow: 'hidden',
                     }}>
@@ -1168,7 +1168,7 @@ const S = {
     background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
   },
   heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 900, color: 'var(--color-text)', letterSpacing: '-0.5px' },
-  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 700, marginTop: 2 },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 700, marginTop: 2 },
   heroEditBadge: {
     width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
     background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
@@ -1191,11 +1191,11 @@ const S = {
   momentScopeLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', flexShrink: 0 },
   momentScopeChips: { display: 'flex', gap: 5 },
   momentScopeChip: {
-    padding: '4px 9px', background: 'rgba(255,255,255,0.7)', border: '1px solid transparent',
+    padding: '4px 9px', background: 'rgba(255,255,255,0.7)', border: 'none',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 600,
     color: 'var(--color-text-muted)', fontFamily: 'inherit',
   },
-  momentScopeChipActive: { background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
+  momentScopeChipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
 
   /* Edit sections (matches '밥팟 열기' style) */
   editSections: { display: 'flex', flexDirection: 'column', gap: 6 },
@@ -1205,16 +1205,16 @@ const S = {
 
   editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   editChip: {
-    padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  editChipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-accent)', fontWeight: 700, color: 'var(--color-accent)' },
+  editChipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
 
   editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
   editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
   editStepperNum: {
     fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
-    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-accent)', color: 'var(--color-accent)',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-selected)', color: 'var(--color-selected)',
   },
 
   editDetailsRow: { display: 'flex', gap: 6 },
@@ -1305,7 +1305,7 @@ const S = {
   shareDialog: { width: '100%', maxWidth: 360, maxHeight: '80vh', overflowY: 'auto', background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)' },
   shareTabs: { display: 'flex', width: '100%', gap: 6 },
   shareTabBtn: { flex: 1, padding: '8px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  shareTabBtnActive: { border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)' },
+  shareTabBtnActive: { border: '1.5px solid var(--color-selected)', background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   shareFriendList: { display: 'flex', flexDirection: 'column', gap: 8, minHeight: 60 },
   shareFriendRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, padding: '10px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   shareFriendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },

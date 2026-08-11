@@ -931,7 +931,7 @@ const styles = {
   // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(500~600).
   datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   relLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-text-muted)' },
-  relBadgeToday: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', background: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
+  relBadgeToday: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: '#fff', background: 'var(--color-selected)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   // 배경·글자색은 getRelativeLabel이 날짜에 따라 인라인으로 넣어준다.
   todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-primary-text)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
@@ -944,8 +944,8 @@ const styles = {
   // 배경(--color-surface-2)이 페이지 배경(--color-bg)과 명도 차가 거의 없어(약 1.1:1) 채움색이
   // 사실상 안 보이고 얇은 테두리+흐린 글자만 남아 칩이 있는지도 모를 만큼 흐릿해진다. 흰 배경(--color-surface)과
   // 진한 글자색으로 바꿔 대비를 WCAG 기준(4.5:1) 위로 끌어올린다.
-  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)', background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  friendGroupFilterChipActive: { color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent)' },
+  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  friendGroupFilterChipActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
 
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)' },
 
@@ -964,7 +964,7 @@ const styles = {
   groupNameRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   groupNameText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 500 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
-  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 500 },
+  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-chip-text)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 500 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   friendRequestBtn: {
     flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-primary-text)',
@@ -994,8 +994,8 @@ const styles = {
   sheetName: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
   sheetTabs: { display: 'flex', gap: 6, marginBottom: 12 },
-  sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  sheetTabBtnActive: { border: '1.5px solid var(--color-accent)', background: 'var(--color-accent-bg)', color: 'var(--color-accent)' },
+  sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: 'none', borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)', fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  sheetTabBtnActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   sheetTabDot: { position: 'absolute', top: 6, right: 10, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)' },
   sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
   friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
@@ -1004,13 +1004,13 @@ const styles = {
   friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
   friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
   wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
-  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
-  wishLikeBtnActive: { color: 'var(--color-accent)', background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)' },
+  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishLikeBtnActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
   wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
   wishCommentsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8 },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-accent)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
   wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
@@ -1034,7 +1034,7 @@ const styles = {
   },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
-  statusCellSelected: { background: 'var(--color-accent-bg)', border: '1.5px solid var(--color-accent)' },
+  statusCellSelected: { background: 'var(--color-chip-bg)', border: '1.5px solid var(--color-selected)' },
   statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 },
   slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0 },
   statusCellRight: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
@@ -1047,8 +1047,8 @@ const styles = {
 
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
   proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },
-  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-accent-bg)', color: 'var(--color-accent)', border: '1px solid var(--color-accent)' },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   proposeInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },

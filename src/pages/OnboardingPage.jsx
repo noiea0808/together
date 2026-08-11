@@ -350,14 +350,14 @@ const styles = {
   tabs: { display: 'flex', gap: 8, flex: 1 },
   tab: {
     flex: 1, padding: '10px 0',
-    border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
-    fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer',
+    border: 'none',
+    borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)',
+    fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer',
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    borderColor: 'var(--color-accent)', background: 'var(--color-accent-bg)',
-    color: 'var(--color-accent)',
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
   label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
@@ -379,5 +379,5 @@ const styles = {
     width: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
     paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)',
   },
-  inviteBanner: { background: 'var(--color-accent-bg)', border: '1px solid var(--color-accent-a20)', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-accent)', fontWeight: 600, lineHeight: 1.5 },
+  inviteBanner: { background: 'var(--color-chip-bg)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-md)', padding: '10px var(--spacing-md)', fontSize: 'var(--font-size-xs)', color: 'var(--color-chip-text)', fontWeight: 600, lineHeight: 1.5 },
 }
