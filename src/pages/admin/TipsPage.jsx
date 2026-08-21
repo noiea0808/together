@@ -51,7 +51,11 @@ export default function TipsPage() {
     try {
       let image_url = editing.image_url ?? null
       if (editing._newImageFile) {
-        const blob = await resizeImageFile(editing._newImageFile)
+        // 팁/시작하기 이미지는 대부분 UI 스샷 — 글자가 읽혀야 해서 사진보다 후하게 잡는다.
+        // 모달 폭이 최대 380px이라 3배 화면 기준 1140px은 있어야 늘어나 보이지 않는다.
+        const blob = await resizeImageFile(editing._newImageFile, {
+          maxWidth: 1280, maxHeight: 2560, quality: 0.95,
+        })
         image_url = await uploadDailyTipImage(blob)
       }
       const payload = {
@@ -155,7 +159,7 @@ export default function TipsPage() {
                     {t.is_active ? 'ON' : 'OFF'}
                   </button>
                 </td>
-                <td style={{ ...s.td, maxWidth: 360, cursor: 'pointer' }} onClick={() => openEdit(t)}>{truncate(t.content, 60)}</td>
+                <td style={{ ...s.td, maxWidth: 360, cursor: 'pointer', whiteSpace: 'pre-line' }} onClick={() => openEdit(t)}>{truncate(t.content, 60)}</td>
                 <td style={s.td}>
                   {t.image_url ? <img src={t.image_url} alt="" style={s.thumb} /> : <div style={s.thumbEmpty}>—</div>}
                 </td>
@@ -239,28 +243,28 @@ export default function TipsPage() {
 
 const s = {
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 },
-  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  title: { fontSize: 22, fontWeight: 700, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 540, lineHeight: 1.5 },
-  addBtn: { marginLeft: 'auto', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  addBtn: { marginLeft: 'auto', background: '#1A1A1A', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
   tabRow: { display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 },
-  tabBtn: { background: '#fff', border: '1.5px solid #E5E1DB', borderRadius: 999, padding: '8px 16px', fontSize: 13, fontWeight: 700, color: '#8A8AA0', cursor: 'pointer' },
+  tabBtn: { background: '#fff', border: '1.5px solid #E5E1DB', borderRadius: 999, padding: '8px 16px', fontSize: 13, fontWeight: 600, color: '#8A8AA0', cursor: 'pointer' },
   tabBtnActive: { background: '#FF6B35', borderColor: '#FF6B35', color: '#fff' },
   muted: { color: '#8A8AA0', fontSize: 14 },
   table: { width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  th: { textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#8A8AA0', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 14px', borderBottom: '1px solid #EEE', background: '#FAFAFC' },
+  th: { textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#8A8AA0', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 14px', borderBottom: '1px solid #EEE', background: '#FAFAFC' },
   tr: { borderBottom: '1px solid #F0F0F4' },
   td: { padding: '12px 14px', fontSize: 13, color: '#1A1A1A', verticalAlign: 'middle' },
   thumb: { width: 44, height: 44, objectFit: 'cover', borderRadius: 6, border: '1px solid #EEE' },
   thumbEmpty: { width: 44, height: 44, display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 6, background: '#FAFAFC', border: '1px solid #EEE', color: '#C0C0CC', fontSize: 12 },
-  toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700, cursor: 'pointer' },
+  toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600, cursor: 'pointer' },
   starBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, lineHeight: 1, padding: 2 },
   toggleOn: { borderColor: '#34A853', background: '#34A853', color: '#fff' },
   linkBtn: { background: 'none', border: 'none', cursor: 'pointer', fontSize: 13, color: '#FF6B35', fontWeight: 600, marginLeft: 10, padding: 2 },
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 24 },
   modal: { width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 14, padding: 28, display: 'flex', flexDirection: 'column', gap: 16 },
-  modalTitle: { fontSize: 18, fontWeight: 800, margin: 0 },
+  modalTitle: { fontSize: 18, fontWeight: 700, margin: 0 },
   formRow: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 },
-  label: { fontSize: 12, fontWeight: 700, color: '#4A4A60' },
+  label: { fontSize: 12, fontWeight: 600, color: '#4A4A60' },
   input: { padding: '10px 12px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', width: '100%' },
   previewWrap: { display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 },
   preview: { maxWidth: 200, maxHeight: 140, objectFit: 'contain', borderRadius: 8, border: '1px solid #EEE' },
@@ -268,6 +272,6 @@ const s = {
   checkRow: { display: 'flex', gap: 24, flexWrap: 'wrap' },
   checkLabel: { display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, fontWeight: 600, color: '#1A1A1A', cursor: 'pointer' },
   modalBtns: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
-  cancelBtn: { background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  saveBtn: { background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  saveBtn: { background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
 }

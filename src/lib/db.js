@@ -3,26 +3,42 @@ import { Browser } from '@capacitor/browser'
 import { supabase } from './supabase'
 import { isPotTimeExpired } from './potConstants'
 import { takePendingRoute } from './pendingRoute'
+import { getPublicOrigin, IS_STG } from './platform'
+import { imageExtFor } from './resizeImage'
+
+export { getPublicOrigin } from './platform'
 
 // send-push 결과 로깅 — 실패 사유(FCM 에러 코드 등)가 담긴 pushResult.failures가 객체 배열이라
 // console.warn에 그냥 넘기면 네이티브 WebView 콘솔 브릿지(logcat)에서 "[object Object]"로만
 // 찍혀 원인을 못 본다. JSON으로 풀어서 실제 값이 보이게 한다.
 function logPushResult(label, pushError, pushResult) {
   if (pushError) console.warn(`${label} send-push 실패:`, JSON.stringify(pushError))
-  else if (pushResult?.failed > 0) console.warn(`${label} send-push 일부 실패:`, JSON.stringify(pushResult.failures))
+  // sent를 같이 찍는다 — failures만 보면 "일부만 실패"인지 "한 명도 못 받았는지" 구분이 안 돼서,
+  // 구독 하나가 낡은 건지 발송 경로 전체가 죽은 건지 로그만으로는 판단할 수 없었다.
+  else if (pushResult?.failed > 0) {
+    console.warn(`${label} send-push 실패 ${pushResult.failed}건 (성공 ${pushResult.sent}건):`, JSON.stringify(pushResult.failures))
+  }
 }
 
-// 커패시터 네이티브 앱에서 window.location.origin은 번들 dist가 로드되는
-// https://localhost 라 공유 가능한 링크로 못 쓴다. 실제 배포 도메인으로 대체한다.
-const PUBLIC_ORIGIN = 'https://www.eat-together.net'
-export function getPublicOrigin() {
-  return Capacitor.isNativePlatform() ? PUBLIC_ORIGIN : window.location.origin
+// send-push는 이미 저장된 notifications 행의 id만 받으므로(클라이언트가 보낸 title/body를 믿지
+// 않기 위한 설계) 보낸 알림의 id를 알아야 하는데, insert에 .select()를 붙여 받아오면 안 된다 —
+// .select()는 INSERT ... RETURNING이 되고, Postgres는 RETURNING에 SELECT 정책까지 적용한다.
+// notifications의 SELECT 정책은 user_id = 나 하나뿐이라 "남에게 보내는 알림"은 반환행을 읽을 수
+// 없어 INSERT 전체가 롤백된다(알림함에도 안 남고 푸시도 못 간다). 그래서 id를 여기서 미리 만들어
+// insert에 같이 넣고, RETURNING 없이 저장한 뒤 그 id로 send-push를 부른다.
+function newNotificationId() {
+  return crypto.randomUUID()
 }
 
-// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml의 intent-filter와
-// 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로 돌아오면
-// AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
-const NATIVE_OAUTH_REDIRECT = 'gachimeokja://oauth-callback'
+// OAuth 콜백용 커스텀 스킴 — android/app/src/main/AndroidManifest.xml(STG는 android-stg/)의
+// intent-filter와 짝을 이룬다. Chrome Custom Tab(Browser.open)에서 로그인 완료 후 이 스킴으로
+// 돌아오면 AndroidManifest의 intent-filter가 앱을 열고, NativeDeepLinkHandler가 code를 교환한다.
+// STG는 프로덕션 앱과 스킴이 겹치면 로그인 복귀 시 OS가 앱 선택창을 띄우므로 별도 스킴을 쓴다.
+// NativeDeepLinkHandler가 돌아온 딥링크의 protocol을 이 값과 대조하므로 스킴을 따로 export한다 —
+// 양쪽에 문자열을 각자 적어두면 STG처럼 한쪽만 달라졌을 때 콜백이 조용히 무시되고(아무 분기에도
+// 안 걸림) 로그인 화면으로 되돌아온 것처럼만 보인다.
+export const NATIVE_OAUTH_SCHEME = IS_STG ? 'gachimeokjastg' : 'gachimeokja'
+const NATIVE_OAUTH_REDIRECT = `${NATIVE_OAUTH_SCHEME}://oauth-callback`
 
 // ── Auth ──────────────────────────────────────────
 export async function signUp(email, password) {
@@ -121,7 +137,7 @@ export async function signInWithKakao() {
   if (error) throw error
 }
 
-// NativeDeepLinkHandler가 gachimeokja://oauth-callback 딥링크를 받으면 호출한다.
+// NativeDeepLinkHandler가 <NATIVE_OAUTH_SCHEME>://oauth-callback 딥링크를 받으면 호출한다.
 // PKCE 플로우라 code 쿼리 파라미터 하나만 교환하면 세션이 생기고, UserContext의
 // onAuthStateChange 구독이 SIGNED_IN을 받아 나머지(라우팅 등)는 기존 흐름 그대로 이어진다.
 export async function handleNativeOAuthCallback(url) {
@@ -184,7 +200,13 @@ export async function fetchProfileForAuthUser(authUser) {
 }
 
 export async function getSessionUser() {
-  const { data: { session } } = await supabase.auth.getSession()
+  // getSession()은 저장된 세션이 만료돼 리프레시가 필요할 때 네트워크 요청을 한다.
+  // 이 리프레시가 네트워크 문제로 실패하면(진짜 로그아웃이 아니라) error와 함께
+  // session: null을 반환하는데, 여기서 error를 버리고 null만 보면 "로그인 안 된 상태"와
+  // "세션은 멀쩡한데 확인을 못한 상태"를 구분할 수 없다. 호출부(UserContext)가 판단할 수
+  // 있도록 error가 있으면 그대로 던진다.
+  const { data: { session }, error } = await supabase.auth.getSession()
+  if (error) throw error
   if (!session) return null
   return fetchProfileForAuthUser(session.user)
 }
@@ -332,12 +354,13 @@ export async function deleteDailyTip(id) {
   if (error) throw error
 }
 
-// blob: resizeImageFile로 재인코딩한 JPEG 이미지 (크롭 없이 원본 비율 유지 — 스샷 등)
+// blob: resizeImageFile을 거친 이미지 (크롭 없이 원본 비율 유지 — 스샷 등).
+// 줄일 필요가 없으면 원본 PNG가 그대로 오기도 해서 확장자/타입을 blob에서 가져온다.
 export async function uploadDailyTipImage(blob) {
-  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const path = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${imageExtFor(blob)}`
   const { error: uploadError } = await supabase.storage
     .from('daily-tips')
-    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+    .upload(path, blob, { cacheControl: '3600', contentType: blob.type || 'image/jpeg' })
   if (uploadError) throw uploadError
 
   const { data: { publicUrl } } = supabase.storage.from('daily-tips').getPublicUrl(path)
@@ -507,12 +530,77 @@ export async function setLunchReminderEnabled(userId, value) {
   if (error) throw error
 }
 
+// 메인 화면에 표시할 슬롯 — 끈 슬롯은 오늘부터(과거 날짜는 영향 없음) 서브탭에서 숨겨진다.
+export async function updateActiveSlots(userId, slots) {
+  const { error } = await supabase.from('users').update({ active_slots: slots }).eq('id', userId)
+  if (error) throw error
+}
+
+// 슬롯 끄기는 순수 디스플레이 설정이라 데이터를 지울 필요가 없다 — 대신 특정 날짜에 그 슬롯을
+// 실제로 쓰고 있으면(직접 입력한 상태 또는 밥팟 참여) 그 날짜만 예외적으로 탭에 보여준다.
+// potsMap은 그룹 밥팟만 모으므로, 그룹 없는 친구 밥팟(add_friend_pot.sql) 참여까지 잡으려면
+// 그룹 무관하게 "내 팟"을 직접 조회해야 한다 — pot_members_select_sharedpot RLS가 본인 행은
+// 이미 허용하므로(add_guest_support.sql) 별도 RPC 없이 바로 가능하다.
+export async function getMyPotSlotsForDate(userId, date) {
+  const { data, error } = await supabase
+    .from('pot_members')
+    .select('meal_pots!inner(slot, date)')
+    .eq('user_id', userId)
+    .eq('meal_pots.date', date)
+  if (error) throw error
+  return [...new Set(data.map(r => r.meal_pots.slot))]
+}
+
+// "활동 알림"(좋아요/댓글/초대 등, send-push 경유) on/off — notify_lunch_reminder와 독립된
+// 컬럼이라 서로 영향을 주지 않는다. 실제 발송 여부 필터링은 send-push Edge Function이 한다.
+export async function setActivityNotifyEnabled(userId, value) {
+  const { error } = await supabase.from('users').update({ notify_activity: value }).eq('id', userId)
+  if (error) throw error
+}
+
 // 친구 목록/요청은 users 테이블 RLS(같은 밥팟 참여자만 조회 가능)를 우회해야 해서
 // SECURITY DEFINER RPC를 거친다 — 친구가 반드시 같은 밥팟에 있으리란 보장이 없기 때문.
 export async function getMyFriends() {
   const { data, error } = await supabase.rpc('get_my_friends')
   if (error) throw error
   return data.map(r => ({ requestId: r.request_id, id: r.id, nickname: r.nickname, avatar_url: r.avatar_url }))
+}
+
+// 그룹 없는 친구 상태(오늘 화면 "친구 보기")용 파생 — deriveGroupStatuses의 groupId 비교 대신
+// RPC가 미리 계산해 내려준 same_pot_as_me로 "같이 먹자" 제안으로 같이 있게 된 팟인지 판별한다.
+// 같은 팟이면 참여중/참여완료(실제 공유 상태)로, 다른 팟이면 closed(약속있음, 정보 비노출)로 표시.
+function deriveFriendStatuses(statusRows, potRows, date) {
+  const map = {}
+  statusRows.forEach(s => { map[`${s.user_id}:${s.slot}`] = { ...s } })
+  potRows.forEach(p => {
+    const key = `${p.user_id}:${p.slot}`
+    if (p.same_pot_as_me) {
+      map[key] = {
+        user_id: p.user_id, slot: p.slot,
+        status: isPotTimeExpired(date, p.end_time) ? '참여완료' : '참여중',
+        meal_time: p.meal_time, end_time: p.end_time,
+        is_hidden: map[key]?.is_hidden ?? false,
+      }
+    } else {
+      map[key] = {
+        user_id: p.user_id, slot: p.slot, status: 'closed', meal_time: p.meal_time, end_time: null,
+        is_hidden: map[key]?.is_hidden ?? false,
+      }
+    }
+  })
+  return Object.values(map).filter(s => !s.is_hidden)
+}
+
+// 친구의 daily_status/밥팟 참여도 같은 밥팟 참여자 한정 RLS를 우회해야 해서 SECURITY DEFINER RPC를 거친다.
+// (scripts/add_friend_status.sql) 메뉴·그룹·팟 정보는 RPC가 처음부터 내려주지 않는다.
+export async function getFriendsStatuses(date) {
+  const [statusRes, potRes] = await Promise.all([
+    supabase.rpc('get_friends_daily_status', { p_date: date }),
+    supabase.rpc('get_friends_pot_participation', { p_date: date }),
+  ])
+  if (statusRes.error) throw statusRes.error
+  if (potRes.error) throw potRes.error
+  return deriveFriendStatuses(statusRes.data ?? [], potRes.data ?? [], date)
 }
 
 // direction: 'sent' | 'received'
@@ -524,13 +612,14 @@ export async function getMyFriendRequests() {
 
 async function notifyFriendRequest(requestId, toUserId, fromUserId, { title, body, eventType }) {
   const url = '/group?friend_requests=1'
+  const notifId = newNotificationId()
   const { error: notifError } = await supabase.from('notifications').insert({
-    user_id: toUserId, friend_request_id: requestId, title, body, url, event_type: eventType,
+    id: notifId, user_id: toUserId, friend_request_id: requestId, title, body, url, event_type: eventType,
   })
-  if (notifError) console.error('friend notification insert 실패:', notifError)
+  if (notifError) { console.error('friend notification insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('friend notification', pushError, pushResult)
 }
@@ -654,13 +743,14 @@ export async function inviteGroupFriend(groupId, fromUserId, toUserId) {
   const body = `${from?.nickname ?? '누군가'}님이 "${group?.name ?? '그룹'}"에 초대했어요.`
   const url = `/join/${group?.invite_code}`
 
+  const notifId = newNotificationId()
   const { error } = await supabase.from('notifications').insert({
-    user_id: toUserId, group_id: groupId, title, body, url, event_type: 'invite',
+    id: notifId, user_id: toUserId, group_id: groupId, title, body, url, event_type: 'invite',
   })
   if (error) throw error
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('inviteGroupFriend', pushError, pushResult)
 }
@@ -944,18 +1034,18 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
 
     // 알림함 기록 — 푸시 구독/권한 여부와 무관하게 항상 남긴다.
     // supabase-js는 insert 실패 시 throw하지 않고 {error}만 채워서 반환하므로 직접 체크해야 한다.
-    const rows = userIds.map(user_id => ({ user_id, pot_id: potId, title, body, url, event_type: eventType ?? null }))
+    const rows = userIds.map(user_id => ({ id: newNotificationId(), user_id, pot_id: potId, title, body, url, event_type: eventType ?? null }))
     const { error: insertError } = await supabase.from('notifications').insert(rows)
     if (insertError) {
       // event_type 컬럼이 DB에 아직 없는 경우(마이그레이션 미실행) 대비 — 컬럼 없이 재시도
       console.error('notifyPotMembers insert 실패, event_type 없이 재시도:', insertError)
       const fallbackRows = rows.map(({ event_type, ...rest }) => rest)
       const retry = await supabase.from('notifications').insert(fallbackRows)
-      if (retry.error) console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error)
+      if (retry.error) { console.error('notifyPotMembers insert 재시도도 실패 (테이블/RLS 확인 필요):', retry.error); return }
     }
 
     const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-      body: { userIds, title, body, url },
+      body: { notificationIds: rows.map(r => r.id) },
     })
     logPushResult('notifyPotMembers', pushError, pushResult)
   } catch (e) {
@@ -965,24 +1055,46 @@ export async function notifyPotMembers(potId, excludeUserId, { title, body, even
 
 // 특정 유저 한 명에게만 초대 알림 발송. 대상이 아직 팟 멤버가 아니어도 되며,
 // 발신자 본인이 이 팟의 멤버이기만 하면 notifications_insert_sharedpot RLS를 통과한다.
-export async function invitePotFriend(potId, fromUserId, toUserId) {
+export async function invitePotFriend(potId, fromUserId, toUserId, menu) {
   const [{ data: pot }, { data: from }] = await Promise.all([
     supabase.from('meal_pots').select('title, slot').eq('id', potId).single(),
     supabase.from('users').select('nickname').eq('id', fromUserId).single(),
   ])
   const title = '같이 먹자고 초대했어요'
-  const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.`
+  const trimmedMenu = menu?.trim()
+  const body = `${from?.nickname ?? '누군가'}님이 [${pot?.title ?? '밥팟'}]에 초대했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = `/pot/${potId}`
 
+  const notifId = newNotificationId()
   const { error } = await supabase.from('notifications').insert({
-    user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite',
+    id: notifId, user_id: toUserId, pot_id: potId, title, body, url, event_type: 'invite', invite_status: 'pending',
   })
   if (error) throw error
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('invitePotFriend', pushError, pushResult)
+}
+
+// 알림함에서 밥팟 초대(invitePotFriend)를 수락 — 실제 참여는 joinPot과 완전히 같은 경로를
+// 타서, 밥팟 상세 화면에서 직접 참여했을 때와 알림함 상태가 어긋나지 않는다.
+export async function acceptPotFriendInvite(notificationId, potId, userId) {
+  await joinPot(potId, userId)
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('id', notificationId)
+  if (error) throw error
+}
+
+// 알림함에서 밥팟 초대를 거절 — pot_members는 건드리지 않는다(원래도 참여 안 한 상태이므로).
+export async function declinePotFriendInvite(notificationId) {
+  const { error } = await supabase
+    .from('notifications')
+    .update({ invite_status: 'declined' })
+    .eq('id', notificationId)
+  if (error) throw error
 }
 
 // 아직 밥팟이 없는 상태에서 "같이 먹자" 제안. 상대가 수락하면 acceptPotInvitation에서 밥팟이 생성된다.
@@ -1000,16 +1112,21 @@ export async function proposeMealTogether({ groupId, fromUserId, toUserId, date,
 
   const { data: from } = await supabase.from('users').select('nickname').eq('id', fromUserId).single()
   const title = '같이 먹자는 제안이 왔어요'
-  const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.`
+  const trimmedMenu = menu?.trim()
+  const body = `${from?.nickname ?? '누군가'}님이 ${slot}에 같이 먹자고 제안했어요.${trimmedMenu ? ` "${trimmedMenu}"` : ''}`
   const url = '/notifications'
 
+  const notifId = newNotificationId()
   const { error: notifError } = await supabase.from('notifications').insert({
-    user_id: toUserId, invitation_id: inv.id, title, body, url, event_type: 'invite_new',
+    id: notifId, user_id: toUserId, invitation_id: inv.id, title, body, url, event_type: 'invite_new',
   })
-  if (notifError) console.error('proposeMealTogether 알림 insert 실패:', notifError)
+  if (notifError) {
+    console.error('proposeMealTogether 알림 insert 실패:', notifError)
+    return inv
+  }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [toUserId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('proposeMealTogether', pushError, pushResult)
 
@@ -1091,13 +1208,14 @@ export async function declinePotInvitation(invitationId, userId, reason) {
     : `${me?.nickname ?? '상대'}님이 ${inv.slot} 제안을 거절했어요.`
   const url = '/notifications'
 
+  const notifId = newNotificationId()
   const { error: notifError } = await supabase.from('notifications').insert({
-    user_id: inv.from_user_id, invitation_id: invitationId, title, body, url, event_type: 'invite_declined',
+    id: notifId, user_id: inv.from_user_id, invitation_id: invitationId, title, body, url, event_type: 'invite_declined',
   })
-  if (notifError) console.error('declinePotInvitation 알림 insert 실패:', notifError)
+  if (notifError) { console.error('declinePotInvitation 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [inv.from_user_id], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('declinePotInvitation', pushError, pushResult)
 }
@@ -1128,7 +1246,10 @@ export async function cancelPotInvitation(invitationId, userId) {
 export async function getMyNotifications(userId, limit = 50) {
   const { data, error } = await supabase
     .from('notifications')
-    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name))')
+    // friend_requests를 같이 읽는 이유 — 밥팟 초대는 처리 여부가 알림 행(invite_status)이나
+    // pot_invitations.status에 남지만, 친구 요청은 알림 행에 상태 컬럼이 없어서 원본 요청의
+    // status를 봐야 알림함에서 "이미 수락/거절한 요청"에 버튼을 다시 띄우지 않을 수 있다.
+    .select('*, meal_pots(title, date, slot, is_default, groups(name)), pot_invitations(id, date, slot, meal_time, title, menu, status, pot_id, decline_reason, groups(name)), friend_requests(id, status, to_user_id)')
     .eq('user_id', userId)
     .neq('event_type', 'lunch_reminder')
     .order('created_at', { ascending: false })
@@ -1187,6 +1308,14 @@ export async function joinPot(potId, userId) {
     .upsert({ pot_id: potId, user_id: userId })
   if (error) throw error
 
+  // 알림함의 밥팟 초대(invite)를 거치지 않고 상세 화면에서 바로 참여한 경우에도, 그
+  // 초대 알림이 대기 상태로 남아있지 않도록 여기서 같이 정리한다 — 실패해도 참여 자체는
+  // 이미 끝났으니 조용히 넘어간다(알림함 표시만 살짝 안 맞을 뿐 기능엔 영향 없음).
+  supabase.from('notifications')
+    .update({ invite_status: 'accepted' })
+    .eq('pot_id', potId).eq('user_id', userId).eq('event_type', 'invite').eq('invite_status', 'pending')
+    .then(({ error: syncError }) => { if (syncError) console.warn('invite 알림 동기화 실패:', syncError) })
+
   const { data: joined } = await supabase.from('users').select('nickname').eq('id', userId).single()
   await notifyPotMembers(potId, userId, {
     title: '같이 먹자',
@@ -1197,6 +1326,14 @@ export async function joinPot(potId, userId) {
 
 // 게스트로 밥팟 참여: 익명 세션 발급 → 게스트 프로필 생성 → 참여. 게스트 프로필 반환.
 export async function joinPotAsGuest(potId, nickname) {
+  // 화면이 일시적으로 로그아웃 상태로 오인해(네트워크 문제 등) 게스트 참여 게이트가 떠도,
+  // 실제로는 로그인 세션이 살아있을 수 있다. signInAnonymously는 같은 storage key에 익명
+  // 세션을 덮어써서 진짜 계정 세션을 되돌릴 수 없이 날려버리므로, 발급 전에 한 번 더 확인한다.
+  const { data: { session: existingSession } } = await supabase.auth.getSession()
+  if (existingSession && !existingSession.user.is_anonymous) {
+    throw new Error('ALREADY_LOGGED_IN')
+  }
+
   const { data: authData, error: authError } = await supabase.auth.signInAnonymously()
   if (authError) throw authError
   const authId = authData.user.id
@@ -1263,6 +1400,42 @@ export async function leavePot(potId, userId) {
     .from('pot_members')
     .delete()
     .match({ pot_id: potId, user_id: userId })
+  if (error) throw error
+}
+
+// 방장/기본팟 관리자가 다른 멤버를 강제로 내보낸다. leavePot(자진 탈퇴)과 달리 나가는 이유가
+// 본인의 선택이 아니므로 당사자에게도 알림이 가야 하는데, notifyPotMembers는 "나간 사람 본인"을
+// 항상 제외하도록 설계돼 있어(자진 탈퇴 시 본인에게 "나갔다"는 알림이 뜰 필요가 없어서) 그대로
+// 재사용하면 정작 쫓겨난 사람만 알림을 못 받는 문제가 있었다. 여기서는 당사자에게 별도 알림을 더 보낸다.
+export async function kickPotMember(potId, targetUserId) {
+  const { data: target } = await supabase.from('users').select('nickname').eq('id', targetUserId).single()
+
+  // 다른 멤버들에게: 기존 leavePot과 동일한 "나갔어요" 알림 (targetUserId 제외)
+  await notifyPotMembers(potId, targetUserId, {
+    title: '같이 먹자',
+    body: `${target?.nickname ?? '누군가'}님이 밥팟에서 나갔어요.`,
+    eventType: 'leave',
+  })
+
+  // 쫓겨난 당사자에게: 별도 문구로 직접 알림 + 푸시
+  const { data: pot } = await supabase.from('meal_pots').select('title').eq('id', potId).single()
+  const title = '밥팟에서 나가게 됐어요'
+  const body = `[${pot?.title ?? '밥팟'}]에서 방장에 의해 내보내졌어요.`
+  const notifId = newNotificationId()
+  const { error: insertError } = await supabase.from('notifications').insert({
+    id: notifId, user_id: targetUserId, pot_id: potId, title, body, event_type: 'kicked',
+  })
+  if (insertError) { console.error('kickPotMember 알림 insert 실패:', insertError); return }
+
+  const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
+    body: { notificationIds: [notifId] },
+  })
+  logPushResult('kickPotMember', pushError, pushResult)
+
+  const { error } = await supabase
+    .from('pot_members')
+    .delete()
+    .match({ pot_id: potId, user_id: targetUserId })
   if (error) throw error
 }
 
@@ -1361,6 +1534,43 @@ export async function setGroupShareSettingBulk(userId, groupId, centerDate, isSh
     const { error } = await supabase
       .from('group_share_settings')
       .upsert(rows, { onConflict: 'user_id,group_id,date' })
+    if (error) throw error
+  }
+}
+
+// ── 친구 공유 설정 (친구 × 날짜 단위 — 그룹처럼 "그룹 전체"가 아니라 친구마다 따로 켜고 끈다) ──
+// 사전 조건: scripts/add_friend_share_settings.sql 실행 필요
+export async function getFriendShareSettings(userId, date) {
+  const { data, error } = await supabase
+    .from('friend_share_settings')
+    .select('friend_id, is_shared')
+    .eq('user_id', userId)
+    .eq('date', date)
+  if (error) throw error
+  return data
+}
+
+// centerDate 전후 모든 날짜(과거·미래 60일씩)에 공유 설정 적용 — group_share_settings와 동일한 방식.
+export async function setFriendShareSettingBulk(userId, friendId, centerDate, isShared) {
+  if (isShared) {
+    const { error } = await supabase
+      .from('friend_share_settings')
+      .delete()
+      .eq('user_id', userId)
+      .eq('friend_id', friendId)
+    if (error) throw error
+  } else {
+    const rows = []
+    const d = new Date(centerDate)
+    d.setDate(d.getDate() - 60)
+    for (let i = 0; i < 121; i++) {
+      const dateStr = d.toISOString().slice(0, 10)
+      rows.push({ user_id: userId, friend_id: friendId, date: dateStr, is_shared: false })
+      d.setDate(d.getDate() + 1)
+    }
+    const { error } = await supabase
+      .from('friend_share_settings')
+      .upsert(rows, { onConflict: 'user_id,friend_id,date' })
     if (error) throw error
   }
 }
@@ -1621,15 +1831,15 @@ export async function getPotPhotosCount(potId) {
   return data ?? 0
 }
 
-// blob: PhotoAdjustModal에서 정사각형으로 잘라 재인코딩한 JPEG 이미지
+// blob: PhotoAdjustModal에서 정사각형으로 자르거나 resizeImageFile을 거친 이미지
 export async function addPotPhoto(potId, userId, blob) {
   const { data: { user: authUser } } = await supabase.auth.getUser()
   if (!authUser) throw new Error('로그인이 필요합니다.')
 
-  const path = `${authUser.id}/${potId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.jpg`
+  const path = `${authUser.id}/${potId}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${imageExtFor(blob)}`
   const { error: uploadError } = await supabase.storage
     .from('pot-photos')
-    .upload(path, blob, { cacheControl: '3600', contentType: 'image/jpeg' })
+    .upload(path, blob, { cacheControl: '3600', contentType: blob.type || 'image/jpeg' })
   if (uploadError) throw uploadError
 
   const { data: { publicUrl } } = supabase.storage.from('pot-photos').getPublicUrl(path)
@@ -1776,9 +1986,28 @@ export async function addWishPlace(userId, content, category = 'like') {
 }
 
 export async function updateWishPlace(id, content, category) {
+  // 내용이 바뀌면 링크도 바뀌었을 수 있어 저장해둔 미리보기를 비운다 — 다음에 볼 때
+  // LinkPreviewCard가 새 링크로 한 번 다시 가져와 updateWishPlacePreview로 채워 넣는다.
   const { error } = await supabase
     .from('wish_places')
-    .update({ content, category })
+    .update({ content, category, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null })
+    .eq('id', id)
+  if (error) throw error
+}
+
+// 위시 항목의 링크 미리보기를 등록/조회 시점에 한 번 가져와 저장해둔다. 이후에는 매번
+// 다시 긁어오지 않고 저장된 값을 그대로 보여준다(느리게 뜨는 문제 방지). data가 null이면
+// (fetchLinkPreview 자체가 실패한 경우) 아무것도 저장하지 않아 다음에 다시 시도할 수 있다.
+export async function updateWishPlacePreview(id, data) {
+  if (!data) return
+  const { error } = await supabase
+    .from('wish_places')
+    .update({
+      preview_title: data.title ?? null,
+      preview_description: data.description ?? null,
+      preview_image: data.image ?? null,
+      preview_site_name: data.siteName ?? null,
+    })
     .eq('id', id)
   if (error) throw error
 }
@@ -1820,13 +2049,14 @@ async function notifyWishPlaceOwner({ wishPlaceId, fromUserId, insertPayload, ti
   const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" ${bodyPrefix}`
   const url = '/account?tab=wish'
 
+  const notifId = newNotificationId()
   const { error: notifError } = await supabase.from('notifications').insert({
-    user_id: ownerId, title, body, url, ...insertPayload,
+    id: notifId, user_id: ownerId, title, body, url, ...insertPayload,
   })
-  if (notifError) console.error('wish place 알림 insert 실패:', notifError)
+  if (notifError) { console.error('wish place 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [ownerId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('wish place', pushError, pushResult)
 }
@@ -1904,14 +2134,15 @@ async function notifyWishPlaceMention({ commentId, wishPlaceId, fromUserId, ment
   const body = `${from?.nickname ?? '누군가'}님이 "${shortContent}" 댓글에서 나를 언급했어요.`
   const url = '/account?tab=wish'
 
+  const notifId = newNotificationId()
   const { error: notifError } = await supabase.from('notifications').insert({
-    user_id: mentionedUserId, title, body, url,
+    id: notifId, user_id: mentionedUserId, title, body, url,
     wish_place_mention_comment_id: commentId, event_type: 'wish_mention',
   })
-  if (notifError) console.error('wish mention 알림 insert 실패:', notifError)
+  if (notifError) { console.error('wish mention 알림 insert 실패:', notifError); return }
 
   const { data: pushResult, error: pushError } = await supabase.functions.invoke('send-push', {
-    body: { userIds: [mentionedUserId], title, body, url },
+    body: { notificationIds: [notifId] },
   })
   logPushResult('wish mention', pushError, pushResult)
 }

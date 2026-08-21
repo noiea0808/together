@@ -235,11 +235,11 @@ export default function IconsPage() {
 
 const s = {
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 },
-  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  title: { fontSize: 22, fontWeight: 700, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 640, lineHeight: 1.6 },
 
   section: { background: '#fff', borderRadius: 12, padding: 20, marginBottom: 20, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  sectionTitle: { fontSize: 15, fontWeight: 800, margin: 0 },
+  sectionTitle: { fontSize: 15, fontWeight: 700, margin: 0 },
   sectionDesc: { fontSize: 12, color: '#8A8AA0', marginTop: 4, marginBottom: 16, lineHeight: 1.5 },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(108px, 1fr))', gap: 12 },
 
@@ -253,6 +253,6 @@ const s = {
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, color: '#4A4A60',
   },
   iconBoxDark: { background: '#1E1E2E' },
-  swatchLabel: { fontSize: 12, fontWeight: 700, color: '#1A1A1A', textAlign: 'center' },
+  swatchLabel: { fontSize: 12, fontWeight: 600, color: '#1A1A1A', textAlign: 'center' },
   swatchSub: { fontSize: 10, color: '#9090A8', textAlign: 'center', lineHeight: 1.4 },
 }

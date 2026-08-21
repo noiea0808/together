@@ -153,15 +153,20 @@ export async function replyToFeedbackAdmin(feedbackId, adminId, userId, reply) {
     .single()
   if (error) throw error
 
+  // id를 미리 만들어 넣고 .select() 없이 insert한다 — RETURNING이 붙으면 notifications의
+  // SELECT 정책(user_id = 나)에 걸려 "남에게 보내는 알림"은 INSERT 자체가 롤백된다(db.js 참고).
+  const notifId = crypto.randomUUID()
   const { error: notifError } = await adminSupabase.from('notifications').insert({
-    user_id: userId, title: '의견에 답변이 달렸어요', body: reply, url: '/account', event_type: 'feedback_reply',
+    id: notifId, user_id: userId, title: '의견에 답변이 달렸어요', body: reply, url: '/account', event_type: 'feedback_reply',
   })
-  if (notifError) console.error('feedback reply 알림 insert 실패:', notifError)
-
-  const { error: pushError } = await adminSupabase.functions.invoke('send-push', {
-    body: { userIds: [userId], title: '의견에 답변이 달렸어요', body: reply, url: '/account' },
-  })
-  if (pushError) console.warn('feedback reply send-push 실패:', pushError)
+  if (notifError) {
+    console.error('feedback reply 알림 insert 실패:', notifError)
+  } else {
+    const { error: pushError } = await adminSupabase.functions.invoke('send-push', {
+      body: { notificationIds: [notifId] },
+    })
+    if (pushError) console.warn('feedback reply send-push 실패:', pushError)
+  }
 
   return data
 }

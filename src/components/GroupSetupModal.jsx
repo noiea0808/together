@@ -249,10 +249,10 @@ const styles = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(26,20,15,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', boxShadow: 'var(--shadow-md)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)', textAlign: 'center' },
   iconBadge: {
-    width: 56, height: 56, borderRadius: '50%', background: 'rgba(255,107,53,0.14)',
-    color: 'var(--color-primary)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+    width: 56, height: 56, borderRadius: '50%', background: 'var(--color-chip-bg)',
+    color: 'var(--color-chip-text)', display: 'flex', alignItems: 'center', justifyContent: 'center',
   },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
@@ -261,14 +261,14 @@ const styles = {
   tabs: { display: 'flex', width: '100%', gap: 5 },
   tab: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-    padding: '9px 0', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-md)', background: 'var(--color-bg)',
-    fontSize: 'var(--font-size-2xs)', fontWeight: 600, cursor: 'pointer',
+    padding: '9px 0', border: 'none',
+    borderRadius: 'var(--radius-md)', background: 'var(--color-chip-bg)',
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, cursor: 'pointer',
     color: 'var(--color-text-muted)', fontFamily: 'inherit',
   },
   tabActive: {
-    border: '2px solid var(--color-primary)', background: 'rgba(255,107,53,0.1)',
-    color: 'var(--color-primary)', fontWeight: 700,
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   input: {
     width: '100%', padding: '11px 14px',
@@ -284,6 +284,6 @@ const styles = {
     padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     background: 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
   },
-  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)' },
+  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
   searchResultCount: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
 }

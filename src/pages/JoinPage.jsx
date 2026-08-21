@@ -32,5 +32,5 @@ export default function JoinPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 'var(--spacing-md)', padding: 'var(--spacing-xl)' },
   emoji: { fontSize: 56 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 800, textAlign: 'center' },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, textAlign: 'center' },
 }

@@ -138,9 +138,13 @@ export default function MySchedulePage() {
           const isWeekend = dow === 0 || dow === 6
           const showMonth = idx === 0 || date.getDate() === 1
 
-          const dayColor = isToday ? 'var(--color-primary)' : isWeekend ? '#E53935' : isPast ? 'var(--color-text-muted)' : '#1A1A1A'
-          const cardBg = isToday ? '#FFF4EF' : '#FFFFFF'
-          const cardBorder = isToday ? '#FFD6C0' : '#EDE8E3'
+          // 날짜 숫자의 색은 "무슨 요일인가"만 말한다. 오늘인지는 카드 배경·테두리·"오늘" 배지가
+          // 이미 세 겹으로 알리고 있어서, 여기까지 강조하면 네 번째가 되는 데다 그 색(주황 계열)이
+          // 주말 빨강과 색상환에서 11도밖에 안 떨어져 평일인 오늘이 쉬는 날처럼 보였다.
+          // 이제 오늘이 주말이면 주말색으로 나오는데, 그게 사실에 더 맞다.
+          const dayColor = isWeekend ? 'var(--color-weekend)' : isPast ? 'var(--color-text-muted)' : 'var(--color-text)'
+          const cardBg = isToday ? 'var(--color-primary-a05)' : '#FFFFFF'
+          const cardBorder = isToday ? 'var(--color-primary)' : 'var(--warm-200)'
 
           const chips = SLOT_ORDER
             .filter(slot => dayStatuses[slot])
@@ -191,21 +195,21 @@ const S = {
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
-  dateNavLabel: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  dateNavLabel: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
 
-  list: { flex: 1, overflowY: 'auto', paddingBottom: 80, paddingTop: 4 },
+  list: { flex: 1, overflowY: 'auto', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)', paddingTop: 4 },
   empty: { display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40, padding: 40 },
 
-  monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', padding: '12px 4px 6px', letterSpacing: '0.3px' },
+  monthLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', padding: '12px 4px 6px', letterSpacing: '0.3px' },
   card: { borderRadius: 15, padding: '12px 14px', marginBottom: 7, cursor: 'pointer' },
   row: { display: 'flex', alignItems: 'center', gap: 10 },
 
   dateCol: { minWidth: 38, textAlign: 'center', flexShrink: 0, marginRight: 6 },
-  dayNum: { fontSize: 'var(--font-size-lg)', fontWeight: 900, lineHeight: 1.1 },
+  dayNum: { fontSize: 'var(--font-size-lg)', fontWeight: 700, lineHeight: 1.1 },
   dayName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, marginTop: 1 },
 
   chipsArea: { flex: 1, display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center', minWidth: 0 },
-  noStatus: { fontSize: 'var(--font-size-2xs)', color: '#B8B0A6' },
-  todayBadge: { background: 'var(--color-primary)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
-  goIcon: { color: '#ADA59B', fontSize: 'var(--font-size-base)', fontWeight: 700, flexShrink: 0 },
+  noStatus: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  todayBadge: { background: 'var(--color-selected)', color: 'white', fontSize: 'var(--font-size-2xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px', flexShrink: 0 },
+  goIcon: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-base)', fontWeight: 700, flexShrink: 0 },
 }

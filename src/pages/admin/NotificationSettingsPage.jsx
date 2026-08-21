@@ -255,21 +255,21 @@ export default function NotificationSettingsPage() {
 
 const s = {
   header: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, gap: 16 },
-  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  title: { fontSize: 22, fontWeight: 700, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 540, lineHeight: 1.5 },
   muted: { color: '#8A8AA0', fontSize: 14 },
-  errorText: { color: '#E04545', fontSize: 14, fontWeight: 700, margin: '0 0 6px' },
+  errorText: { color: '#E04545', fontSize: 14, fontWeight: 600, margin: '0 0 6px' },
   errorDetail: { color: '#E04545', fontSize: 12, fontFamily: 'monospace', background: '#FFF0F0', padding: '8px 10px', borderRadius: 6, marginBottom: 10, wordBreak: 'break-all' },
-  retryBtn: { marginTop: 8, background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  retryBtn: { marginTop: 8, background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '8px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
 
   card: { background: '#fff', borderRadius: 10, boxShadow: '0 1px 3px rgba(0,0,0,0.06)', padding: 20, marginBottom: 20 },
   cardHeaderRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 },
-  cardTitle: { fontSize: 15, fontWeight: 700, margin: '0 0 14px' },
+  cardTitle: { fontSize: 15, fontWeight: 600, margin: '0 0 14px' },
 
   configRow: { display: 'flex', alignItems: 'center', gap: 28, flexWrap: 'wrap' },
   configItem: { display: 'flex', alignItems: 'center', gap: 10 },
-  label: { fontSize: 12, fontWeight: 700, color: '#4A4A60' },
-  toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  label: { fontSize: 12, fontWeight: 600, color: '#4A4A60' },
+  toggle: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#9090A8', borderRadius: 6, padding: '5px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
   toggleOn: { borderColor: '#34A853', background: '#34A853', color: '#fff' },
   timeInput: { padding: '7px 10px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 13, outline: 'none' },
   lastSent: { fontSize: 12, color: '#8A8AA0' },
@@ -277,15 +277,15 @@ const s = {
   messageBox: { marginTop: 16, paddingTop: 16, borderTop: '1px solid #F0F0F4', display: 'flex', flexDirection: 'column', gap: 12 },
   formRow: { display: 'flex', flexDirection: 'column', gap: 6 },
   input: { padding: '9px 12px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 13, outline: 'none', boxSizing: 'border-box', width: '100%', fontFamily: 'inherit' },
-  saveBtn: { alignSelf: 'flex-start', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  saveBtn: { alignSelf: 'flex-start', background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
 
   monthNav: { display: 'flex', alignItems: 'center', gap: 10 },
   navBtn: { width: 28, height: 28, borderRadius: '50%', border: '1px solid #DDD', background: '#fff', color: '#4A4A60', cursor: 'pointer', fontSize: 14, lineHeight: 1 },
-  monthLabel: { fontSize: 14, fontWeight: 700, minWidth: 90, textAlign: 'center' },
+  monthLabel: { fontSize: 14, fontWeight: 600, minWidth: 90, textAlign: 'center' },
   calendarHint: { fontSize: 12, color: '#8A8AA0', marginBottom: 14 },
 
   weekRow: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', marginBottom: 4 },
-  weekLabel: { textAlign: 'center', fontSize: 11, fontWeight: 700, padding: '4px 0' },
+  weekLabel: { textAlign: 'center', fontSize: 11, fontWeight: 600, padding: '4px 0' },
   grid: { display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 4 },
   cell: { minHeight: 56 },
   dayCell: {
@@ -295,5 +295,5 @@ const s = {
   },
   dayCellHoliday: { background: '#E04545', border: '1px solid #E04545' },
   dayCellToday: { boxShadow: '0 0 0 1.5px #FF6B35 inset' },
-  dayCellLabel: { fontSize: 10, color: '#fff', fontWeight: 700, lineHeight: 1.2, textAlign: 'center', wordBreak: 'break-all' },
+  dayCellLabel: { fontSize: 10, color: '#fff', fontWeight: 600, lineHeight: 1.2, textAlign: 'center', wordBreak: 'break-all' },
 }

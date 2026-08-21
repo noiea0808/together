@@ -145,14 +145,14 @@ export default function ReportsPage() {
 
 const s = {
   header: { marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  title: { fontSize: 22, fontWeight: 700, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 560, lineHeight: 1.5 },
   muted: { color: '#8A8AA0', fontSize: 14 },
 
   tabRow: { display: 'flex', gap: 6, marginBottom: 18 },
   tabBtn: {
     display: 'flex', alignItems: 'center', gap: 6, border: '1.5px solid #DDD', background: '#fff',
-    color: '#6A6A80', borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    color: '#6A6A80', borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   },
   tabBtnActive: { borderColor: '#FF6B35', background: '#FF6B35', color: '#fff' },
   tabCount: { fontSize: 11, opacity: 0.8 },
@@ -161,8 +161,8 @@ const s = {
   card: { background: '#fff', borderRadius: 12, padding: 16, boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
   cardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 },
   badgeRow: { display: 'flex', alignItems: 'center', gap: 8 },
-  targetBadge: { fontSize: 11, fontWeight: 700, color: '#7070A0', background: '#F0F0F8', padding: '2px 8px', borderRadius: 4 },
-  statusBadge: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 },
+  targetBadge: { fontSize: 11, fontWeight: 600, color: '#7070A0', background: '#F0F0F8', padding: '2px 8px', borderRadius: 4 },
+  statusBadge: { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 },
   date: { fontSize: 12, color: '#9090A8' },
 
   body: { display: 'flex', flexDirection: 'column', gap: 5, fontSize: 13, color: '#1A1A1A' },
@@ -172,7 +172,7 @@ const s = {
   mono: { fontFamily: 'monospace', fontSize: 12, color: '#6A6A80' },
 
   actions: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid #F0F0F4' },
-  resolveBtn: { border: '1.5px solid #34A853', background: '#fff', color: '#34A853', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  dismissBtn: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#6A6A80', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
-  suspendBtn: { border: '1.5px solid #E04545', background: '#fff', color: '#E04545', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 700, cursor: 'pointer' },
+  resolveBtn: { border: '1.5px solid #34A853', background: '#fff', color: '#34A853', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  dismissBtn: { border: '1.5px solid #D0D0DC', background: '#fff', color: '#6A6A80', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
+  suspendBtn: { border: '1.5px solid #E04545', background: '#fff', color: '#E04545', borderRadius: 8, padding: '7px 14px', fontSize: 12, fontWeight: 600, cursor: 'pointer' },
 }

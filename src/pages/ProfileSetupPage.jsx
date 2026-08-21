@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getActiveTerms, completeOnboarding } from '../lib/db'
+import { completeOnboarding } from '../lib/db'
+import { useRequiredTerms } from '../lib/useRequiredTerms'
 import { parseBirthId } from '../lib/birthId'
 import RiceBowlIcon from '../components/RiceBowlIcon'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
@@ -16,8 +17,10 @@ export default function ProfileSetupPage() {
   const [birthFront, setBirthFront] = useState('')
   const [birthGenderDigit, setBirthGenderDigit] = useState('')
   const [lifestyle, setLifestyle] = useState('')
-  const [terms, setTerms] = useState([])
-  const [agreed, setAgreed] = useState({}) // { [termId]: true }
+  const {
+    terms, agreed, loadingTerms, loadError, retryLoad,
+    allChecked, requiredAllChecked, toggleAll, toggle, agree, agreedList,
+  } = useRequiredTerms()
   const [viewTerm, setViewTerm] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
@@ -29,19 +32,7 @@ export default function ProfileSetupPage() {
     if (user?.nickname && user.nickname !== user.email?.split('@')[0]) {
       setNickname(user.nickname)
     }
-    getActiveTerms().then(setTerms).catch(() => setTerms([]))
   }, [user])
-
-  const requiredTerms = terms.filter(t => t.is_required)
-  const allChecked = terms.length > 0 && terms.every(t => agreed[t.id])
-  const requiredAllChecked = requiredTerms.every(t => agreed[t.id])
-
-  const toggleAll = () => {
-    if (allChecked) setAgreed({})
-    else setAgreed(Object.fromEntries(terms.map(t => [t.id, true])))
-  }
-
-  const toggle = (id) => setAgreed(a => ({ ...a, [id]: !a[id] }))
 
   const birthTouched = birthFront.length > 0 || birthGenderDigit.length > 0
   const birthComplete = birthFront.length === 6 && birthGenderDigit.length === 1
@@ -54,13 +45,13 @@ export default function ProfileSetupPage() {
     if (!canSubmit) return
     setLoading(true); setError(null)
     try {
-      const agreedTerms = terms.filter(t => agreed[t.id]).map(t => ({ id: t.id, version: t.version }))
       const profile = await completeOnboarding(
         user.id,
         { nickname, birthdate: parsedBirth?.birthdate ?? null, gender: parsedBirth?.gender ?? null, lifestyle },
-        agreedTerms,
+        agreedList(),
       )
       login(profile)
+      localStorage.setItem('justOnboarded', '1')
       if (pendingCode) {
         // 코드는 localStorage에 그대로 두고 메인으로 — 전역 초대 팝업(GroupInviteModal)이
         // 메인 화면 위에서 이어받아 수락 여부를 묻는다.
@@ -151,7 +142,14 @@ export default function ProfileSetupPage() {
         </div>
 
         {/* 약관 동의 */}
-        {terms.length > 0 && (
+        {loadingTerms ? (
+          <p style={styles.hint}>약관 불러오는 중...</p>
+        ) : loadError ? (
+          <div style={styles.terms}>
+            <span style={styles.birthErrorText}>약관을 불러오지 못했어요.</span>
+            <button type="button" style={styles.viewBtn} onClick={retryLoad}>다시 시도</button>
+          </div>
+        ) : terms.length > 0 && (
           <div style={styles.terms}>
             <button type="button" style={styles.agreeAll} onClick={toggleAll} disabled={loading}>
               <span style={{ ...styles.checkbox, ...(allChecked ? styles.checkboxOn : {}) }}>
@@ -202,7 +200,7 @@ export default function ProfileSetupPage() {
             <div style={styles.modalBody}>{viewTerm.content || '내용이 등록되지 않았습니다.'}</div>
             <button
               style={styles.modalAgree}
-              onClick={() => { setAgreed(a => ({ ...a, [viewTerm.id]: true })); setViewTerm(null) }}
+              onClick={() => { agree(viewTerm.id); setViewTerm(null) }}
             >
               동의하고 닫기
             </button>
@@ -221,7 +219,7 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 48, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, marginBottom: 8 },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 8 },
   sub: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-sm)', whiteSpace: 'pre-line', lineHeight: 1.6 },
   card: {
     width: '100%', background: 'var(--color-surface)',
@@ -230,8 +228,8 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   field: { display: 'flex', flexDirection: 'column', gap: 4 },
-  label: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
-  req: { color: 'var(--color-primary)' },
+  label: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
+  req: { color: 'var(--color-primary-text)' },
   optional: { color: 'var(--color-text-muted)', fontWeight: 400, fontSize: 'var(--font-size-xs)' },
   input: {
     width: '100%', padding: '13px var(--spacing-md)',
@@ -255,13 +253,13 @@ const styles = {
   birthMask: { flexShrink: 0, color: 'var(--color-text-muted)', letterSpacing: 2, fontSize: 'var(--font-size-sm)' },
   chipRow: { display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 2 },
   chip: {
-    padding: '8px 14px', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
+    padding: '8px 14px', border: 'none',
+    borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)',
     fontSize: 'var(--font-size-sm)', cursor: 'pointer', color: 'var(--color-text-muted)',
   },
   chipActive: {
-    borderColor: 'var(--color-primary)', background: 'var(--color-primary-a10)',
-    color: 'var(--color-primary)', fontWeight: 700,
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   terms: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4, borderTop: '1px solid var(--color-border)', paddingTop: 'var(--spacing-md)' },
   agreeAll: {
@@ -274,19 +272,19 @@ const styles = {
   termRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   termCheck: { display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', cursor: 'pointer', padding: '8px 0', flex: 1, textAlign: 'left' },
   termLabel: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', lineHeight: 1.4 },
-  tagReq: { color: 'var(--color-primary)', fontWeight: 700, fontSize: 'var(--font-size-xs)' },
+  tagReq: { color: 'var(--color-primary-text)', fontWeight: 600, fontSize: 'var(--font-size-xs)' },
   tagOpt: { color: 'var(--color-text-muted)', fontWeight: 600, fontSize: 'var(--font-size-xs)' },
   checkbox: {
     width: 22, height: 22, borderRadius: '50%', border: '2px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    color: '#fff', fontSize: 13, fontWeight: 800,
+    color: '#fff', fontSize: 13, fontWeight: 700,
   },
   checkboxSm: {
     width: 20, height: 20, borderRadius: '50%', border: '2px solid var(--color-border)',
     display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-    color: '#fff', fontSize: 12, fontWeight: 800,
+    color: '#fff', fontSize: 12, fontWeight: 700,
   },
-  checkboxOn: { background: 'var(--color-primary)', borderColor: 'var(--color-primary)' },
+  checkboxOn: { background: 'var(--color-selected)', borderColor: 'var(--color-selected)' },
   viewBtn: {
     flexShrink: 0, background: 'none', border: 'none', cursor: 'pointer',
     fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)',
@@ -304,7 +302,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   modalHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  modalTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  modalTitle: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   modalClose: { background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)' },
   modalBody: {
     flex: 1, overflowY: 'auto', fontSize: 'var(--font-size-sm)',

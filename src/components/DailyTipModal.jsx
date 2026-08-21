@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { useUser } from '../lib/UserContext'
 import { getActiveDailyTips } from '../lib/db'
 import { useScrollLock } from '../lib/useScrollLock'
@@ -22,6 +22,15 @@ function isDismissedToday() {
 
 function dismissToday() {
   localStorage.setItem('dailyTipDismissedDate', JSON.stringify(toDateStr(new Date())))
+}
+
+// 방금 온보딩(프로필 설정)을 마친 신규 가입자인지 여부. ProfileSetupPage에서 온보딩 완료 시
+// 심어두는 1회성 플래그를 읽고 바로 지운다 — 그래서 이번 접속에서만 "처음"으로 취급되고,
+// 다음 접속부터는 재방문자와 동일하게 취급된다.
+function consumeFirstTimeFlag() {
+  const isFirstTime = localStorage.getItem('justOnboarded') === '1'
+  if (isFirstTime) localStorage.removeItem('justOnboarded')
+  return isFirstTime
 }
 
 // 별표(is_featured) 팁은 가중치 2, 일반 팁은 가중치 1로 뽑아 순서를 정한다.
@@ -56,7 +65,7 @@ export function openDailyTipModal(tab = 'tip') {
 
 // 로그인 후 접속할 때마다 뜨는 팝업. "시작하기"(guide, 정해진 순서)와
 // "오늘의 팁"(tip, 랜덤 순서) 두 탭을 가지며, 탭은 자유롭게 오갈 수 있다.
-// 시작하기 탭이 있으면 항상 그 탭을 기본으로 보여주고, 없으면 오늘의 팁을 보여준다.
+// 방금 온보딩을 마친 신규 가입자는 시작하기 탭을, 그 외(재방문자)는 오늘의 팁 탭을 기본으로 본다.
 // "오늘 하루 보지 않기"는 기기(로컬스토리지) 기준으로만 적용되며, 그냥 닫기는 다음 접속 때 다시 뜬다.
 // GroupInviteModal과 겹치지 않도록 초대 코드가 대기 중이면 이번 접속에서는 띄우지 않는다.
 export default function DailyTipModal() {
@@ -66,6 +75,8 @@ export default function DailyTipModal() {
   const [index, setIndex] = useState(0)
   const [open, setOpen] = useState(false)
   const scrollRef = useRef(null)
+  const itemRefs = useRef([])
+  const [trackHeight, setTrackHeight] = useState(null)
   const dragScroll = useDragScroll()
   // 카드가 좌우로 넘어간다는 걸 처음 진입한 사용자에게만 몸으로 알려주는 1회성 넛지.
   // TodayPage의 나의 상태 카드 넛지와 같은 애니메이션(statusCardSwipeHint)을 재사용한다.
@@ -90,8 +101,10 @@ export default function DailyTipModal() {
           setTabItems({ guide: [], tip: [] })
           return
         }
+        // 처음 사용하는(=방금 온보딩을 마친) 사람에게는 "시작하기"를, 그 외에는 "오늘의 팁"을 기본으로.
+        const firstTime = consumeFirstTimeFlag()
         setTabItems({ guide, tip })
-        setActiveTab(guide.length > 0 ? 'guide' : 'tip')
+        setActiveTab(firstTime && guide.length > 0 ? 'guide' : (tip.length > 0 ? 'tip' : 'guide'))
         setOpen(true)
       })
       .catch(() => { if (!cancelled) setTabItems({ guide: [], tip: [] }) })
@@ -131,6 +144,36 @@ export default function DailyTipModal() {
 
   const items = tabItems?.[activeTab] ?? []
   const availableTabs = tabItems ? Object.keys(TABS).filter(k => tabItems[k]?.length > 0) : []
+
+  const indexRef = useRef(index)
+  indexRef.current = index
+
+  // 카드들은 가로 스크롤 트랙 안에 나란히 놓여 있어서, 그냥 두면 트랙(=팝업) 높이가
+  // 가장 큰 카드에 맞춰 고정되고 짧은 카드에는 빈 공간이 남는다. 지금 보고 있는 카드의
+  // 높이를 재서 트랙에 직접 물려 준다.
+  // observer를 카드 하나가 아니라 전체 카드에 계속 걸어두는 이유: 이전에는 index가 바뀔 때마다
+  // 옛 observer를 끊고 새로 만들었는데, 이미지 로딩이 늦어 "지금 보고 있는 카드의 리사이즈 알림"이
+  // 하필 그 끊고-다시-거는 순간에 겹치면 통째로 유실될 수 있었다. 그러면 트랙이 이미지가 뒤늦게
+  // 키운 높이로 못 줄어들고 그대로 눌러앉는다(한번 커지면 안 줄어드는 버그). 모든 카드를 계속
+  // 관찰하고 콜백에서 "지금 카드"인지만 걸러내면 이 유실 구간이 아예 없어진다.
+  useLayoutEffect(() => {
+    const els = itemRefs.current.slice(0, items.length)
+    if (els.every(el => !el)) return
+    const indexOf = new Map(els.map((el, i) => [el, i]))
+    const ro = new ResizeObserver(entries => {
+      for (const entry of entries) {
+        if (indexOf.get(entry.target) === indexRef.current) setTrackHeight(entry.target.offsetHeight)
+      }
+    })
+    els.forEach(el => el && ro.observe(el))
+    return () => ro.disconnect()
+  }, [activeTab, open, items.length])
+
+  // 카드를 전환한 그 순간에는 리사이즈 알림을 기다리지 않고 바로 현재 카드 높이로 맞춘다.
+  useLayoutEffect(() => {
+    const el = itemRefs.current[index]
+    if (el) setTrackHeight(el.offsetHeight)
+  }, [index])
 
   if (!open || items.length === 0) return null
 
@@ -175,23 +218,28 @@ export default function DailyTipModal() {
           </div>
         )}
 
-        {/* 넛지 애니메이션을 scroll-snap 컨테이너 자신이 아니라 이 바깥 래퍼에 건다.
-            iOS Safari는 overflow-x:auto + scroll-snap-type이 걸린 요소에 transform
-            애니메이션까지 같이 주면 애니메이션 종료 시 스냅 위치를 잘못 계산해, 첫 카드가
-            아니라 두세 번째 카드로 스냅해버리는 버그가 있다. */}
+        {/* 넛지 애니메이션과 카드별 높이 트랜지션을 scroll-snap 컨테이너 자신이 아니라 이 바깥
+            래퍼에 건다. iOS Safari/모바일 WebView는 overflow-x:auto + scroll-snap-type이 걸린
+            요소에 transform·height 같은 애니메이션까지 같이 주면 스냅 위치 계산이 꼬이거나
+            (엉뚱한 카드로 스냅) 레이아웃 갱신이 멈춰버리는(카드가 커진 뒤 다시 안 줄어드는)
+            버그가 있어, 애니메이션은 항상 스크롤 컨테이너 밖의 래퍼가 담당한다. */}
         <div
-          style={{ animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined }}
+          style={{
+            height: trackHeight ?? undefined, minHeight: 300, overflow: 'hidden',
+            transition: 'height 0.28s cubic-bezier(0.16, 1, 0.3, 1)',
+            animation: (showSwipeHint && items.length > 1) ? 'statusCardSwipeHint 0.9s ease-in-out 0.4s' : undefined,
+          }}
           onAnimationEnd={dismissSwipeHint}
         >
           <div
             className="no-scrollbar"
-            style={styles.scroll}
+            style={{ ...styles.scroll, height: '100%' }}
             ref={scrollRef}
             onScroll={handleScroll}
             {...dragScroll}
           >
-            {items.map(item => (
-              <div key={item.id} style={styles.item}>
+            {items.map((item, i) => (
+              <div key={item.id} ref={el => { itemRefs.current[i] = el }} style={styles.item}>
                 {item.image_url && <img src={item.image_url} alt="" style={styles.image} loading="lazy" />}
                 {item.content && <p style={styles.body}>{item.content}</p>}
               </div>
@@ -228,14 +276,21 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)',
   },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0 var(--spacing-lg)' },
-  headerTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  headerTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   tabRow: { display: 'flex', gap: 6, background: 'var(--color-surface-2)', borderRadius: 'var(--radius-full)', padding: 4, margin: '0 var(--spacing-lg)' },
   tabBtn: {
     flex: 1, padding: '8px 10px', background: 'none', border: 'none', borderRadius: 'var(--radius-full)',
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', cursor: 'pointer',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)', cursor: 'pointer',
   },
-  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-primary, #FF6B35)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
-  scroll: { display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab' },
+  tabBtnActive: { background: 'var(--color-surface)', color: 'var(--color-selected)', boxShadow: '0 1px 3px rgba(0,0,0,0.08)' },
+  // alignItems: center — 기본값(stretch)이면 모든 카드가 가장 큰 카드 높이로 늘어나 카드별
+  // 실제 높이를 잴 수 없다. 그렇다고 늘리진 않되, 바깥 래퍼의 minHeight로 바닥을 깔아둔 상태
+  // (글자 한두 줄짜리 짧은 카드)에서 내용이 위쪽에 붙지 않고 가운데에 오도록 center로 정렬한다.
+  // height/transition은 스냅 버그를 피해 바깥 래퍼가 담당하므로 여기서는 100%로 그걸 채우기만 한다.
+  scroll: {
+    display: 'flex', overflowX: 'auto', overflowY: 'hidden', alignItems: 'center',
+    scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch', cursor: 'grab',
+  },
   item: {
     flex: '0 0 100%', scrollSnapAlign: 'start',
     display: 'flex', flexDirection: 'column', gap: 12, alignItems: 'center',
@@ -244,11 +299,11 @@ const styles = {
   body: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.6, margin: 0, padding: '0 var(--spacing-lg)' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5 },
   dot: { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-border)' },
-  dotActive: { background: 'var(--color-primary, #FF6B35)' },
+  dotActive: { background: 'var(--color-selected)' },
   btnRow: { width: '100%', display: 'flex', gap: 8, padding: '0 var(--spacing-lg)' },
   closeBtn: {
-    flex: 1, padding: 11, background: 'linear-gradient(135deg, #FF6B35, #FF8C5A)', color: '#fff',
-    border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer',
+    flex: 1, padding: 11, background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-light))', color: '#fff',
+    border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer',
   },
   dismissBtn: { flex: 1, padding: 11, background: 'none', color: 'var(--color-text-muted)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', cursor: 'pointer' },
 }

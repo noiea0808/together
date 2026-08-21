@@ -7,14 +7,9 @@ import { resizeImageFile } from '../lib/resizeImage'
 import { useDragScroll } from '../lib/useDragScroll'
 import PhotoAdjustModal from './PhotoAdjustModal'
 import { MoreHorizontalIcon } from './GroupIcons'
+import { avatarColor } from '../lib/avatarColor'
 import ReportModal from './ReportModal'
 
-function avBg(name) {
-  const colors = ['#7C3AED', '#0891B2', '#059669', '#D97706', '#DC2626', '#4F46E5', '#DB2777']
-  let h = 0
-  for (const x of name) h = (h * 31 + x.charCodeAt(0)) & 0xfffff
-  return colors[h % colors.length]
-}
 
 function timeAgo(iso) {
   const diffMin = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
@@ -42,6 +37,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
   const [comments, setComments] = useState([])
   const [commentCount, setCommentCount] = useState(0)
   const [commentText, setCommentText] = useState('')
+  const [commentInputFocused, setCommentInputFocused] = useState(false)
   const [postingComment, setPostingComment] = useState(false)
   const [photos, setPhotos] = useState([])
   const [photoCount, setPhotoCount] = useState(0)
@@ -286,7 +282,7 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
           {comments.length === 0 && !compact && <p style={S.empty}>아직 한마디도 없어요.</p>}
           {comments.map(c => (
             <div key={c.id} style={S.commentItem}>
-              <div style={{ ...S.commentAvatar, background: avBg(c.users?.nickname ?? '?') }}>
+              <div style={{ ...S.commentAvatar, background: avatarColor(c.users?.nickname) }}>
                 {c.users?.avatar_url
                   ? <img src={c.users.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                   : (c.users?.nickname ?? '?')[0]}
@@ -340,11 +336,13 @@ const PotSocialSection = forwardRef(function PotSocialSection({ potId, currentUs
         {canPost && (
           <div style={{ ...S.commentInputRow, ...(compact ? S.commentInputRowCompact : {}) }}>
             <input
-              style={S.commentInput}
+              style={{ ...S.commentInput, ...(commentInputFocused ? S.commentInputFocused : {}) }}
               placeholder="한마디 남기기"
               value={commentText}
               onChange={e => setCommentText(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handlePostComment()}
+              onFocus={() => setCommentInputFocused(true)}
+              onBlur={() => setCommentInputFocused(false)}
               maxLength={200}
             />
             <button
@@ -381,7 +379,7 @@ const S = {
   cardCompact: {},
   commentsCard: { marginTop: 16 },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 },
-  title: { fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  title: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   count: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', fontWeight: 600 },
   countInline: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   empty: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '8px 0', margin: 0 },
@@ -392,7 +390,7 @@ const S = {
   photoImg: { width: '100%', height: '100%', objectFit: 'cover', display: 'block' },
   dotsRow: { display: 'flex', justifyContent: 'center', gap: 5, marginTop: 8 },
   dot: { width: 5, height: 5, borderRadius: '50%', background: 'var(--color-border)', transition: 'width 0.15s, background 0.15s' },
-  dotActive: { width: 14, background: 'var(--color-primary)' },
+  dotActive: { width: 14, background: 'var(--color-selected)' },
 
   photoMenuWrap: { position: 'absolute', top: 8, right: 8 },
   photoUploaderChip: {
@@ -402,7 +400,7 @@ const S = {
   },
   photoEditBtn: {
     width: 26, height: 26, borderRadius: '50%', border: 'none', background: 'rgba(0,0,0,0.5)',
-    color: '#fff', fontSize: 15, fontWeight: 900, cursor: 'pointer', display: 'flex',
+    color: '#fff', fontSize: 15, fontWeight: 700, cursor: 'pointer', display: 'flex',
     alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1,
   },
   menuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
@@ -418,7 +416,7 @@ const S = {
   },
   photoMenuItemDanger: {
     width: '100%', padding: '10px 12px', background: 'none', border: 'none', textAlign: 'left',
-    fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-danger)', cursor: 'pointer', fontFamily: 'inherit',
+    fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-danger)', cursor: 'pointer', fontFamily: 'inherit',
     whiteSpace: 'nowrap',
   },
   photoMenuConfirmText: { padding: '8px 12px 2px', fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
@@ -432,10 +430,10 @@ const S = {
   /* Comments */
   commentsList: { display: 'flex', flexDirection: 'column', gap: 12 },
   commentItem: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  commentAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 'var(--font-size-2xs)' },
+  commentAvatar: { width: 28, height: 28, borderRadius: '50%', flexShrink: 0, overflow: 'hidden', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 600, fontSize: 'var(--font-size-2xs)' },
   commentBody: { flex: 1, minWidth: 0 },
   commentMetaRow: { display: 'flex', alignItems: 'center', gap: 6 },
-  commentName: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)' },
+  commentName: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text)' },
   commentTime: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   commentText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', marginTop: 2, wordBreak: 'break-word', lineHeight: 1.5 },
   commentDeleteBtn: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
@@ -456,9 +454,13 @@ const S = {
   },
   commentConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
   commentConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-  commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
+  commentConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 4, textDecoration: 'underline' },
   commentInputRow: { display: 'flex', gap: 8, marginTop: 14, paddingTop: 14, borderTop: '1px solid var(--color-border)' },
   commentInputRowCompact: { marginTop: 10, paddingTop: 10 },
-  commentInput: { flex: 1, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)' },
-  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 700, cursor: 'pointer' },
+  // minWidth: 0이 없으면 input의 자동 최소 크기(size 속성 기본값 20자 폭)가 하한이 되어
+  // flex:1인데도 그 아래로 줄지 않는다. 줄 폭이 모자라면 대신 옆의 '등록'이 오른쪽 밖으로
+  // 밀려난다 — 화면이 넓은 웹에서는 하한에 걸릴 일이 없어 기기에서만 드러났다.
+  commentInput: { flex: 1, minWidth: 0, padding: '10px 12px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)', color: 'var(--color-text)', transition: 'border-color 0.15s, box-shadow 0.15s' },
+  commentInputFocused: { borderColor: 'var(--color-selected)', boxShadow: '0 0 0 3px var(--color-selected-a20)' },
+  commentSendBtn: { flexShrink: 0, padding: '0 16px', background: 'var(--color-primary)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
 }

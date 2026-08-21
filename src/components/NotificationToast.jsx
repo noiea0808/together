@@ -135,7 +135,7 @@ const styles = {
   },
   icon: { fontSize: 20, flexShrink: 0, lineHeight: 1 },
   body: { flex: 1, minWidth: 0 },
-  title: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: 'var(--color-text)' },
+  title: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text)' },
   desc: {
     fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', marginTop: 2,
     overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box',
@@ -148,7 +148,7 @@ const styles = {
   actionRow: { display: 'flex', gap: 6, marginTop: 8 },
   acceptBtn: {
     flex: 1, padding: '7px 0', background: 'var(--color-primary)', color: '#fff', border: 'none',
-    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 700, cursor: 'pointer',
+    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-2xs)', fontWeight: 600, cursor: 'pointer',
   },
   declineBtn: {
     flex: 1, padding: '7px 0', background: 'none', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)',

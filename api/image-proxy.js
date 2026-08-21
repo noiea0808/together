@@ -8,6 +8,8 @@ const FETCH_TIMEOUT_MS = 6000
 const MAX_IMAGE_BYTES = 8_000_000
 
 export default async function handler(req, res) {
+  // link-preview.js와 동일한 이유(Capacitor WebView 오리진 https://localhost)로 허용.
+  res.setHeader('Access-Control-Allow-Origin', '*')
   const { url, error } = parseSafeUrl(req.query?.url)
   if (error) {
     res.status(400).json({ error })

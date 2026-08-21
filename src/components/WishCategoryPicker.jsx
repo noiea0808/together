@@ -30,7 +30,7 @@ const S = {
     padding: '8px 2px', borderRadius: 'var(--radius-md)', border: '1.5px solid var(--color-border)',
     background: 'var(--color-surface)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  btnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a05)' },
+  btnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-surface)' },
   label: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.2 },
-  labelActive: { color: 'var(--color-primary)' },
+  labelActive: { color: 'var(--color-primary-text)' },
 }

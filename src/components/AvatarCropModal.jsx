@@ -128,7 +128,7 @@ export default function AvatarCropModal({ file, onCancel, onConfirm, uploading }
 const S = {
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 400, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 340, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  title: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  title: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   desc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', margin: 0 },
   viewport: {
     width: VIEWPORT, height: VIEWPORT, borderRadius: '50%', overflow: 'hidden',

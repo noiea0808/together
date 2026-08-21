@@ -11,7 +11,11 @@
     "test": "vitest run",
     "cap:sync": "npm run build && npx cap sync android",
     "cap:open:android": "npx cap open android",
-    "cap:assets": "npx @capacitor/assets generate --android"
+    "cap:assets": "npx @capacitor/assets generate --android",
+    "build:stg": "node scripts/generate-icons.mjs && vite build --mode stg",
+    "cap:add:stg": "node scripts/cap-stg.mjs add",
+    "cap:sync:stg": "npm run build:stg && node scripts/cap-stg.mjs sync",
+    "cap:open:stg": "node scripts/cap-stg.mjs open"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

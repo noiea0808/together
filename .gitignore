@@ -29,13 +29,19 @@ supabase/.temp
 .vercel
 .env*
 
-# Capacitor / Android
+# Capacitor / Android — android/(프로덕션)와 android-stg/(STG, 나란히 설치용) 둘 다 적용
 android/app/build
 android/build
 android/.gradle
 android/local.properties
 android/app/release
 android/keystore.properties
+android-stg/app/build
+android-stg/build
+android-stg/.gradle
+android-stg/local.properties
+android-stg/app/release
+android-stg/keystore.properties
 *.keystore
 *.jks
 
@@ -44,3 +50,5 @@ android/keystore.properties
 # 들어있어 절대 커밋하면 안 된다.
 android/app/google-services.json
 android/app/*firebase-adminsdk*.json
+android-stg/app/google-services.json
+android-stg/app/*firebase-adminsdk*.json

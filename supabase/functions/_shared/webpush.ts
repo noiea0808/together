@@ -73,7 +73,11 @@ export async function sendPushToUsers(
     if (r.status === 'rejected') {
       const reason = r.reason as { statusCode?: number; body?: string; message?: string }
       const statusCode = reason?.statusCode
-      if (statusCode === 404 || statusCode === 410) staleEndpoints.push(subs![i].endpoint)
+      // 404/410: 브라우저가 구독을 폐기한 경우.
+      // 403: VAPID 키를 재발급하기 전에 만들어진 구독 — 지금 서버 키로는 영영 서명이 안 맞아
+      //      매 발송마다 실패만 쌓인다. 지워두면 그 사람이 다음에 앱을 열 때 push.js의
+      //      syncPushSubscription이 현재 공개키로 새로 구독하므로 저절로 복구된다.
+      if (statusCode === 404 || statusCode === 410 || statusCode === 403) staleEndpoints.push(subs![i].endpoint)
       // endpoint 전체는 구독자 식별에 쓰일 수 있어 응답엔 끝 8자만 남긴다.
       failures.push({
         target: '...' + subs![i].endpoint.slice(-8),
@@ -87,11 +91,13 @@ export async function sendPushToUsers(
   }
 
   // FCM 시크릿이 없으면 sendFcmToUsers가 즉시 빈 결과를 돌려주므로 웹 푸시만 있어도 그대로 동작한다.
-  const fcmResult = await sendFcmToUsers(admin, userIds, payload).catch((e) => ({
-    sent: 0,
-    failed: 1,
-    failures: [{ target: 'fcm', message: e instanceof Error ? e.message : String(e) }],
-  }))
+  // 여기서 잡히는 건 토큰별 실패(sendFcmToUsers 내부에서 이미 로그됨)가 아니라 OAuth2 토큰
+  // 발급 실패 등 발송 자체를 막는 예외라 별도로 로그를 남긴다.
+  const fcmResult = await sendFcmToUsers(admin, userIds, payload).catch((e) => {
+    const message = e instanceof Error ? e.message : String(e)
+    console.error('[fcm] 발송 자체 실패:', message)
+    return { sent: 0, failed: 1, failures: [{ target: 'fcm', message }] }
+  })
 
   return {
     sent: results.filter((r) => r.status === 'fulfilled').length + fcmResult.sent,

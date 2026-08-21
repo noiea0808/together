@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react'
+import { createContext, useContext, useState, useEffect, useRef } from 'react'
 import { supabase } from './supabase'
 import { getSessionUser, fetchProfileForAuthUser } from './db'
 
@@ -21,9 +21,35 @@ async function withRetry(fn, retries = 2, delayMs = 800) {
 export function UserProvider({ children }) {
   const [user, setUser] = useState(undefined) // undefined = 로딩중
 
+  // check()가 항상 최신 user 값을 보게 하려고 ref로도 같이 들고 있는다 — 아래 useEffect는
+  // 마운트 시 한 번만 실행되므로([] 의존성), 그 안의 클로저는 최초 state(undefined)에 갇혀
+  // 있어서 이후 값을 알 수 없다.
+  const userRef = useRef(undefined)
+  const checkingRef = useRef(false)
+  const setUserBoth = (value) => { userRef.current = value; setUser(value) }
+
   useEffect(() => {
-    // 초기 세션 확인 — 재시도까지 다 실패하면 그제서야 비로그인으로 확정한다.
-    withRetry(getSessionUser).then(setUser).catch(() => setUser(null))
+    // 초기/재연결 세션 확인. 여기서 던져진 에러는 절대 로그아웃으로 해석하지 않는다 —
+    // getSessionUser()가 던지는 경우는 (1) 로컬에 세션이 남아있는데 리프레시가 네트워크
+    // 문제로 실패했거나 (2) 프로필 조회가 네트워크/서버 문제로 실패한 경우뿐이고, 둘 다
+    // "세션이 없다"는 확정 신호가 아니다(세션이 정말 없으면 네트워크 없이 즉시 null이 온다).
+    // 진짜 로그아웃(리프레시 토큰이 서버에서 거부됨 등)은 supabase가 내부적으로 세션을
+    // 지우면서 SIGNED_OUT 이벤트를 반드시 같이 쏴주므로, 그건 아래 onAuthStateChange가 처리한다.
+    // 그래서 여기서 실패하면 로딩 상태로 남겨두고, 재연결되는 시점(online/visibilitychange)에
+    // 다시 시도한다 — 살아있는 세션을 오인해서 로그인 화면으로 튕겨내는 걸 막기 위함.
+    const check = () => {
+      if (userRef.current !== undefined || checkingRef.current) return
+      checkingRef.current = true
+      withRetry(getSessionUser)
+        .then(setUserBoth)
+        .catch((e) => console.error(e))
+        .finally(() => { checkingRef.current = false })
+    }
+
+    check()
+    window.addEventListener('online', check)
+    const onVisible = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVisible)
 
     // 로그인/로그아웃 상태 변경 구독.
     // 콜백을 async로 두고 그 안에서 supabase.auth.getSession() 등 auth 락이 필요한 호출을
@@ -37,7 +63,7 @@ export function UserProvider({ children }) {
       if (event === 'SIGNED_IN') {
         if (!session) return
         withRetry(() => fetchProfileForAuthUser(session.user))
-          .then(setUser)
+          .then(setUserBoth)
           .catch((e) => {
             // 로그인 자체는 성공했는데 프로필 조회가 계속 실패하는 경우 — 여기서 null로
             // 덮어쓰면 애써 로그인한 사용자를 다시 로그인 화면으로 튕겨내게 되니, 기존 상태를
@@ -45,19 +71,23 @@ export function UserProvider({ children }) {
             console.error(e)
           })
       } else if (event === 'SIGNED_OUT') {
-        setUser(null)
+        setUserBoth(null)
       }
     })
 
-    return () => subscription.unsubscribe()
+    return () => {
+      subscription.unsubscribe()
+      window.removeEventListener('online', check)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
-  const login = (userData) => setUser(userData)
+  const login = (userData) => setUserBoth(userData)
 
   const logout = async () => {
     const { signOut } = await import('./db')
     await signOut()
-    setUser(null)
+    setUserBoth(null)
   }
 
   return (

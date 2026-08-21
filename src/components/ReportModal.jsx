@@ -100,7 +100,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', alignItems: 'stretch', gap: 'var(--spacing-md)',
   },
   emoji: { fontSize: 40, textAlign: 'center' },
-  title: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
+  title: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center' },
   desc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', margin: 0, lineHeight: 1.6 },
   reasonList: { display: 'flex', flexDirection: 'column', gap: 8 },
   reasonBtn: {

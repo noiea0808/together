@@ -63,7 +63,7 @@ export function PeopleIcon({ active }) {
 }
 
 export function UserIcon({ active }) {
-  const borderStyle = { border: `2px solid ${active ? 'var(--color-primary)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
+  const borderStyle = { border: `2px solid ${active ? 'var(--color-selected)' : 'var(--color-border)'}`, borderRadius: '50%', boxSizing: 'border-box' }
   return active ? (
     <svg width="40" height="40" viewBox="0 0 24 24" fill="currentColor" style={borderStyle}>
       <circle cx="12" cy="7.5" r="4.3" />
@@ -105,7 +105,7 @@ export default function BottomNav() {
         return (
           <button
             key={path}
-            style={{ ...styles.tab, color: active ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
+            style={{ ...styles.tab, color: active ? 'var(--color-selected)' : 'var(--color-text-muted)' }}
             onClick={() => navigate(path)}
             aria-label={label}
           >
@@ -114,10 +114,10 @@ export default function BottomNav() {
                 <img
                   src={user.avatar_url}
                   alt=""
-                  style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-primary)' : '2px solid transparent' }}
+                  style={{ ...styles.avatarIcon, border: active ? '2px solid var(--color-selected)' : '2px solid transparent' }}
                 />
               ) : path === '/account' && user?.nickname ? (
-                <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-primary)' : '2px solid var(--color-border)' }}>
+                <div style={{ ...styles.avatarInitial, border: active ? '2px solid var(--color-selected)' : '2px solid var(--color-border)' }}>
                   {user.nickname[0]}
                 </div>
               ) : (
@@ -133,10 +133,14 @@ export default function BottomNav() {
 }
 
 const styles = {
+  // height를 못박아 --bottom-nav-height를 "실제 렌더 높이"로 만든다 — 본문 쪽 padding-bottom이
+  // 이 변수를 기준으로 잡히므로, 여기 높이가 콘텐츠에 따라 흘러 다니면 그 여백이 어긋난다.
+  // (box-sizing:border-box라 borderTop 1px + 탭 68px = 69px이 정확히 맞물린다.)
   nav: {
     position: 'fixed', bottom: 0, left: '50%',
     transform: 'translateX(-50%)',
     width: '100%', maxWidth: 'var(--max-width)',
+    height: 'var(--bottom-nav-space)',
     display: 'flex', borderTop: '1px solid var(--color-border)',
     background: 'var(--color-surface)',
     paddingBottom: 'var(--safe-area-inset-bottom)',
@@ -157,7 +161,7 @@ const styles = {
   avatarInitial: {
     width: 40, height: 40, borderRadius: '50%', boxSizing: 'border-box',
     display: 'flex', alignItems: 'center', justifyContent: 'center',
-    background: 'var(--color-primary)', color: 'white',
-    fontSize: 'var(--font-size-sm)', fontWeight: 800,
+    background: 'var(--color-selected)', color: 'white',
+    fontSize: 'var(--font-size-sm)', fontWeight: 700,
   },
 }

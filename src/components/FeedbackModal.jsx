@@ -106,7 +106,7 @@ const styles = {
     display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', overflow: 'hidden',
   },
   header: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 },
-  title: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  title: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   closeBtn: { background: 'none', border: 'none', fontSize: 18, cursor: 'pointer', color: 'var(--color-text-muted)', padding: 4 },
 
   list: { flex: 1, minHeight: 60, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 10, paddingRight: 2 },
@@ -115,7 +115,7 @@ const styles = {
   itemMineRow: { display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
   itemMine: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   itemDate: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
-  itemReply: { fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
+  itemReply: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text)', fontWeight: 600, lineHeight: 1.5, whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   itemPending: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
 
   composeRow: { flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 'var(--spacing-md)', borderTop: '1px solid var(--color-border)' },

@@ -147,35 +147,35 @@ export default function FeedbackPage() {
 
 const s = {
   header: { marginBottom: 20 },
-  title: { fontSize: 22, fontWeight: 800, margin: 0 },
+  title: { fontSize: 22, fontWeight: 700, margin: 0 },
   subtitle: { fontSize: 13, color: '#6A6A80', marginTop: 6, maxWidth: 560, lineHeight: 1.5 },
   muted: { color: '#8A8AA0', fontSize: 14 },
 
   tabRow: { display: 'flex', gap: 6, marginBottom: 18 },
   tabBtn: {
     display: 'flex', alignItems: 'center', gap: 6, border: '1.5px solid #DDD', background: '#fff',
-    color: '#6A6A80', borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 700, cursor: 'pointer',
+    color: '#6A6A80', borderRadius: 999, padding: '7px 14px', fontSize: 13, fontWeight: 600, cursor: 'pointer',
   },
   tabBtnActive: { borderColor: '#FF6B35', background: '#FF6B35', color: '#fff' },
   tabCount: { fontSize: 11, opacity: 0.8 },
 
   table: { width: '100%', borderCollapse: 'collapse', background: '#fff', borderRadius: 10, overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.06)' },
-  th: { textAlign: 'left', fontSize: 11, fontWeight: 700, color: '#8A8AA0', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 14px', borderBottom: '1px solid #EEE', background: '#FAFAFC' },
+  th: { textAlign: 'left', fontSize: 11, fontWeight: 600, color: '#8A8AA0', textTransform: 'uppercase', letterSpacing: 0.5, padding: '12px 14px', borderBottom: '1px solid #EEE', background: '#FAFAFC' },
   tr: { borderBottom: '1px solid #F0F0F4', cursor: 'pointer' },
   td: { padding: '12px 14px', fontSize: 13, color: '#1A1A1A', verticalAlign: 'middle' },
-  statusBadge: { fontSize: 11, fontWeight: 700, padding: '2px 8px', borderRadius: 4 },
+  statusBadge: { fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 4 },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 500, padding: 24 },
   modal: { width: '100%', maxWidth: 560, maxHeight: '88vh', overflowY: 'auto', background: '#fff', borderRadius: 14, padding: 28, display: 'flex', flexDirection: 'column', gap: 16 },
-  modalTitle: { fontSize: 18, fontWeight: 800, margin: 0 },
+  modalTitle: { fontSize: 18, fontWeight: 700, margin: 0 },
   modalMeta: { display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginTop: -8 },
   modalMetaText: { fontSize: 12, color: '#8A8AA0', fontWeight: 600 },
   modalContent: { fontSize: 14, color: '#1A1A1A', lineHeight: 1.7, whiteSpace: 'pre-wrap', background: '#FAFAFC', border: '1px solid #EEE', borderRadius: 8, padding: 14 },
   formRow: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1 },
-  label: { fontSize: 12, fontWeight: 700, color: '#4A4A60' },
+  label: { fontSize: 12, fontWeight: 600, color: '#4A4A60' },
   input: { padding: '10px 12px', border: '1.5px solid #DDD', borderRadius: 8, fontSize: 14, outline: 'none', boxSizing: 'border-box', width: '100%' },
   repliedHint: { fontSize: 12, color: '#9090A8', margin: 0 },
   modalBtns: { display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 },
-  cancelBtn: { background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
-  saveBtn: { background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 700, cursor: 'pointer' },
+  cancelBtn: { background: '#F0F0F4', color: '#4A4A60', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
+  saveBtn: { background: '#FF6B35', color: '#fff', border: 'none', borderRadius: 8, padding: '10px 18px', fontSize: 13, fontWeight: 600, cursor: 'pointer' },
 }

@@ -15,7 +15,7 @@ export default function StatusIcon({ statusKey, size = 24, muted = false, style,
       alt=""
       width={size}
       height={size}
-      style={{ display: 'block', objectFit: 'contain', opacity: muted ? 0.55 : 1, filter: `${muted ? 'grayscale(0.4) ' : ''}drop-shadow(0 2px 3px rgba(43,34,24,0.24))`, ...style }}
+      style={{ display: 'block', objectFit: 'contain', opacity: muted ? 0.35 : 1, filter: `${muted ? 'grayscale(0.7) ' : ''}drop-shadow(0 2px 3px rgba(43,34,24,0.24))`, ...style }}
       {...props}
     />
   )

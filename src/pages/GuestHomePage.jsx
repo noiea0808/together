@@ -87,7 +87,7 @@ export default function GuestHomePage() {
                       <>
                         <div style={styles.slotStatusRow}>
                           <span style={{ fontSize: 18, lineHeight: 1 }}>{opt.emoji}</span>
-                          <span style={{ fontSize: 12, fontWeight: 700, color: opt.color }}>{opt.label}</span>
+                          <span style={{ fontSize: 12, fontWeight: 600, color: opt.color }}>{opt.label}</span>
                         </div>
                         <div style={styles.slotMeta}>{pot.meal_time?.slice(0, 5)}</div>
                         <div style={{ ...styles.slotMeta, fontSize: 11 }}>{pot.title}</div>
@@ -136,14 +136,14 @@ const styles = {
 
   // TodayPage.dateNav와 동일한 이유로 margin-top을 음수로 줘서 .page의 top padding을 상쇄한다.
   dateNav: { position: 'sticky', zIndex: 10, display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', background: 'rgba(250,248,245,0.96)', backdropFilter: 'blur(8px)', margin: 'calc(-1 * var(--spacing-md)) calc(-1 * var(--spacing-md)) 0', width: 'calc(100% + 2 * var(--spacing-md))' },
-  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-lg)', letterSpacing: '-0.3px' },
-  guestTag: { fontSize: 'var(--font-size-xs)', fontWeight: 800, color: '#fff', background: '#FF9800', borderRadius: 'var(--radius-full)', padding: '2px 10px' },
+  datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-lg)', letterSpacing: '-0.3px' },
+  guestTag: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: '#fff', background: 'var(--color-selected)', borderRadius: 'var(--radius-full)', padding: '2px 10px' },
 
   myCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-sm)', boxShadow: 'var(--shadow-sm)' },
-  myCardTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)', letterSpacing: '-0.3px' },
+  myCardTitle: { fontWeight: 700, fontSize: 'var(--font-size-base)', letterSpacing: '-0.3px' },
   slotGrid: { display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8 },
   slotCard: { display: 'flex', flexDirection: 'column', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', overflow: 'hidden' },
-  slotName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)' },
+  slotName: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-muted)', textAlign: 'center', padding: '10px 4px 9px', background: 'rgba(0,0,0,0.02)', borderBottom: '1px solid rgba(0,0,0,0.05)' },
   slotBody: { display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 4, padding: '8px 4px 10px', minHeight: 68 },
   slotStatusRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
   slotMeta: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', textAlign: 'center', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '100%' },
@@ -151,11 +151,11 @@ const styles = {
   disabledNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', margin: '2px 0 0' },
 
   section: { display: 'flex', flexDirection: 'column', gap: 8 },
-  sectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  sectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-muted)' },
   groupCard: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-md)', boxShadow: 'var(--shadow-sm)' },
-  groupName: { fontWeight: 800, fontSize: 'var(--font-size-base)', letterSpacing: '-0.3px' },
+  groupName: { fontWeight: 700, fontSize: 'var(--font-size-base)', letterSpacing: '-0.3px' },
   pots: { display: 'flex', flexDirection: 'column', gap: 8 },
 
-  signupCard: { marginTop: 'auto', textAlign: 'center', background: 'linear-gradient(135deg, #FFF4EF 0%, #FFE8DC 100%)', border: '1.5px solid #FFD6C0', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
+  signupCard: { marginTop: 'auto', textAlign: 'center', background: 'linear-gradient(135deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%)', border: '1.5px solid var(--color-hero-border)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
   signupText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', lineHeight: 1.6, margin: 0 },
 }

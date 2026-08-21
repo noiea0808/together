@@ -270,19 +270,19 @@ const styles = {
   },
   top: { textAlign: 'center' },
   logo: { fontSize: 48, marginBottom: 8 },
-  title: { fontSize: 'var(--font-size-xl)', fontWeight: 900, marginBottom: 6 },
+  title: { fontSize: 'var(--font-size-xl)', fontWeight: 700, marginBottom: 6 },
   sub: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)' },
   tabs: { display: 'flex', width: '100%', gap: 8 },
   tab: {
     flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4,
-    padding: '10px 0', border: '1.5px solid var(--color-border)',
-    borderRadius: 'var(--radius-full)', background: 'transparent',
-    fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer',
+    padding: '10px 0', border: 'none',
+    borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)',
+    fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer',
     color: 'var(--color-text-muted)',
   },
   tabActive: {
-    border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)',
-    color: 'var(--color-primary)',
+    background: 'var(--color-selected)',
+    color: 'var(--color-on-selected)',
   },
   card: {
     width: '100%', background: 'var(--color-surface)',
@@ -310,6 +310,6 @@ const styles = {
     padding: '12px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)',
     background: 'var(--color-bg)', cursor: 'pointer', fontFamily: 'inherit', textAlign: 'left',
   },
-  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)' },
+  searchResultName: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text)' },
   searchResultCount: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
 }

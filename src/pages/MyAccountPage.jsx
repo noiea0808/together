@@ -3,11 +3,14 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
 import { useEscKey } from '../lib/useEscKey'
 import {
-  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setAutoFriendGroupmates,
-  getWishPlaces, addWishPlace, updateWishPlace, deleteWishPlace, updateWishPlaceOrder,
+  updateNickname, uploadAvatar, deleteAccount, setDiscoverable, setLunchReminderEnabled, setActivityNotifyEnabled, setAutoFriendGroupmates,
+  getWishPlaces, addWishPlace, updateWishPlace, updateWishPlacePreview, deleteWishPlace, updateWishPlaceOrder,
   getMyGroups, setWishPlaceShares, getMyWishPlaceReactions, getWishPlaceComments, deleteWishPlaceComment,
   getWishPlaceLikers, addWishPlaceComment,
+  updateActiveSlots,
 } from '../lib/db'
+import { SLOT_KEYS } from '../lib/potConstants'
+import SlotIcon from '../components/SlotIcon'
 import FeedbackModal from '../components/FeedbackModal'
 import { openDailyTipModal } from '../components/DailyTipModal'
 import { useInstallPrompt } from '../hooks/useInstallPrompt'
@@ -21,6 +24,7 @@ import LinkPreviewCard, { extractFirstUrl, textWithoutUrl } from '../components/
 import WishCategoryIcon from '../components/WishCategoryIcon'
 import WishCategoryPicker from '../components/WishCategoryPicker'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { avatarColor } from '../lib/avatarColor'
 
 const MAX_AVATAR_SIZE = 5 * 1024 * 1024 // 5MB
 
@@ -35,7 +39,7 @@ function ToggleSwitch({ on, onClick, disabled, label }) {
       aria-label={label}
       onClick={onClick}
       disabled={disabled}
-      style={{ ...styles.toggleTrack, background: on ? 'var(--color-success)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
+      style={{ ...styles.toggleTrack, background: on ? 'var(--color-toggle-on)' : 'var(--color-border)', opacity: disabled ? 0.6 : 1 }}
     >
       <span style={{ ...styles.toggleThumb, transform: on ? 'translateX(20px)' : 'translateX(0)' }} />
     </button>
@@ -80,6 +84,33 @@ function SettingsRow({ title, description, right, onClick, last }) {
   )
 }
 
+// 사용 슬롯 설정 카드 하나 — 누르면 앞(사용중)/뒤(미사용)로 뒤집히며 토글된다.
+function SlotToggleCard({ slot, active, busy, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={busy}
+      aria-pressed={active}
+      aria-label={`${slot} ${active ? '사용중' : '미사용'}`}
+      style={{ ...styles.slotCardOuter, opacity: busy ? 0.6 : 1 }}
+    >
+      <div style={{ ...styles.slotCardInner, transform: active ? 'rotateY(0deg)' : 'rotateY(180deg)' }}>
+        <div style={{ ...styles.slotCardFace, ...styles.slotCardFront }}>
+          <SlotIcon slot={slot} size={20} />
+          <span style={styles.slotCardLabel}>{slot}</span>
+          <span style={styles.slotCardBadgeOn}>사용중</span>
+        </div>
+        <div style={{ ...styles.slotCardFace, ...styles.slotCardBack }}>
+          <SlotIcon slot={slot} size={20} muted />
+          <span style={{ ...styles.slotCardLabel, color: 'var(--color-text-muted)' }}>{slot}</span>
+          <span style={styles.slotCardBadgeOff}>미사용</span>
+        </div>
+      </div>
+    </button>
+  )
+}
+
 export default function MyAccountPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
@@ -98,7 +129,12 @@ export default function MyAccountPage() {
   const [avatarError, setAvatarError] = useState(null)
   const [cropFile, setCropFile] = useState(null)
   const avatarInputRef = useRef(null)
-  const [pushEnabled, setPushEnabled] = useState(false)
+  // pushEnabled(활동 알림)와 lunchReminderEnabled(점심 상태 리마인드)는 서로 독립적인
+  // DB 컬럼(notify_activity / notify_lunch_reminder)이다. hasPushSubscription은 둘 중
+  // 하나라도 켜져 있으면 필요한 "이 기기가 푸시를 받을 수 있는 상태인지"를 나타내는
+  // 순수 인프라 플래그로, 어느 토글의 on/off 표시에도 직접 쓰이지 않는다.
+  const [pushEnabled, setPushEnabled] = useState(user?.notify_activity ?? true)
+  const [hasPushSubscription, setHasPushSubscription] = useState(false)
   const [pushLoading, setPushLoading] = useState(false)
   const [pushError, setPushError] = useState(null)
   const [discoverable, setDiscoverableState] = useState(user?.is_discoverable ?? true)
@@ -107,6 +143,11 @@ export default function MyAccountPage() {
   const [autoFriendGroupmatesLoading, setAutoFriendGroupmatesLoading] = useState(false)
   const [lunchReminderEnabled, setLunchReminderState] = useState(user?.notify_lunch_reminder ?? true)
   const [lunchReminderLoading, setLunchReminderLoading] = useState(false)
+  // 메인 화면에 표시할 슬롯 — 순수 디스플레이 선호. 꺼도 그 슬롯에 실제 잡힌 일정이 있는
+  // 날짜는 TodayPage가 예외적으로 계속 보여주므로, 여기서는 데이터 정리 없이 즉시 토글한다.
+  const [activeSlots, setActiveSlotsState] = useState(user?.active_slots ?? SLOT_KEYS)
+  const [slotBusy, setSlotBusy] = useState(null) // 확인 중인 슬롯 (중복 클릭 방지)
+  const [slotError, setSlotError] = useState(null)
   const [showFeedbackModal, setShowFeedbackModal] = useState(false)
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false)
 
@@ -141,7 +182,7 @@ export default function MyAccountPage() {
 
   useEffect(() => {
     if (!isPushSupported()) return
-    getPushSubscription().then((sub) => setPushEnabled(!!sub)).catch(() => {})
+    getPushSubscription().then((sub) => setHasPushSubscription(!!sub)).catch(() => {})
   }, [])
 
 
@@ -263,6 +304,17 @@ export default function MyAccountPage() {
     }
   }
 
+  // LinkPreviewCard가 처음 가져오거나(등록 직후) 새로고침 버튼으로 다시 가져온 미리보기를
+  // DB에 저장해 다음부터는 다시 긁어오지 않고 바로 보여준다. data가 null이면(요청 자체 실패)
+  // 저장하지 않고 다음에 다시 시도할 수 있게 둔다.
+  const handleWishPreviewFetched = (placeId, data) => {
+    if (!data) return
+    updateWishPlacePreview(placeId, data).catch(e => console.error(e))
+    setWishPlaces(prev => prev.map(p => p.id === placeId
+      ? { ...p, preview_title: data.title ?? null, preview_description: data.description ?? null, preview_image: data.image ?? null, preview_site_name: data.siteName ?? null }
+      : p))
+  }
+
   const toggleNewWishGroup = (groupId) => {
     setNewWishGroupIds(prev => prev.includes(groupId) ? prev.filter(id => id !== groupId) : [...prev, groupId])
   }
@@ -307,7 +359,11 @@ export default function MyAccountPage() {
       await updateWishPlace(editingWishId, content, editingWishCategory)
       await setWishPlaceShares(editingWishId, editingWishGroupIds)
       const shares = editingWishGroupIds.map(group_id => ({ group_id }))
-      setWishPlaces(prev => prev.map(p => p.id === editingWishId ? { ...p, content, category: editingWishCategory, wish_place_shares: shares } : p))
+      // 링크가 바뀌었을 수 있어 db.js의 updateWishPlace가 저장된 미리보기를 서버에서 비웠다 —
+      // 로컬 상태도 맞춰서 비워야 LinkPreviewCard가 새 링크로 다시 가져온다.
+      setWishPlaces(prev => prev.map(p => p.id === editingWishId
+        ? { ...p, content, category: editingWishCategory, wish_place_shares: shares, preview_title: null, preview_description: null, preview_image: null, preview_site_name: null }
+        : p))
       cancelEditWish()
     } catch (e) {
       console.error(e)
@@ -349,13 +405,24 @@ export default function MyAccountPage() {
     setPushLoading(true)
     setPushError(null)
     try {
-      if (pushEnabled) {
-        await unsubscribeFromPush()
-        setPushEnabled(false)
+      const next = !pushEnabled
+      if (next) {
+        // 아직 이 기기가 구독 전이면(리마인드도 꺼져 있던 경우) 지금 만들어준다.
+        if (!hasPushSubscription) {
+          await subscribeToPush(user.id)
+          setHasPushSubscription(true)
+        }
+        await setActivityNotifyEnabled(user.id, true)
       } else {
-        await subscribeToPush(user.id)
-        setPushEnabled(true)
+        await setActivityNotifyEnabled(user.id, false)
+        // 리마인드가 켜져 있으면 그쪽에 구독이 계속 필요하니 지금은 끄지 않는다.
+        if (!lunchReminderEnabled) {
+          await unsubscribeFromPush()
+          setHasPushSubscription(false)
+        }
       }
+      setPushEnabled(next)
+      login({ ...user, notify_activity: next })
     } catch (e) {
       console.error(e)
       setPushError(e.message || '알림 설정에 실패했어요.')
@@ -449,13 +516,23 @@ export default function MyAccountPage() {
     setPushError(null)
     try {
       const next = !lunchReminderEnabled
-      // 리마인드는 활동 알림과 별개 항목이지만 발송에는 같은 브라우저 푸시 구독이 필요하므로,
-      // 아직 구독 전이면 켜는 시점에 대신 구독해준다.
-      if (next && !pushEnabled) {
-        await subscribeToPush(user.id)
-        setPushEnabled(true)
+      // 리마인드는 활동 알림과 완전히 독립된 항목이지만 발송에는 같은 푸시 구독이 필요하므로,
+      // 아직 구독 전이면 켜는 시점에 대신 구독해준다. (활동 알림 토글은 건드리지 않는다 —
+      // notify_activity 컬럼이 따로 있어서 여기서 구독만 만들어도 그쪽이 켜진 것으로 보이지 않는다.)
+      if (next) {
+        if (!hasPushSubscription) {
+          await subscribeToPush(user.id)
+          setHasPushSubscription(true)
+        }
+        await setLunchReminderEnabled(user.id, true)
+      } else {
+        await setLunchReminderEnabled(user.id, false)
+        // 활동 알림이 켜져 있으면 그쪽에 구독이 계속 필요하니 지금은 끄지 않는다.
+        if (!pushEnabled) {
+          await unsubscribeFromPush()
+          setHasPushSubscription(false)
+        }
       }
-      await setLunchReminderEnabled(user.id, next)
       setLunchReminderState(next)
       login({ ...user, notify_lunch_reminder: next })
     } catch (e) {
@@ -463,6 +540,30 @@ export default function MyAccountPage() {
       setPushError(e.message || '알림 설정에 실패했어요.')
     } finally {
       setLunchReminderLoading(false)
+    }
+  }
+
+  // 슬롯 켜기/끄기 — 순수 디스플레이 선호라 데이터 정리 없이 즉시 반영한다.
+  // 꺼도 실제 잡힌 일정이 있는 날짜는 TodayPage가 예외로 계속 보여준다.
+  const handleSlotToggle = async (slot) => {
+    if (slotBusy) return
+    const turningOn = !activeSlots.includes(slot)
+    if (!turningOn && activeSlots.length <= 1) {
+      setSlotError('최소 1개 슬롯은 사용 중이어야 해요.')
+      return
+    }
+    setSlotBusy(slot)
+    setSlotError(null)
+    try {
+      const next = turningOn ? [...activeSlots, slot] : activeSlots.filter(s => s !== slot)
+      await updateActiveSlots(user.id, next)
+      setActiveSlotsState(next)
+      login({ ...user, active_slots: next })
+    } catch (e) {
+      console.error(e)
+      setSlotError('설정을 저장하지 못했어요.')
+    } finally {
+      setSlotBusy(null)
     }
   }
 
@@ -554,7 +655,26 @@ export default function MyAccountPage() {
           {/* 홈 화면 설치 — 닉네임 카드 바로 아래, 페이지 스크롤을 따라가는 일반 위치.
               설치/바로가기가 이미 돼 있으면 컴포넌트 안에서 알아서 "설치됨" 배지로 바뀐다.
               settingsGroup의 기본 gap 절반만큼 끌어올려 바로 위 카드와의 간격만 좁힌다. */}
-          <InstallAppPrompt hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
+          <InstallAppPrompt variant="subtle" hideDesc buttonLabel="바로가기 안내" style={{ marginTop: 'calc(var(--spacing-xl) / -2)' }} />
+
+          {/* 사용 슬롯 설정 — 메인 화면 서브탭에 보여줄 슬롯을 고른다. 카드를 뒤집어 사용/미사용을
+              표시하며, 오늘 이후로만 적용되고 지난 날짜 기록은 그대로 보인다. */}
+          <div style={styles.settingsSection}>
+            <h2 style={styles.settingsSectionTitle}>사용 슬롯 설정</h2>
+            <p style={styles.slotSectionDesc}>자주 쓰지 않는 슬롯은 꺼서 메인 화면을 단순하게 정리할 수 있어요. 오늘부터 적용되고, 지난 날짜 기록에는 영향을 주지 않아요.</p>
+            <div style={styles.slotGrid}>
+              {SLOT_KEYS.map(slot => (
+                <SlotToggleCard
+                  key={slot}
+                  slot={slot}
+                  active={activeSlots.includes(slot)}
+                  busy={slotBusy === slot}
+                  onClick={() => handleSlotToggle(slot)}
+                />
+              ))}
+            </div>
+            {slotError && <p style={styles.avatarErrorMsg}>{slotError}</p>}
+          </div>
 
           {/* 계정 공개 */}
           <SettingsSection title="계정 공개">
@@ -715,7 +835,14 @@ export default function MyAccountPage() {
                   </div>
                 </div>
                 {/* 링크는 원문 주소 대신 미리보기 카드로, 나머지 메모는 카드 뒤에 이어서 보여준다 */}
-                <LinkPreviewCard text={place.content} />
+                <LinkPreviewCard
+                  text={place.content}
+                  preview={place.preview_site_name != null
+                    ? { title: place.preview_title, description: place.preview_description, image: place.preview_image, siteName: place.preview_site_name }
+                    : null}
+                  onFetched={data => handleWishPreviewFetched(place.id, data)}
+                  editable
+                />
                 {(() => {
                   const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                   return text && <div style={styles.wishText}>{text}</div>
@@ -775,7 +902,7 @@ export default function MyAccountPage() {
                                 {l.avatar_url ? (
                                   <img src={l.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                 ) : (
-                                  <div style={styles.wishProposalAvatar}>{l.nickname?.[0] ?? '?'}</div>
+                                  <div style={{ ...styles.wishProposalAvatar, background: avatarColor(l.nickname) }}>{l.nickname?.[0] ?? '?'}</div>
                                 )}
                                 <span style={styles.wishProposalName}>{l.nickname}</span>
                               </div>
@@ -796,7 +923,7 @@ export default function MyAccountPage() {
                                   {c.avatar_url ? (
                                     <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                   ) : (
-                                    <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                    <div style={{ ...styles.wishProposalAvatar, background: avatarColor(c.nickname) }}>{c.nickname?.[0] ?? '?'}</div>
                                   )}
                                   <div style={styles.wishProposalTextCol}>
                                     <button style={styles.wishProposalNameBtn} onClick={() => insertMention(c)}>{c.nickname}</button>
@@ -977,7 +1104,7 @@ export default function MyAccountPage() {
 
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--spacing-xl) + var(--safe-area-inset-bottom))' },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },
 
   // 프로필 카드와 3개 설정 섹션을 한 그룹으로 묶어, 페이지 내 다른 블록(설치 안내, 로그아웃)과는
   // 구분되는 넉넉한 간격을 준다.
@@ -989,23 +1116,23 @@ const styles = {
     borderRadius: 'var(--radius-lg)', cursor: 'pointer',
   },
   avatarWrap: { position: 'relative', flexShrink: 0, cursor: 'pointer' },
-  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  avatar: { width: 52, height: 52, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   avatarImg: { width: 52, height: 52, borderRadius: '50%', objectFit: 'cover', display: 'block' },
   avatarEditBadge: {
     position: 'absolute', bottom: -2, right: -2, width: 19, height: 19, borderRadius: '50%',
-    background: '#5C5650', color: '#fff', fontSize: 11, display: 'flex',
+    background: 'var(--warm-800)', color: '#fff', fontSize: 11, display: 'flex',
     alignItems: 'center', justifyContent: 'center', border: '2px solid var(--color-surface)',
   },
   avatarErrorMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-danger)', margin: 0 },
   profileInfo: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 3 },
-  profileName: { fontWeight: 700, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' },
+  profileName: { fontWeight: 600, fontSize: 'var(--font-size-sm)', color: 'var(--color-text)' },
   profileEmail: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
   savedMsg: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-success)', fontWeight: 600, margin: '2px 0 0' },
 
   // 섹션 = 제목(굵게, 카드 밖) + 카드 하나(그 안에서 행들을 얇은 구분선으로만 나눔).
   // 카드를 행마다 만들지 않고 섹션마다 하나만 써서 테두리가 과도해지지 않게 한다.
   settingsSection: { display: 'flex', flexDirection: 'column', gap: 10 },
-  settingsSectionTitle: { fontSize: 16, fontWeight: 700, color: 'var(--color-text)', margin: '0 0 0 4px' },
+  settingsSectionTitle: { fontSize: 16, fontWeight: 600, color: 'var(--color-text)', margin: '0 0 0 4px' },
   settingsList: {
     display: 'flex', flexDirection: 'column',
     background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-lg)',
@@ -1022,54 +1149,70 @@ const styles = {
   settingsRowDesc: { fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', lineHeight: 1.5 },
   settingsNotice: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', padding: '18px 20px', margin: 0 },
 
+  slotSectionDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', lineHeight: 1.5, margin: '-4px 4px 0' },
+  // 메인 화면 슬롯 서브탭(subSlotRow)과 같은 방식 — 6개를 한 행에 꽉 채워 배열한다.
+  slotGrid: { display: 'flex', alignItems: 'stretch', gap: 4 },
+  // perspective는 카드 하나하나가 아니라 바깥(버튼)에 걸어야 뒤집힐 때 입체감이 생긴다.
+  slotCardOuter: { flex: '1 1 0', minWidth: 0, background: 'none', border: 'none', padding: 0, cursor: 'pointer', perspective: 700, height: 72, fontFamily: 'inherit', WebkitTapHighlightColor: 'transparent' },
+  slotCardInner: { position: 'relative', width: '100%', height: '100%', transformStyle: 'preserve-3d', transition: 'transform 0.45s cubic-bezier(0.4, 0.2, 0.2, 1)' },
+  // 뒷면은 애초에 180deg 돌려둔 채로 배치 — inner 전체가 뒤집히면 자연스럽게 정면을 보게 된다.
+  slotCardFace: { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 3, padding: '0 2px', boxSizing: 'border-box', borderRadius: 12, overflow: 'hidden', backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' },
+  slotCardFront: { background: 'var(--color-primary-a05)', border: '1.5px solid var(--color-primary)' },
+  slotCardBack: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-border)', transform: 'rotateY(180deg)' },
+  slotCardLabel: { fontSize: 11, fontWeight: 600, color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.15 },
+  slotCardBadgeOn: { fontSize: 11, fontWeight: 600, color: 'var(--color-chip-text)' },
+  slotCardBadgeOff: { fontSize: 11, fontWeight: 600, color: 'var(--color-text-muted)' },
+
   toggleTrack: { width: 46, height: 26, borderRadius: 13, border: 'none', padding: 2, position: 'relative', cursor: 'pointer', transition: 'background 0.2s', flexShrink: 0, boxSizing: 'border-box' },
   toggleThumb: { display: 'block', width: 22, height: 22, borderRadius: '50%', background: '#fff', boxShadow: '0 1px 3px rgba(0,0,0,0.25)', transition: 'transform 0.2s' },
 
   installDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center' },
   modalOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'flex-end', justifyContent: 'center', zIndex: 300 },
-  modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32 },
+  modal: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 'calc(32px + var(--safe-area-inset-bottom))' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
+  dialogDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text-muted)', whiteSpace: 'pre-line', lineHeight: 1.7, textAlign: 'center' },
   dialogInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', textAlign: 'center' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
+  dialogBtnSecondary: { width: '100%', padding: 13, background: 'var(--color-surface-2)', color: 'var(--color-text)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
 
   withdrawWrap: { display: 'flex', justifyContent: 'center', marginTop: 14 },
   withdrawLink: { background: 'none', border: 'none', color: 'var(--color-danger)', fontSize: 'var(--font-size-2xs)', textDecoration: 'underline', cursor: 'pointer', padding: 4, opacity: 0.55 },
   withdrawIcon: { fontSize: 40, textAlign: 'center', marginBottom: 8 },
-  withdrawTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
+  withdrawTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawDesc: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', textAlign: 'center', lineHeight: 1.6, marginBottom: 'var(--spacing-md)' },
-  withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: '#FFF0F0', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: '#c62828', lineHeight: 1.8 },
+  withdrawList: { margin: '0 0 var(--spacing-lg)', padding: '12px 16px 12px 32px', background: 'var(--color-danger-bg)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', color: 'var(--color-danger)', lineHeight: 1.8 },
   withdrawConfirmLabel: { fontSize: 'var(--font-size-sm)', textAlign: 'center', marginBottom: 8, color: 'var(--color-text)' },
   withdrawInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginBottom: 'var(--spacing-md)' },
   withdrawInput: { flex: 1, padding: '12px var(--spacing-md)', border: '1.5px solid var(--color-danger)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-base)', outline: 'none', boxSizing: 'border-box', textAlign: 'center' },
   withdrawErrorMsg: { fontSize: 'var(--font-size-xs)', color: 'var(--color-danger)', textAlign: 'center', margin: '0 0 var(--spacing-sm)' },
-  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 800, cursor: 'pointer' },
+  withdrawBtn: { flexShrink: 0, padding: '12px 16px', background: 'var(--color-danger)', color: '#fff', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer' },
   withdrawCancel: { width: '100%', padding: 12, background: 'none', color: 'var(--color-text-muted)', border: 'none', fontSize: 'var(--font-size-sm)', fontWeight: 600, cursor: 'pointer' },
 
   tabs: { display: 'flex', gap: 6, padding: '10px var(--spacing-md) 0', flexShrink: 0 },
-  tabBtn: { flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  tabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
+  tabBtn: { flex: 1, padding: '9px 0', border: 'none', borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)', fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  tabBtnActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
 
   wishHeader: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
   wishCount: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600 },
   wishHeaderBtns: { display: 'flex', alignItems: 'center', gap: 6 },
-  wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishAddTriggerBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: '#fff', background: 'var(--color-primary)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 14px', cursor: 'pointer', fontFamily: 'inherit' },
 
   wishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   wishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   wishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
-  wishModalTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
+  wishModalTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', marginBottom: 12 },
   wishModalInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit', background: 'var(--color-surface)', color: 'var(--color-text)' },
 
   wishScopeBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2, marginBottom: 14 },
   wishScopeLabel: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishScopeChips: { display: 'flex', flexWrap: 'wrap', gap: 6 },
-  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   wishCardTop: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, flex: 1, minWidth: 0 },
   wishScopeBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
@@ -1077,7 +1220,7 @@ const styles = {
   wishScopeGroupChip: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '2px 8px' },
   wishMenuBtn: {
     width: 24, height: 24, borderRadius: '50%', border: 'none', background: 'transparent',
-    color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 900, cursor: 'pointer',
+    color: 'var(--color-text-muted)', fontSize: 16, fontWeight: 700, cursor: 'pointer',
     display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 0, lineHeight: 1, flexShrink: 0,
   },
   wishMenuBackdrop: { position: 'fixed', inset: 0, zIndex: 40 },
@@ -1095,20 +1238,20 @@ const styles = {
   wishProposalsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 4 },
   wishProposalsRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
   wishReactionRow: { display: 'flex', alignItems: 'center', gap: 10 },
-  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' },
-  wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
+  wishLikeCount: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'none', border: 'none', padding: 0, fontFamily: 'inherit' },
+  wishProposalsToggle: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-primary-text)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: 'inherit' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
-  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
-  wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)' },
+  wishProposalNameBtn: { alignSelf: 'flex-start', fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishProposalConfirmRow: { flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4 },
   wishProposalConfirmText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-  wishProposalConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
+  wishProposalConfirmDanger: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-danger)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishCommentInputRow: { display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 },
   wishCommentInput: { flex: 1, padding: '8px 12px', fontSize: 'var(--font-size-2xs)' },
 

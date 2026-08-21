@@ -5,11 +5,15 @@ import { getMyGroups, getGroupDefaultPotConfigs, insertGroupDefaultPotConfig, up
 import { invalidateCache } from '../lib/cache'
 import { useScrollLock } from '../lib/useScrollLock'
 import { useEscKey } from '../lib/useEscKey'
-import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS } from '../lib/potConstants'
+import { SLOT_KEYS, SLOT_TIME_PRESETS, DURATION_OPTIONS, MIN_POT_PEOPLE, MAX_POT_PEOPLE } from '../lib/potConstants'
 import CarouselPicker, { CAROUSEL_AMPM, CAROUSEL_HOURS, CAROUSEL_MINUTES, getCarouselTime, carouselTimeToStr } from '../components/CarouselPicker'
 import { PRIMARY_ACTION_BUTTON, DESTRUCTIVE_ACTION_BUTTON } from '../styles/buttons'
 import RiceBowlIcon from '../components/RiceBowlIcon'
+import PotIcon from '../components/PotIcon'
 import PotIconPicker from '../components/PotIconPicker'
+
+const MIN_PEOPLE = MIN_POT_PEOPLE
+const MAX_PEOPLE = MAX_POT_PEOPLE
 
 const SLOT_DEFAULT_TIME = {
   '아침': '07:00',
@@ -63,12 +67,16 @@ export default function GroupSettingsPage() {
   const [confirmDelete, setConfirmDelete] = useState(null)
   const [timePicker, setTimePicker] = useState(null)
   const [pickerSnapshot, setPickerSnapshot] = useState(null)
+  const [showSlotPicker, setShowSlotPicker] = useState(false)
+  const [editField, setEditField] = useState(null)
 
-  useScrollLock(!!confirmDelete || !!timePicker)
+  useScrollLock(!!confirmDelete || !!timePicker || !!editField)
   useEscKey(useCallback(() => {
     if (timePicker) { cancelTimePicker(); return }
+    if (editField) { setEditField(null); return }
+    if (showSlotPicker) { setShowSlotPicker(false); return }
     if (confirmDelete) setConfirmDelete(null)
-  }, [timePicker, confirmDelete]))
+  }, [timePicker, editField, showSlotPicker, confirmDelete]))
 
   const editingConfigParam = searchParams.get('config')
   const editingSlotParam = searchParams.get('slot')
@@ -144,10 +152,13 @@ export default function GroupSettingsPage() {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const selectSlot = (s) => {
-    if (editingConfigId) { set('slot', s); return }
-    const t = defaultTimeForSlot(s)
-    setForm(f => ({ ...f, slot: s, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutes(t, f.duration_minutes) : f.end_time }))
+  const changeSlot = (newSlot) => {
+    setShowSlotPicker(false)
+    if (newSlot === form.slot) return
+    // 기존 설정을 수정하는 중이면 이미 저장된 시간을 건드리지 않고 슬롯만 바꾼다.
+    if (editingConfigId) { set('slot', newSlot); return }
+    const t = defaultTimeForSlot(newSlot)
+    setForm(f => ({ ...f, slot: newSlot, meal_time: t, end_time: f.duration_minutes > 0 ? addMinutes(t, f.duration_minutes) : f.end_time }))
   }
 
   const setStartTime = (val) => {
@@ -180,6 +191,8 @@ export default function GroupSettingsPage() {
     if (which === 'start') setStartTime(timeStr)
     else setForm(f => ({ ...f, end_time: timeStr, duration_minutes: 0 }))
   }
+
+  const stepPeople = (delta) => set('max_people', Math.max(MIN_PEOPLE, Math.min(MAX_PEOPLE, form.max_people + delta)))
 
   const handleSave = async () => {
     if (!form.title.trim() || saving) return
@@ -224,6 +237,7 @@ export default function GroupSettingsPage() {
 
   const presets = SLOT_TIME_PRESETS[form.slot] ?? []
   const isCustomTime = !presets.includes(form.meal_time)
+  const timeValue = `${form.meal_time} ~ ${(form.end_time || '').slice(0, 5)}`
 
   return (
     <div style={S.page}>
@@ -239,132 +253,81 @@ export default function GroupSettingsPage() {
       <div style={S.body}>
         <div style={S.hero}>매일 자동으로 열리는 밥팟이에요 <RiceBowlIcon size={18} /></div>
 
-        <div style={S.sections}>
-          {/* 공개 범위 */}
-          <div style={S.section}>
-            <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
-              <span>🔓 공개 범위</span>
-              <span style={S.hint}>기본: 그룹만</span>
-            </div>
-            <div style={S.groupRow}>
-              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
-              <button style={{ ...S.groupBtn, background: 'var(--color-surface)', ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
-            </div>
-            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
-          </div>
-
-          {/* 그룹 고정 표시 */}
-          <div style={S.section}>
-            <div style={S.sectionLabel}>👪 그룹</div>
-            <div style={S.fixedGroup}>{groupName}</div>
-          </div>
-
-          {/* 식사 슬롯 */}
-          <div style={S.section}>
-            <div style={S.sectionLabel}>🍽 어떤 식사예요?</div>
-            <div style={S.chipRow}>
-              {SLOT_KEYS.map(s => {
-                const active = form.slot === s
-                return (
-                  <button
-                    key={s}
-                    style={{ ...S.chip, ...(active ? S.chipActive : {}) }}
-                    onClick={() => selectSlot(s)}
-                  >
-                    {s}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {/* 시간 */}
-          <div style={S.section}>
-            <div style={S.sectionLabel}>🕒 언제 먹을까요?</div>
-            <div style={S.chipRow}>
-              {presets.map(t => {
-                const active = form.meal_time === t
-                return (
-                  <button key={t} style={{ ...S.chip, ...(active ? S.chipActive : {}) }} onClick={() => setStartTime(t)}>
-                    {t}
-                  </button>
-                )
-              })}
-              <button
-                style={{ ...S.chip, ...(isCustomTime ? S.chipActive : {}) }}
-                onClick={() => openTimePicker('start')}
-              >
-                {isCustomTime ? form.meal_time : '직접 설정'}
+        {/* 일반 밥팟과 동일한 구성 — 슬롯/그룹 칩, 아이콘·이름, 시간·인원·메모 */}
+        <div style={S.heroCard}>
+          <div style={S.heroTagRow}>
+            <div style={S.chipWrap}>
+              <button type="button" style={S.chipBtn} onClick={() => setShowSlotPicker(v => !v)}>
+                {form.slot}
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
               </button>
+              {showSlotPicker && (
+                <>
+                  <div style={S.pickerOverlay} onClick={() => setShowSlotPicker(false)} />
+                  <div style={S.pickerDropdown}>
+                    {SLOT_KEYS.map(slot => (
+                      <button
+                        key={slot}
+                        type="button"
+                        style={{ ...S.pickerItem, ...(slot === form.slot ? S.pickerItemActive : {}) }}
+                        onClick={() => changeSlot(slot)}
+                      >
+                        {slot}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
             </div>
-            <div style={{ marginTop: 8 }}>
-              <div style={S.sectionLabel}>~ 종료 {form.end_time ? form.end_time.slice(0, 5) : ''}</div>
-              <div style={S.chipRow}>
-                {DURATION_OPTIONS.map(o => (
-                  <button
-                    key={o.min}
-                    style={{ ...S.chip, ...(form.duration_minutes === o.min ? S.chipActive : {}) }}
-                    onClick={() => setDuration(o.min)}
-                  >
-                    {o.label}
-                  </button>
-                ))}
-                <button
-                  style={{ ...S.chip, ...(form.duration_minutes === 0 ? S.chipActive : {}) }}
-                  onClick={() => { setDuration(0); openTimePicker('end') }}
-                >
-                  {form.duration_minutes === 0 && form.end_time ? form.end_time.slice(0, 5) : '직접 설정'}
-                </button>
+
+            {/* 그룹은 이미 URL로 정해져 있어 선택할 수 없다 — 칩 모양만 맞춰 표시 */}
+            <div style={S.chipBtnStatic}>{groupName}</div>
+          </div>
+
+          <div style={S.heroHeader}>
+            <div style={S.heroIcon}>{form.icon ? <PotIcon icon={form.icon} size={56} /> : <RiceBowlIcon size={56} />}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={S.heroTitle}>{form.title || '밥팟 이름을 정해주세요'}</div>
+              <div style={S.heroSlot}>{form.slot}</div>
+            </div>
+            <button style={S.heroEditBadge} onClick={() => setEditField('title')} aria-label="아이콘·이름 수정">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9" />
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+              </svg>
+            </button>
+          </div>
+
+          <div style={S.infoGrid}>
+            {[
+              { key: 'time', label: '시간', value: timeValue, full: false },
+              { key: 'max_people', label: '최대 인원', value: `${form.max_people}명`, full: false },
+              { key: 'memo', label: '메모', value: form.memo || '없음', full: true },
+            ].map(({ key, label, value, full }) => (
+              <div
+                key={key}
+                style={{ ...S.infoPanel, ...(full ? S.infoPanelFull : {}), ...S.infoPanelEditable }}
+                onClick={() => setEditField(key)}
+              >
+                <span style={S.infoPanelEditBadge}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </span>
+                <div style={S.infoPanelRow}>
+                  <span style={S.infoPanelLabel}>{label}</span>
+                  <span style={S.infoPanelValue}>{value}</span>
+                </div>
               </div>
-            </div>
+            ))}
           </div>
+        </div>
 
-          {/* 최대 인원 */}
-          <div style={{ ...S.section, ...S.sectionRow }}>
-            <div style={S.sectionLabel}>👥 몇 명까지?</div>
-            <div style={S.stepper}>
-              <button style={S.stepperBtn} onClick={() => set('max_people', Math.max(2, form.max_people - 1))} aria-label="인원 줄이기">−</button>
-              <span style={S.stepperNum}>{form.max_people}명</span>
-              <button style={S.stepperBtn} onClick={() => set('max_people', Math.min(10, form.max_people + 1))} aria-label="인원 늘리기">+</button>
-            </div>
-          </div>
-
-          {/* 구분: 필수 → 선택 */}
-          <div style={S.divider}>
-            <div style={S.dividerLine} />
-            <span style={S.dividerLabel}>더 꾸며볼까요 (선택)</span>
-            <div style={S.dividerLine} />
-          </div>
-
-          {/* 선택 트레이: 아이콘 + 세부 정보 */}
-          <div style={S.tray}>
-            <div>
-              <div style={S.sectionLabel}>🖼 아이콘</div>
-              <PotIconPicker value={form.icon} onChange={v => set('icon', v)} />
-            </div>
-
-            <div style={S.trayDivider} />
-
-            <div>
-              <div style={S.sectionLabel}>✏️ 이름 · 한마디</div>
-              <input
-                style={S.trayInput}
-                placeholder="밥팟 이름 (예: 점심팟, 저녁 한판)"
-                value={form.title}
-                onChange={e => set('title', e.target.value)}
-                maxLength={20}
-              />
-              <input
-                style={{ ...S.trayInput, marginTop: 6 }}
-                placeholder="메모 (선택, 예: 1층 로비 집합, 더치페이)"
-                value={form.memo}
-                onChange={e => set('memo', e.target.value)}
-                maxLength={50}
-              />
-            </div>
-          </div>
-
-          {/* 적용 시작일 */}
+        {/* 일반 밥팟보다 더 입력해야 하는 정보 — 적용 시작일 / 반복 요일 / 공개 범위 */}
+        <div style={S.sections}>
           <div style={S.section}>
             <div style={S.sectionLabel}>📅 적용 시작일</div>
             <input
@@ -395,6 +358,18 @@ export default function GroupSettingsPage() {
             </div>
           </div>
 
+          <div style={S.section}>
+            <div style={{ ...S.sectionLabel, display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 7 }}>
+              <span>🔓 공개 범위</span>
+              <span style={S.hint}>기본: 그룹만</span>
+            </div>
+            <div style={S.groupRow}>
+              <button style={{ ...S.groupBtn, ...(!form.is_public ? S.groupOnlyActive : {}) }} onClick={() => set('is_public', false)}>그룹만</button>
+              <button style={{ ...S.groupBtn, ...(form.is_public ? S.publicActive : {}) }} onClick={() => set('is_public', true)}>전체 공개</button>
+            </div>
+            {form.is_public && <p style={{ fontSize: 'var(--font-size-2xs)', color: 'var(--color-info)', margin: '6px 0 0' }}>링크로 누구든 참여할 수 있어요.</p>}
+          </div>
+
           {error && <p style={{ color: 'var(--color-danger)', fontSize: 'var(--font-size-xs)', margin: 0 }}>{error}</p>}
         </div>
       </div>
@@ -414,6 +389,99 @@ export default function GroupSettingsPage() {
           </button>
         )}
       </div>
+
+      {/* 개별 수정 팝업 — 아이콘·이름 / 시간 / 최대 인원 / 메모 (일반 밥팟과 동일한 구성, 메뉴·미정 옵션은 없음) */}
+      {editField && (
+        <div style={S.overlay} onClick={() => setEditField(null)}>
+          <div style={S.dialog} onClick={e => e.stopPropagation()}>
+            <div style={S.dialogTitle}>
+              {{ title: '🖼️ 아이콘 · 이름 수정', time: '🕒 시간 수정', max_people: '👥 최대 인원 수정', memo: '📝 메모 수정' }[editField]}
+            </div>
+
+            {editField === 'title' && (
+              <div style={{ width: '100%' }}>
+                <PotIconPicker value={form.icon} onChange={v => set('icon', v)} />
+                <input
+                  style={{ ...S.editSectionInput, width: '100%', marginTop: 10 }}
+                  placeholder="밥팟 이름 (예: 점심팟, 저녁 한판)"
+                  value={form.title}
+                  onChange={e => set('title', e.target.value)}
+                  maxLength={20}
+                  autoFocus
+                />
+              </div>
+            )}
+
+            {editField === 'time' && (
+              <div style={{ width: '100%' }}>
+                <div style={S.editChipRow}>
+                  {presets.map(t => {
+                    const active = form.meal_time === t
+                    return (
+                      <button
+                        key={t}
+                        style={{ ...S.editChip, ...(active ? S.editChipActive : {}) }}
+                        onClick={() => setStartTime(t)}
+                      >
+                        {t}
+                      </button>
+                    )
+                  })}
+                  <button
+                    style={{ ...S.editChip, ...(isCustomTime ? S.editChipActive : {}) }}
+                    onClick={() => openTimePicker('start')}
+                  >
+                    {isCustomTime ? form.meal_time : '직접 설정'}
+                  </button>
+                </div>
+                <div style={{ marginTop: 8 }}>
+                  <div style={S.editSectionLabel}>~ 종료 {form.end_time ? form.end_time.slice(0, 5) : ''}</div>
+                  <div style={S.editChipRow}>
+                    {DURATION_OPTIONS.map(o => (
+                      <button
+                        key={o.min}
+                        style={{ ...S.editChip, ...(form.duration_minutes === o.min ? S.editChipActive : {}) }}
+                        onClick={() => setDuration(o.min)}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                    <button
+                      style={{ ...S.editChip, ...(form.duration_minutes === 0 ? S.editChipActive : {}) }}
+                      onClick={() => { setDuration(0); openTimePicker('end') }}
+                    >
+                      {form.duration_minutes === 0 && form.end_time ? form.end_time.slice(0, 5) : '직접 설정'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {editField === 'max_people' && (
+              <div style={S.editStepper}>
+                <button style={S.editStepperBtn} onClick={() => stepPeople(-1)} disabled={form.max_people <= MIN_PEOPLE} aria-label="인원 줄이기">−</button>
+                <span style={S.editStepperNum}>{form.max_people}명</span>
+                <button style={S.editStepperBtn} onClick={() => stepPeople(1)} disabled={form.max_people >= MAX_PEOPLE} aria-label="인원 늘리기">+</button>
+              </div>
+            )}
+
+            {editField === 'memo' && (
+              <input
+                style={S.editSectionInput}
+                placeholder="메모 (선택, 예: 1층 로비 집합, 더치페이)"
+                value={form.memo}
+                onChange={e => set('memo', e.target.value)}
+                maxLength={50}
+                autoFocus
+              />
+            )}
+
+            <div style={S.dialogBtns}>
+              <button style={S.dialogBtnPrimary} onClick={() => setEditField(null)}>완료</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* 시간 캐러셀 팝업 */}
       {timePicker && (() => {
@@ -457,7 +525,11 @@ export default function GroupSettingsPage() {
 }
 
 const S = {
-  page: { flex: 1, display: 'flex', flexDirection: 'column' },
+  // TabLayout으로 감싸이지 않는 최상위 라우트라 #root의 min-height:100dvh(플로어일 뿐,
+  // 상한이 없음)에 기대면 콘텐츠가 길어질 때 이 div까지 같이 늘어나 footer가 뷰포트
+  // 하단이 아니라 "늘어난 페이지의 끝"에 걸린다. height를 뷰포트로 못박고 overflow:hidden을
+  // 줘야 body의 overflowY:auto만 내부 스크롤되고 header/footer가 실제로 고정된다.
+  page: { height: '100dvh', display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
 
   header: {
@@ -471,32 +543,99 @@ const S = {
     alignItems: 'center', justifyContent: 'center', fontFamily: 'inherit', flexShrink: 0,
     lineHeight: 1,
   },
-  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  headerTitle: { fontFamily: 'var(--font-title)', fontSize: 'var(--font-size-base)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
   headerSub: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)' },
 
   body: { flex: 1, overflowY: 'auto', paddingBottom: 20 },
-  hero: { padding: '10px 16px 6px', fontSize: 'var(--font-size-sm)', fontWeight: 800, color: 'var(--color-text)', letterSpacing: '-0.3px' },
+  hero: { padding: '10px 16px 6px', fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px' },
 
-  sections: { padding: '0 16px', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 12 },
+  /* Hero card — 일반 밥팟 만들기/상세 화면과 동일한 스타일 */
+  heroCard: { margin: '0 16px', background: 'linear-gradient(135deg, var(--color-hero-from) 0%, var(--color-hero-to) 100%)', border: '1.5px solid var(--color-hero-border)', borderRadius: 20, padding: 18 },
+
+  heroTagRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 14, flexWrap: 'wrap' },
+  chipWrap: { position: 'relative', display: 'inline-flex' },
+  chipBtn: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: 'var(--color-selected)', borderRadius: 999,
+    padding: '6px 14px', color: '#fff', border: 'none',
+    cursor: 'pointer', fontFamily: 'var(--font-body)',
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+  },
+  // 그룹은 URL로 이미 고정돼 있어 선택할 수 없다 — 칩 모양은 맞추되 대비를 낮춰 비활성 느낌만 준다.
+  chipBtnStatic: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 400, background: 'rgba(13,148,136,0.5)', borderRadius: 999,
+    padding: '6px 14px', color: '#fff',
+    fontFamily: 'var(--font-body)',
+    display: 'inline-flex', alignItems: 'center', gap: 5,
+  },
+  pickerOverlay: { position: 'fixed', inset: 0, zIndex: 90, background: 'transparent' },
+  pickerDropdown: {
+    position: 'absolute', top: 'calc(100% + 6px)', left: 0, zIndex: 91, minWidth: 140, maxWidth: 220,
+    background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-md)',
+    boxShadow: '0 4px 14px rgba(0,0,0,0.12)', padding: 4,
+  },
+  pickerItem: {
+    display: 'flex', alignItems: 'center', width: '100%', boxSizing: 'border-box',
+    padding: '9px 10px', borderRadius: 'var(--radius-sm)', cursor: 'pointer', background: 'none',
+    border: 'none', color: 'var(--color-text)', fontSize: 'var(--font-size-xs)', fontWeight: 600,
+    fontFamily: 'inherit', whiteSpace: 'nowrap', textAlign: 'left',
+  },
+  pickerItemActive: { color: 'var(--color-selected)', fontWeight: 700, background: 'var(--color-chip-bg)' },
+  heroHeader: { display: 'flex', gap: 12, alignItems: 'center', marginBottom: 16 },
+  heroIcon: {
+    width: 60, height: 60, borderRadius: '50%', border: '1.5px solid var(--color-border)',
+    background: 'var(--color-surface-2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  heroTitle: { fontSize: 'var(--font-size-lg)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.5px' },
+  heroSlot: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, marginTop: 2 },
+  heroEditBadge: {
+    width: 26, height: 26, borderRadius: '50%', flexShrink: 0, alignSelf: 'flex-start',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)', border: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer',
+  },
+  infoGrid: { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 },
+  infoPanel: { position: 'relative', background: 'rgba(255,255,255,0.7)', borderRadius: 'var(--radius-md)', padding: '10px 12px' },
+  infoPanelFull: { gridColumn: '1 / -1' },
+  infoPanelEditable: { cursor: 'pointer', paddingRight: 26 },
+  infoPanelEditBadge: {
+    position: 'absolute', top: 6, right: 6, width: 18, height: 18, borderRadius: '50%',
+    background: 'rgba(255,255,255,0.9)', color: 'var(--color-primary-text)',
+    display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+  },
+  infoPanelRow: { display: 'flex', alignItems: 'baseline', gap: 10, whiteSpace: 'nowrap', overflow: 'hidden' },
+  infoPanelLabel: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', fontWeight: 600, flexShrink: 0 },
+  infoPanelValue: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text)', letterSpacing: '-0.3px', overflow: 'hidden', textOverflow: 'ellipsis' },
+
+  editSectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 7 },
+  editChipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
+  editChip: {
+    padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
+    borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
+  },
+  editChipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
+
+  editStepper: { display: 'flex', alignItems: 'center', gap: 10 },
+  editStepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
+  editStepperNum: {
+    fontWeight: 700, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
+    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-selected)', color: 'var(--color-selected)',
+  },
+  editSectionInput: {
+    width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
+    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-bg)',
+    color: 'var(--color-text)', boxSizing: 'border-box',
+  },
+
+  /* 그룹 기본 밥팟 전용 — 일반 밥팟에는 없는 추가 입력(공개 범위/적용 시작일/반복 요일) */
+  sections: { padding: '12px 16px 0', display: 'flex', flexDirection: 'column', gap: 6, paddingBottom: 12 },
   section: { background: 'var(--color-surface)', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', padding: 10 },
-  sectionRow: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' },
-  sectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 7 },
-
-  fixedGroup: { padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', fontWeight: 600 },
+  sectionLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 7 },
 
   chipRow: { display: 'flex', gap: 5, flexWrap: 'wrap' },
   chip: {
-    padding: '5px 10px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    padding: '5px 10px', background: 'var(--color-chip-bg)', border: 'none',
     borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
   },
-  chipActive: { background: 'var(--color-bg)', border: '2px solid var(--color-primary)', fontWeight: 700, color: 'var(--color-primary)' },
-
-  stepper: { display: 'flex', alignItems: 'center', gap: 10 },
-  stepperBtn: { width: 26, height: 26, border: '1.5px solid var(--color-border)', borderRadius: '50%', background: 'var(--color-bg)', fontSize: 15, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--color-text)', lineHeight: 1 },
-  stepperNum: {
-    fontWeight: 800, fontSize: 'var(--font-size-xs)', minWidth: 44, textAlign: 'center',
-    padding: '3px 0', borderRadius: 'var(--radius-full)', border: '1.5px solid var(--color-primary)', color: 'var(--color-primary)',
-  },
+  chipActive: { background: 'var(--color-selected)', fontWeight: 700, color: 'var(--color-on-selected)' },
 
   sectionInput: {
     width: '100%', padding: '8px 10px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
@@ -506,24 +645,12 @@ const S = {
 
   groupRow: { display: 'flex', gap: 6 },
   groupBtn: {
-    flex: 1, padding: '6px 6px', background: 'var(--color-bg)', border: '1.5px solid var(--color-border)',
+    flex: 1, padding: '6px 6px', background: 'var(--color-surface)', border: '1.5px solid var(--color-border)',
     borderRadius: 'var(--radius-sm)', fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', cursor: 'pointer', fontFamily: 'inherit',
     letterSpacing: '-0.2px',
   },
   groupOnlyActive: { background: 'var(--color-surface-2)', border: '1.5px solid var(--color-text-muted)', fontWeight: 700, color: 'var(--color-text)' },
   publicActive: { background: 'var(--color-info-bg)', border: '1.5px solid var(--color-info)', fontWeight: 700, color: 'var(--color-info)' },
-
-  divider: { display: 'flex', alignItems: 'center', gap: 8, margin: '2px 0' },
-  dividerLine: { flex: 1, height: 1, background: 'var(--color-border)' },
-  dividerLabel: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', whiteSpace: 'nowrap' },
-
-  tray: { background: 'var(--color-tray)', borderRadius: 'var(--radius-lg)', padding: 12, display: 'flex', flexDirection: 'column', gap: 10 },
-  trayInput: {
-    width: '100%', padding: '8px 10px', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-sm)',
-    fontSize: 'var(--font-size-xs)', outline: 'none', fontFamily: 'inherit', background: 'var(--color-surface)',
-    color: 'var(--color-text)', boxSizing: 'border-box',
-  },
-  trayDivider: { height: 1, background: 'rgba(0,0,0,0.06)' },
   hint: { fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)', opacity: 0.8 },
 
   submitBtn: { ...PRIMARY_ACTION_BUTTON },
@@ -532,13 +659,13 @@ const S = {
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   timeDialog: { width: '100%', maxWidth: 320, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  timeDialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
+  timeDialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
   timeCarouselRow: { display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 4 },
-  timeColon: { fontSize: 20, fontWeight: 800, color: 'var(--color-text-muted)' },
+  timeColon: { fontSize: 20, fontWeight: 700, color: 'var(--color-text-muted)' },
   timeDoneBtn: { ...PRIMARY_ACTION_BUTTON },
 
   dialog: { width: '100%', maxWidth: 360, background: 'var(--color-surface)', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogDesc: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', whiteSpace: 'pre-line', lineHeight: 1.7, margin: 0 },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },

@@ -97,14 +97,14 @@ export default function CarouselPicker({ items, value, onChange, disabled, width
     >
       <div style={sideCell} onClick={() => step(-1)}>{get(-1)}</div>
       <div style={{ height: 40, width: '100%', position: 'relative', overflow: 'hidden',
-        borderTop: '1.5px solid var(--color-primary)', borderBottom: '1.5px solid var(--color-primary)',
-        background: 'rgba(255,107,53,0.05)' }}
+        borderTop: '1.5px solid var(--color-selected)', borderBottom: '1.5px solid var(--color-selected)',
+        background: 'var(--color-selected-a08)' }}
       >
         <div
           key={anim.n}
           style={{
             position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 20, fontWeight: 800, color: 'var(--color-text)',
+            fontSize: 20, fontWeight: 700, color: 'var(--color-text)',
             animation: anim.dir !== 0 ? `${anim.dir > 0 ? 'carouselUp' : 'carouselDown'} 0.18s ease-out` : 'none',
           }}
         >{get(0)}</div>

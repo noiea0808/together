@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useUser } from '../lib/UserContext'
-import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getMyFriendRequests, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest } from '../lib/db'
+import { getMyGroups, getGroupMembers, getGroupStatuses, getMyPotsForSlot, invitePotFriend, proposeMealTogether, getMyPendingInvitationsForDate, cancelPotInvitation, getMyFriends, getMyFriendRequests, removeFriend, getFriendWishPlaces, likeWishPlace, unlikeWishPlace, getWishPlaceComments, addWishPlaceComment, deleteWishPlaceComment, sendFriendRequest, cancelFriendRequest } from '../lib/db'
 import { useNavBadges } from '../lib/NavBadgeContext'
 import { getCache, setCache } from '../lib/cache'
 import { SLOT_KEYS } from '../lib/potConstants'
@@ -17,6 +17,8 @@ import ReportModal from '../components/ReportModal'
 import { MoreHorizontalIcon } from '../components/GroupIcons'
 import { usePageHeader } from '../lib/HeaderConfigContext'
 import { PRIMARY_ACTION_BUTTON } from '../styles/buttons'
+import { avatarColor, avatarGray } from '../lib/avatarColor'
+import { getRelativeLabel, REL_TONE_FILL, REL_TONE_TEXT } from '../lib/relativeDay'
 
 function toDateStr(d) {
   const year = d.getFullYear()
@@ -29,20 +31,16 @@ function formatDate(date) {
   return date.toLocaleDateString('ko-KR', { month: 'long', day: 'numeric', weekday: 'short' })
 }
 
-function getRelativeLabel(date) {
-  const diff = Math.round((date - TODAY) / (1000 * 60 * 60 * 24))
-  if (diff === 0)  return { label: '오늘',   color: 'var(--color-primary)' }
-  if (diff === -1) return { label: '어제',   color: 'var(--color-info)' }
-  if (diff === 1)  return { label: '내일',   color: 'var(--color-success)' }
-  if (diff < 0)    return { label: `${Math.abs(diff)}일 전`, color: '#9E9E9E' }
-  return { label: `${diff}일 뒤`, color: '#9E9E9E' }
-}
 
 function addDays(date, n) {
   const d = new Date(date); d.setDate(d.getDate() + n); return d
 }
 
-const TODAY = new Date(); TODAY.setHours(0, 0, 0, 0)
+// 자정을 넘겨도 항상 실제 오늘을 가리키도록 호출 시점에 계산 — 모듈 로드 시 한 번만 고정하면
+// 앱을 자정 너머까지 켜둔 세션에서 "오늘"이 실제로는 어제인 상태로 굳어버린다.
+function getToday() {
+  const d = new Date(); d.setHours(0, 0, 0, 0); return d
+}
 const isActiveStatus = st => st === '참여중' || st === '참여완료'
 
 // 나와 같은 팟인지에 따라 참여 상태 라벨을 구분 — 같은 팟: 같이 먹을 예정/같이 먹음, 다른 팟: 밥팟 참여 예정/밥팟 참여완료
@@ -58,6 +56,8 @@ export default function GroupPage() {
   const [showFriendsModal, setShowFriendsModal] = useState(false)
   const [friendsModalTab, setFriendsModalTab] = useState('search')
   usePageHeader({ title: '그룹 멤버들', action: { label: '친구 찾기', onClick: () => { setFriendsModalTab('search'); setShowFriendsModal(true) } } })
+
+  const TODAY = getToday()
 
   // 친구 요청 알림(/group?friend_requests=1)을 눌러 들어온 경우, 요청 탭이 열린 채로 바로 뜬다.
   useEffect(() => {
@@ -125,11 +125,17 @@ export default function GroupPage() {
   const [sendingRequestId, setSendingRequestId] = useState(null)
   const [pendingSentIds, setPendingSentIds] = useState(new Set()) // 내가 보낸 pending 요청 상대
   const [pendingReceivedIds, setPendingReceivedIds] = useState(new Set()) // 상대가 나한테 보낸 pending 요청
+  // 요청 취소(cancelFriendRequest)에는 friend_requests.id가 필요한데 pendingSentIds는
+  // 상대 id만 들고 있어서 별도로 상대 id -> 요청 id 맵을 하나 더 둔다.
+  const [pendingSentRequestIds, setPendingSentRequestIds] = useState(new Map())
+  const [cancelingRequest, setCancelingRequest] = useState(false)
 
   const reloadFriendRequests = () =>
     getMyFriendRequests()
       .then(rows => {
-        setPendingSentIds(new Set(rows.filter(r => r.direction === 'sent').map(r => r.other_id)))
+        const sent = rows.filter(r => r.direction === 'sent')
+        setPendingSentIds(new Set(sent.map(r => r.other_id)))
+        setPendingSentRequestIds(new Map(sent.map(r => [r.other_id, r.id])))
         setPendingReceivedIds(new Set(rows.filter(r => r.direction === 'received').map(r => r.other_id)))
       })
       .catch(e => console.error(e))
@@ -262,6 +268,22 @@ export default function GroupPage() {
       console.error(e)
     } finally {
       setUnfriending(false)
+    }
+  }
+
+  const handleCancelSentRequest = async () => {
+    const requestId = pendingSentRequestIds.get(selectedFriendId)
+    if (!requestId || cancelingRequest) return
+    setCancelingRequest(true)
+    try {
+      await cancelFriendRequest(requestId, user.id)
+      setFriendMenuOpen(false)
+      setSelectedFriendId(null)
+      await reloadFriendRequests()
+    } catch (e) {
+      console.error(e)
+    } finally {
+      setCancelingRequest(false)
     }
   }
 
@@ -439,7 +461,7 @@ export default function GroupPage() {
         <button style={styles.navBtn} onClick={() => goToDate(d => addDays(d, -1))} aria-label="이전 날짜">‹</button>
         <div style={styles.dateText}>
           <span style={styles.datePrimary}>{formatDate(currentDate)}</span>
-          <span style={{ ...styles.relBadge, background: relLabel.color }}>{relLabel.label}</span>
+          <span style={{ ...styles.relBadge, background: REL_TONE_FILL[relLabel.tone], color: REL_TONE_TEXT[relLabel.tone] }}>{relLabel.label}</span>
           {!isToday && (
             <button style={styles.todayBtn} onClick={() => goToDate(() => TODAY)}>오늘로</button>
           )}
@@ -519,7 +541,7 @@ export default function GroupPage() {
                     {friend.avatar_url ? (
                       <img src={friend.avatar_url} alt="" style={styles.avatarImg} />
                     ) : (
-                      <div style={styles.avatar}>{friend.nickname[0]}</div>
+                      <div style={{ ...styles.avatar, background: avatarGray(friend.nickname) }}>{friend.nickname[0]}</div>
                     )}
                     {hasNewWish && <span style={styles.avatarDot} />}
                   </div>
@@ -569,7 +591,7 @@ export default function GroupPage() {
               {selectedFriend.avatar_url ? (
                 <img src={selectedFriend.avatar_url} alt="" style={styles.avatarLgImg} />
               ) : (
-                <div style={styles.avatarLg}>{selectedFriend.nickname[0]}</div>
+                <div style={{ ...styles.avatarLg, background: avatarGray(selectedFriend.nickname) }}>{selectedFriend.nickname[0]}</div>
               )}
               <div style={styles.sheetHeaderInfo}>
                 <div style={styles.sheetName}>{selectedFriend.nickname}</div>
@@ -579,7 +601,7 @@ export default function GroupPage() {
                   ))}
                 </div>
               </div>
-              {selectedFriend.requestId && (
+              {selectedFriend.requestId ? (
                 <div style={{ position: 'relative', flexShrink: 0 }}>
                   <button style={styles.wishMoreBtn} onClick={() => setFriendMenuOpen(v => !v)} aria-label="더보기">
                     <MoreHorizontalIcon size={18} />
@@ -597,6 +619,31 @@ export default function GroupPage() {
                       </div>
                     </>
                   )}
+                </div>
+              ) : pendingSentIds.has(selectedFriendId) && (
+                // 아직 친구는 아니지만 내가 보낸 요청이 pending인 경우 — "요청됨" 칩으로
+                // 상태를 보여주고, 점세개 메뉴로 요청 취소를 제공한다.
+                <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                  <span style={styles.sheetRequestSentChip}>요청됨</span>
+                  <div style={{ position: 'relative' }}>
+                    <button style={styles.wishMoreBtn} onClick={() => setFriendMenuOpen(v => !v)} aria-label="더보기">
+                      <MoreHorizontalIcon size={18} />
+                    </button>
+                    {friendMenuOpen && (
+                      <>
+                        <div style={styles.menuBackdrop} onClick={() => setFriendMenuOpen(false)} />
+                        <div style={styles.wishMoreDropdown}>
+                          <button
+                            style={{ ...styles.wishMoreItem, color: 'var(--color-danger)' }}
+                            onClick={handleCancelSentRequest}
+                            disabled={cancelingRequest}
+                          >
+                            {cancelingRequest ? '취소하는 중...' : '요청 취소'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -632,7 +679,12 @@ export default function GroupPage() {
                             {WISH_CATEGORY_OPTIONS.find(o => o.key === place.category)?.label ?? '좋아하는 곳'}
                           </span>
                         </div>
-                        <LinkPreviewCard text={place.content} />
+                        <LinkPreviewCard
+                          text={place.content}
+                          preview={place.preview_site_name != null
+                            ? { title: place.preview_title, description: place.preview_description, image: place.preview_image, siteName: place.preview_site_name }
+                            : null}
+                        />
                         {(() => {
                           const text = textWithoutUrl(place.content, extractFirstUrl(place.content))
                           return text && <div style={styles.friendWishText}>{text}</div>
@@ -684,7 +736,7 @@ export default function GroupPage() {
                                     {c.avatar_url ? (
                                       <img src={c.avatar_url} alt="" style={styles.wishProposalAvatarImg} />
                                     ) : (
-                                      <div style={styles.wishProposalAvatar}>{c.nickname?.[0] ?? '?'}</div>
+                                      <div style={{ ...styles.wishProposalAvatar, background: avatarColor(c.nickname) }}>{c.nickname?.[0] ?? '?'}</div>
                                     )}
                                     <div style={styles.wishProposalTextCol}>
                                       <span style={styles.wishProposalName}>{c.nickname}</span>
@@ -706,7 +758,7 @@ export default function GroupPage() {
                             )}
                             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 6 }}>
                               <input
-                                style={{ ...styles.proposeInput, flex: 1 }}
+                                style={{ ...styles.proposeInput, flex: 1, minWidth: 0 }}
                                 placeholder="댓글 달기"
                                 value={newWishCommentText}
                                 onChange={e => setNewWishCommentText(e.target.value)}
@@ -863,26 +915,34 @@ export default function GroupPage() {
 const styles = {
   page: { flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' },
   loadingPage: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 40 },
-  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer' },
+  findFriendsBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit' },
 
   dateNav: { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '10px var(--spacing-md)', borderBottom: '1px solid var(--color-border)', flexShrink: 0 },
   navBtn: { width: 34, height: 34, borderRadius: '50%', border: 'none', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 'var(--font-size-base)' },
   dateText: { display: 'flex', alignItems: 'center', gap: 8 },
-  datePrimary: { fontWeight: 800, fontSize: 'var(--font-size-base)' },
-  relBadge: { fontSize: 'var(--font-size-xs)', color: '#fff', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 700 },
-  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-primary)', background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
+  // 굵기 배분 근거는 TodayPage의 같은 스타일 주석 참고 — 날짜(700) > 상대 라벨(600).
+  datePrimary: { fontWeight: 700, fontSize: 'var(--font-size-base)' },
+  relBadge: { fontSize: 'var(--font-size-xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px' },
+  // 배경·글자색은 relativeDay의 REL_TONE_FILL/REL_TONE_TEXT가 날짜에 따라 인라인으로 넣어준다.
+  todayBtn: { fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)', background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)', borderRadius: 'var(--radius-full)', padding: '2px 8px', cursor: 'pointer' },
 
-  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 80 },
+  body: { flex: 1, overflowY: 'auto', padding: 'var(--spacing-md)', display: 'flex', flexDirection: 'column', gap: 'var(--spacing-lg)', paddingBottom: 'calc(var(--bottom-nav-space) + 12px)' },
 
-  friendGroupFilterRow: { display: 'flex', gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, marginBottom: 4 },
-  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
-  friendGroupFilterChipActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a10)', border: '1px solid var(--color-primary)' },
+  // flexShrink:0 필수 — overflow-x:auto가 있는 flex 아이템은 flexbox 규칙상 자동 최소 높이가
+  // 0으로 취급돼, 부모(body)의 세로 콘텐츠가 넘칠 때(친구 많은 "전체" 필터 등) 스크롤 대신
+  // 이 줄이 먼저 짜부라져 거의 안 보이게 된다. 오버플로는 body의 overflowY:auto가 처리해야 한다.
+  friendGroupFilterRow: { display: 'flex', flexShrink: 0, gap: 6, overflowX: 'auto', WebkitOverflowScrolling: 'touch', paddingBottom: 2, marginBottom: 4 },
+  // 배경(--color-surface-2)이 페이지 배경(--color-bg)과 명도 차가 거의 없어(약 1.1:1) 채움색이
+  // 사실상 안 보이고 얇은 테두리+흐린 글자만 남아 칩이 있는지도 모를 만큼 흐릿해진다. 흰 배경(--color-surface)과
+  // 진한 글자색으로 바꿔 대비를 WCAG 기준(4.5:1) 위로 끌어올린다.
+  friendGroupFilterChip: { flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '6px 14px', cursor: 'pointer', fontFamily: 'inherit', whiteSpace: 'nowrap' },
+  friendGroupFilterChipActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
 
   empty: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-sm)', padding: 'var(--spacing-xl)' },
 
   friendList: { display: 'flex', flexDirection: 'column', gap: 8 },
   friendRow: { display: 'flex', alignItems: 'center', gap: 'var(--spacing-sm)', padding: '10px var(--spacing-md)', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', cursor: 'pointer' },
-  avatar: { width: 36, height: 36, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
+  avatar: { width: 36, height: 36, borderRadius: '50%', background: 'var(--warm-600)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 600, fontSize: 'var(--font-size-sm)', flexShrink: 0 },
   avatarImg: { width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   avatarWrap: { position: 'relative', flexShrink: 0, display: 'inline-flex' },
   avatarDot: {
@@ -891,53 +951,63 @@ const styles = {
   },
   friendInfo: { flex: 1, display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 },
   friendNameRow: { display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
-  friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 700 },
+  friendName: { fontSize: 'var(--font-size-sm)', fontWeight: 600 },
   groupNameRow: { display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' },
   groupNameText: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 500 },
   friendGroups: { display: 'flex', gap: 4, flexWrap: 'wrap' },
-  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 600 },
+  groupTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-chip-text)', borderRadius: 'var(--radius-full)', padding: '2px 8px', fontWeight: 500 },
   friendChevron: { color: 'var(--color-text-muted)', fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  // 헤더의 '친구 찾기'(.app-header-action)와 같은 알약이다. 보조 액션은 무채색으로 두고 색은
+  // 화면당 하나뿐인 주요 CTA에만 남긴다는 규칙이 이 버튼에만 적용되지 않아 혼자 벽돌색이었다.
   friendRequestBtn: {
-    flexShrink: 0, fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-primary)',
-    background: 'var(--color-primary-a07)', border: '1px solid var(--color-primary-a27)',
-    borderRadius: 'var(--radius-full)', padding: '6px 10px', cursor: 'pointer', fontFamily: 'inherit',
+    flexShrink: 0, fontSize: 'var(--font-size-xs)', fontWeight: 500, color: 'var(--color-chip-text)',
+    background: 'var(--color-surface)', border: '1px solid var(--color-selected-a20)',
+    borderRadius: 'var(--radius-full)', padding: '6px 12px', cursor: 'pointer', fontFamily: 'inherit',
+    whiteSpace: 'nowrap',
   },
   // 이미 보낸 요청("요청됨")은 더 이상 누를 액션이 아니라 상태 표시라, 눈에 덜 띄는 회색 톤으로 구분한다.
   friendRequestBtnSent: {
     color: 'var(--color-text-muted)', background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
   },
+  // 시트 헤더용 "요청됨" 칩 — 목록 행의 friendRequestBtnSent와 같은 톤이지만 버튼이 아니라
+  // 상태 표시라 padding/폰트 크기를 헤더 옆에 맞게 조금 더 작게 뒀다.
+  sheetRequestSentChip: {
+    fontSize: 'var(--font-size-2xs)', fontWeight: 500, color: 'var(--color-text-muted)',
+    background: 'var(--color-surface-2)', border: '1px solid var(--color-border)',
+    borderRadius: 'var(--radius-full)', padding: '5px 10px', whiteSpace: 'nowrap',
+  },
   // 너비를 고정해야 배지 개수가 달라도 모든 친구 행에서 같은 x 위치에서 시작한다(세로 줄맞춤).
   statusChipRow: { display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-start', alignItems: 'center', gap: 5, flexShrink: 0, width: 120 },
 
   sheetOverlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)', zIndex: 200, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' },
-  sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 32, display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '80vh', overflowY: 'auto' },
+  sheet: { width: '100%', maxWidth: 'var(--max-width)', background: '#fff', borderRadius: '20px 20px 0 0', padding: 'var(--spacing-lg)', paddingBottom: 'calc(32px + var(--safe-area-inset-bottom))', display: 'flex', flexDirection: 'column', gap: 4, maxHeight: '80vh', overflowY: 'auto' },
   sheetHeader: { display: 'flex', flexDirection: 'row', alignItems: 'flex-start', gap: 12, paddingBottom: 6 },
   sheetHeaderInfo: { display: 'flex', flexDirection: 'column', gap: 6, flex: 1, paddingTop: 4 },
-  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: '#9B9285', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
+  avatarLg: { width: 56, height: 56, borderRadius: '50%', background: 'var(--warm-600)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 'var(--font-size-lg)', flexShrink: 0 },
   avatarLgImg: { width: 56, height: 56, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
-  sheetName: { fontWeight: 800, fontSize: 'var(--font-size-lg)' },
+  sheetName: { fontWeight: 700, fontSize: 'var(--font-size-lg)' },
   sheetDivider: { height: 1, background: 'var(--color-border)', margin: '12px 0 8px' },
   sheetTabs: { display: 'flex', gap: 6, marginBottom: 12 },
-  sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-full)', background: 'transparent', fontSize: 'var(--font-size-sm)', fontWeight: 700, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
-  sheetTabBtnActive: { border: '1.5px solid var(--color-primary)', background: 'var(--color-primary-a10)', color: 'var(--color-primary)' },
+  sheetTabBtn: { position: 'relative', flex: 1, padding: '9px 0', border: 'none', borderRadius: 'var(--radius-full)', background: 'var(--color-chip-bg)', fontSize: 'var(--font-size-sm)', fontWeight: 400, cursor: 'pointer', color: 'var(--color-text-muted)', fontFamily: 'inherit' },
+  sheetTabBtnActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   sheetTabDot: { position: 'absolute', top: 6, right: 10, width: 7, height: 7, borderRadius: '50%', background: 'var(--color-danger)', border: '1.5px solid var(--color-surface)' },
-  sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 700, color: 'var(--color-text-muted)', marginBottom: 8 },
+  sheetSectionTitle: { fontSize: 'var(--font-size-sm)', fontWeight: 600, color: 'var(--color-text-muted)', marginBottom: 8 },
   friendWishList: { display: 'flex', flexDirection: 'column', gap: 10 },
   friendWishItem: { display: 'flex', flexDirection: 'column', gap: 3, padding: '11px 12px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)' },
   friendWishCategoryRow: { display: 'flex', alignItems: 'center', gap: 6, marginBottom: 4 },
-  friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 700, color: 'var(--color-text-muted)' },
+  friendWishCategoryLabel: { fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-text-muted)' },
   friendWishText: { fontSize: 'var(--font-size-sm)', color: 'var(--color-text)', whiteSpace: 'pre-wrap', wordBreak: 'break-word', lineHeight: 1.5, marginTop: 4 },
   wishReactionRow: { display: 'flex', gap: 8, marginTop: 4 },
-  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
-  wishLikeBtnActive: { color: 'var(--color-primary)', background: 'var(--color-primary-a08)', border: '1px solid var(--color-primary-a27)' },
-  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishLikeBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 400, color: 'var(--color-text-muted)', background: 'var(--color-chip-bg)', border: 'none', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
+  wishLikeBtnActive: { color: 'var(--color-on-selected)', background: 'var(--color-selected)' },
+  wishCommentToggleBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text-muted)', background: 'var(--color-surface)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '5px 12px', cursor: 'pointer', fontFamily: 'inherit' },
   wishCommentsBox: { display: 'flex', flexDirection: 'column', gap: 6, marginTop: 6, padding: '8px 10px', background: 'var(--color-surface)', borderRadius: 'var(--radius-sm)' },
   wishProposalsList: { display: 'flex', flexDirection: 'column', gap: 8 },
   wishProposalRow: { display: 'flex', alignItems: 'flex-start', gap: 8 },
-  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-primary)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  wishProposalAvatar: { width: 26, height: 26, borderRadius: '50%', background: 'var(--color-selected)', color: '#fff', fontSize: 'var(--font-size-2xs)', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
   wishProposalAvatarImg: { width: 26, height: 26, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 },
   wishProposalTextCol: { flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', gap: 1 },
-  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-text)' },
+  wishProposalName: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-text)' },
   wishProposalMessage: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
   wishProposalDismiss: { flexShrink: 0, fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', background: 'none', border: 'none', cursor: 'pointer', padding: 0, textDecoration: 'underline' },
   wishMoreBtn: {
@@ -958,26 +1028,26 @@ const styles = {
   },
   statusGrid: { display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 },
   statusCell: { display: 'flex', flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, padding: '8px 10px', background: 'var(--color-surface-2)', borderRadius: 'var(--radius-md)', border: '1.5px solid transparent' },
-  statusCellSelected: { background: 'var(--color-primary-a10)', border: '1.5px solid var(--color-primary)' },
+  statusCellSelected: { background: 'var(--color-chip-bg)', border: '1.5px solid var(--color-selected)' },
   statusSlotName: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 6 },
   slotIconWrapper: { display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 40, height: 40, flexShrink: 0 },
   statusCellRight: { display: 'flex', flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' },
-  statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
-  statusDash: { fontSize: 'var(--font-size-2xs)', color: '#C7BFB6' },
-  statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)' },
-  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 700, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
-  sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 700, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
+  statusBadge: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, borderRadius: 'var(--radius-full)', padding: '2px 8px', width: 'fit-content' },
+  statusDash: { fontSize: 'var(--font-size-2xs)', color: 'var(--color-text-muted)' },
+  statusInvitedTag: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-success)' },
+  statusCancelBtn: { fontSize: 'var(--font-size-2xs)', fontWeight: 600, color: 'var(--color-success)', background: 'none', border: 'none', padding: 0, cursor: 'pointer', fontFamily: 'inherit', textDecoration: 'underline' },
+  sheetCloseBtn: { marginTop: 16, padding: '12px', background: 'var(--color-surface-2)', border: 'none', borderRadius: 'var(--radius-md)', fontWeight: 600, fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
   noGroupNote: { fontSize: 'var(--font-size-xs)', color: 'var(--color-text-muted)', textAlign: 'center', lineHeight: 1.6, whiteSpace: 'pre-line', margin: 0, padding: '6px 0' },
 
   proposeMainBtn: { ...PRIMARY_ACTION_BUTTON, marginTop: 12 },
   proposePanel: { display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 },
-  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-surface-2)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' },
-  groupPickTagActive: { background: 'var(--color-primary-a10)', color: 'var(--color-primary)', border: '1px solid var(--color-primary)' },
+  groupPickTag: { fontSize: 'var(--font-size-2xs)', background: 'var(--color-chip-bg)', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', padding: '4px 10px', fontWeight: 400, cursor: 'pointer', fontFamily: 'inherit' },
+  groupPickTagActive: { background: 'var(--color-selected)', color: 'var(--color-on-selected)' },
   proposeInput: { width: '100%', padding: '11px 14px', border: '1.5px solid var(--color-border)', borderRadius: 'var(--radius-md)', fontSize: 'var(--font-size-sm)', outline: 'none', boxSizing: 'border-box', fontFamily: 'inherit' },
 
   overlay: { position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 300, padding: 'var(--spacing-lg)' },
   dialog: { width: '100%', maxWidth: 320, background: '#fff', borderRadius: 'var(--radius-lg)', padding: 'var(--spacing-lg)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 'var(--spacing-md)' },
-  dialogTitle: { fontWeight: 800, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
+  dialogTitle: { fontWeight: 700, fontSize: 'var(--font-size-lg)', textAlign: 'center', whiteSpace: 'pre-line' },
   dialogBtns: { width: '100%', display: 'flex', flexDirection: 'column', gap: 8 },
   dialogBtnPrimary: { ...PRIMARY_ACTION_BUTTON },
   dialogBtnCancel: { width: '100%', padding: 13, background: 'none', color: 'var(--color-text-muted)', border: 'none', borderRadius: 'var(--radius-full)', fontSize: 'var(--font-size-sm)', cursor: 'pointer' },
