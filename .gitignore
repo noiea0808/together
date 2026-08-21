@@ -44,6 +44,10 @@ android-stg/app/release
 android-stg/keystore.properties
 *.keystore
 *.jks
+# 서명 키 암호화 백업과 그 압축 해제 산출물 — 절대 커밋 금지
+*.gpg
+gachimeokja-signing-backup*
+gmj-backup*
 
 # Firebase — google-services.json은 클라이언트 설정값이라 관례상 커밋하기도 하지만,
 # 이 프로젝트는 비공개로 두고 각자 로컬에 배치한다. 서비스 계정 키는 private key가

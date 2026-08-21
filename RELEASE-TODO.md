@@ -1,87 +1,75 @@
-# 정식 출시 남은 과제 (집 PC에서 진행)
+# 정식 출시 남은 과제
 
 비공개 테스트가 끝나서 정식 출시(또는 다음 트랙)로 넘어가는 중이다.
-회사 PC에서 하려다 **릴리스 키스토어가 회사 PC엔 없어서** 막혔다 —
-집에서 올렸던 것으로 보이니 나머지는 집에서 이어서 한다.
 
-## 회사 PC에서 이미 끝난 것
+**현재 상태: 릴리스 키스토어를 되찾았고, 서명된 AAB까지 나왔다 (2026-08-21).**
+회사 PC에서 만들어 둔 암호화 백업(`gachimeokja-signing-backup.tar.gz.gpg`)을 집 PC로 옮겨와
+복원했다. 업로드 키 재설정은 **불필요**해졌다. 남은 건 Play Console 업로드뿐이다.
+
+## 이미 끝난 것
 
 - `versionCode` 1 → **2** (`android/app/build.gradle`)
   비공개 테스트로 1이 이미 Play Console에 올라가 있어 그대로면 업로드가 거부된다.
-- `versionName`은 `"1.0"` 그대로 뒀다. 정식 출시라 이대로 가도 되고,
+- `versionName`은 `"1.0"` 그대로. 정식 출시라 이대로 가도 되고,
   테스트판과 구분하고 싶으면 `1.0.1`로 올린다.
-- 스토어 등록 이미지는 `store/`에 이미 완비 (아이콘 512, 그래픽 1024×500, 스크린샷 7장).
-  다시 뽑을 일 있으면 `store/README.md` 참고.
+- 집 PC(`E:\200. Dev\Together`) 기준으로 **빌드 툴체인 검증 완료** (2026-08-21)
+  - `npm run build` → `npx cap sync android` → `gradlew bundleRelease` 전부 통과
+  - `BUILD SUCCESSFUL`, 산출물 13.3MB
+- **릴리스 키스토어 복원 + 서명된 제출용 AAB 빌드 완료** (2026-08-21)
+  - `android/app/build/outputs/bundle/release/app-release.aab`, 13.3MB
+  - `jarsigner -verify` → `jar verified.`
+  - 서명 인증서 SHA-256이 `assetlinks.json`의 업로드 키 지문과 일치 확인
 
-## 0. 최신 코드 받기
+## 0. 집 PC 환경 메모
 
-```powershell
-cd C:\100_Dev\together
-git pull origin staging
-```
+- Android SDK가 기본 위치가 아니라 **`C:\Users\Public`** 에 깔려 있다.
+  `android/local.properties`에 아래처럼 잡아줘야 gradle이 SDK를 찾는다 (gitignore 대상이라 매번 새로 만들어야 함):
 
-versionCode 2가 안 들어온 채로 빌드하면 업로드가 거부되니 이걸 먼저 한다.
+  ```
+  sdk.dir=C\:\Users\Public
+  ```
 
-## 1. 릴리스 키스토어 확인 ← 여기가 관문
+- JDK 21 (Temurin), Node 24 확인됨.
 
-```powershell
-Test-Path C:\100_Dev\together\android\keystore.properties
-Get-Content C:\100_Dev\together\android\keystore.properties
-```
+## 1. 키스토어 — 복원 완료
 
-`keystore.properties`와 그 안 `storeFile`이 가리키는 키 파일이 **둘 다** 있어야 한다.
-(둘 다 `.gitignore` 대상이라 git으로는 절대 안 따라온다. 회사 PC에 없는 이유가 이것.)
-
-키가 맞는지는 지문으로 대조한다:
-
-```powershell
-keytool -list -v -keystore C:\100_Dev\together\gachimeokja-release.keystore -alias gachimeokja
-```
-
-찍힌 SHA-256이 아래 둘 중 하나면 맞는 키다
-(`public/.well-known/assetlinks.json`에 등록돼 있는 값):
-
-- `B1:67:DD:37:5D:E7:B3:52:25:32:F7:56:31:A7:E1:0E:3F:E7:E8:4E:04:89:31:F7:90:2E:BA:3E:4C:EA:DF:33`
-- `0D:EF:75:B0:32:00:23:FD:B0:66:1C:69:86:E2:4F:40:BF:46:B3:75:8B:15:06:BB:B1:33:60:7E:B0:A8:A4:60`
-
-둘 중 하나는 업로드 키, 다른 하나는 Play 앱 서명 키다.
-어느 쪽이 업로드 키인지는 Play Console → 설정 → 앱 무결성 → 앱 서명에서 확인된다.
-
-파일명이 기억과 다르면 통째로 훑는다:
+암호화 백업을 회사 PC에서 옮겨와 프로젝트 루트에서 풀었다:
 
 ```powershell
-Get-ChildItem C:\ -Include *.keystore,*.jks -Recurse -ErrorAction SilentlyContinue | Select-Object FullName
+& "C:\Program Files\Git\usr\bin\gpg.exe" --output gmj-backup.tar.gz --decrypt gachimeokja-signing-backup.tar.gz.gpg
+tar -xzf gmj-backup.tar.gz
 ```
 
-### 1-B. 그래도 못 찾으면 — 업로드 키 재설정
+(PowerShell PATH에는 `gpg`가 없다. Git for Windows에 딸려온 걸 전체 경로로 부르거나 Git Bash에서 실행한다.)
 
-Play App Signing이 켜져 있으면(신규 앱은 기본) **앱 서명 키는 구글이 갖고 있어서 앱은 안전하다.**
-업로드 키만 새로 등록하면 된다. 새 키를 만들고:
+안에 든 것:
+
+| 파일 | 배치 위치 |
+|---|---|
+| `gachimeokja-release.keystore` | 프로젝트 루트 |
+| `keystore.properties` | `android/` |
+
+`keystore.properties`의 `storeFile`은 `../../gachimeokja-release.keystore`다.
+gradle의 `file()`이 `android/app/` 기준으로 풀리기 때문에 이 값이 맞다
+(`keystore.properties.example`이 `../`로 적고 있던 건 오류라 고쳤다).
+
+### 키가 맞는지 확인한 방법
 
 ```powershell
-keytool -genkey -v -keystore C:\100_Dev\together\gachimeokja-upload.keystore -alias gachimeokja -keyalg RSA -keysize 2048 -validity 10000
+keytool -list -v -keystore gachimeokja-release.keystore -alias gachimeokja
 ```
 
-인증서를 뽑아서:
+나온 SHA-256이 `public/.well-known/assetlinks.json`의 `app.eat_together.mobile` 지문
+**첫 번째 값과 일치**했다 (`B1:67:DD:...:4C:EA:DF:33`). 두 번째 값
+(`0D:EF:75:...:B0:A8:A4:60`)은 Play 앱 서명 키다.
 
-```powershell
-keytool -export -rfc -keystore C:\100_Dev\together\gachimeokja-upload.keystore -alias gachimeokja -file upload_certificate.pem
-```
+→ 업로드 키 재설정 요청, 구글 승인 대기, `assetlinks.json` 수정과 웹 재배포는 **전부 불필요**하다.
 
-Play Console → 앱 무결성 → **업로드 키 재설정 요청**에 그 `.pem`을 올린다. 승인까지 며칠 걸릴 수 있다.
-새 키로 가게 되면 그 SHA-256을 `public/.well-known/assetlinks.json`의
-`app.eat_together.mobile` 배열에 **추가**하고(기존 값은 지우지 말 것) 웹을 다시 배포해야
-App Links가 안 깨진다.
+### 이 파일들은 커밋되지 않는다
 
-키를 찾았거나 새로 만들었으면 `android/keystore.properties`를 채운다
-(양식은 `android/keystore.properties.example`):
-
-```
-storeFile=../gachimeokja-release.keystore
-storePassword=...
-keyAlias=gachimeokja
-keyPassword=...
-```
+`.gitignore`에 `*.keystore`, `android/keystore.properties`에 더해
+`*.gpg`, `gachimeokja-signing-backup*`, `gmj-backup*`을 추가해 뒀다.
+압축을 푼 뒤 `gmj-backup.tar.gz`는 지워도 된다.
 
 ## 2. 웹 빌드 → 네이티브 동기화
 
@@ -95,31 +83,40 @@ npx cap sync android
 ## 3. AAB 빌드
 
 ```powershell
-cd C:\100_Dev\together\android
+cd "E:\200. Dev\Together\android"
 .\gradlew.bat bundleRelease
 ```
 
 결과물: `android/app/build/outputs/bundle/release/app-release.aab`
 
-`keystore.properties`가 없으면 서명 없이 빌드돼 Play가 거부한다.
-빌드 후 서명이 붙었는지 확인:
+빌드 후 서명이 붙었는지 반드시 확인 — `jar is unsigned`가 나오면 Play가 거부한다
+(2026-08-21 기준 `jar verified.` 확인됨):
 
 ```powershell
-jarsigner -verify -verbose C:\100_Dev\together\android\app\build\outputs\bundle\release\app-release.aab
+jarsigner -verify -verbose "E:\200. Dev\Together\android\app\build\outputs\bundle\release\app-release.aab"
 ```
 
-## 4. Play Console 업로드
+## 4. 스토어 등록정보 — 이 저장소엔 없다
+
+이전 메모는 "`store/`에 아이콘 512, 그래픽 1024×500, 스크린샷 7장 완비"라고 적고 있었지만,
+**`store/` 폴더는 이 저장소에 커밋된 적이 없다** (`.gitignore` 대상도 아닌데 추적 이력이 없음).
+회사 PC 로컬에만 있었던 것으로 보인다. 필요하면 다시 뽑아야 한다.
+
+Play Console에 이미 업로드돼 있는 등록정보는 콘솔에서 그대로 재사용하면 되니,
+정식 출시만 목표라면 이미지가 로컬에 없어도 진행에는 문제없다.
+
+## 5. Play Console 업로드
 
 - 트랙 선택 (정식 출시 / 공개 테스트 등)
 - `app-release.aab` 업로드, versionCode가 2로 잡히는지 확인
 - 출시 노트 작성
-- 등록정보 이미지가 이미 올라가 있는지 확인 (`store/` 파일들)
+- 등록정보 이미지가 이미 올라가 있는지 확인
 
-## 5. 업로드 끝나고 반드시
+## 6. 업로드 끝나고 반드시
 
-- **키스토어 백업.** 지금처럼 PC 한 대에만 있으면 그 PC가 날아가는 순간
-  같은 앱으로 업데이트를 영영 못 올린다. 키 파일과 비밀번호를 따로,
-  안전한 곳(비밀번호 관리자 / 암호화 백업)에 보관한다.
+- **키스토어 백업 이중화.** 이번엔 회사 PC의 암호화 백업이 살아 있어서 구제됐지만,
+  그 백업이 회사 PC 한 곳에만 있었던 게 문제였다.
+  키 파일과 비밀번호를 서로 다른 곳(비밀번호 관리자 + 오프사이트 암호화 백업)에 이중으로 보관한다.
 - 실기기에서 로그인·딥링크·푸시 확인 (`CAPACITOR.md` 6번 항목)
 
 ## 참고: CAPACITOR.md는 일부 낡았다
@@ -128,7 +125,7 @@ jarsigner -verify -verbose C:\100_Dev\together\android\app\build\outputs\bundle\
 
 | | appId | 서명 |
 |---|---|---|
-| 프로덕션 (`android/`) | `app.eat_together.mobile` | 릴리스 키 (찾아야 하는 그것) |
+| 프로덕션 (`android/`) | `app.eat_together.mobile` | 릴리스 키 (복원 완료) |
 | STG (`android-stg/`) | `com.gachimeokja.app` | 디버그 키 (사이드로드용) |
 
-키스토어 정리가 끝나면 `CAPACITOR.md`도 같이 손보는 게 좋다.
+`CAPACITOR.md`도 같이 손보는 게 좋다.
